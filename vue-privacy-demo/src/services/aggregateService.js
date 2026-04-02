@@ -50,12 +50,20 @@ function calculateVariance(data) {
 
 /**
  * 从localStorage读取提交的数据
+ * @param {string} taskId - 任务ID，可选
  * @returns {Array} 提交的数据数组
  */
-function loadDataFromLocalStorage() {
+function loadDataFromLocalStorage(taskId) {
   try {
     const storedData = localStorage.getItem('submittedData') || '[]';
-    return JSON.parse(storedData);
+    let data = JSON.parse(storedData);
+    
+    // 如果指定了任务ID，过滤数据
+    if (taskId) {
+      data = data.filter(item => item.taskId === taskId);
+    }
+    
+    return data;
   } catch (error) {
     console.error('加载数据失败:', error);
     return [];
@@ -251,11 +259,12 @@ function aggregateAttribute(data, attributeName, epsilon, algorithm = 'agrr') {
 
 /**
  * 获取所有属性的聚合结果
+ * @param {string} taskId - 任务ID，可选
  * @returns {Array} 所有属性的聚合结果数组
  */
-export function getAggregateResults() {
+export function getAggregateResults(taskId) {
   try {
-    const data = loadDataFromLocalStorage();
+    const data = loadDataFromLocalStorage(taskId);
     
     // 如果没有数据，返回空数组
     if (data.length === 0) {
@@ -353,11 +362,12 @@ export function getAggregateResults() {
 
 /**
  * 获取总数据条数
+ * @param {string} taskId - 任务ID，可选
  * @returns {number} 总数据条数
  */
-export function getTotalDataCount() {
+export function getTotalDataCount(taskId) {
   try {
-    const data = loadDataFromLocalStorage();
+    const data = loadDataFromLocalStorage(taskId);
     return data.length;
   } catch (error) {
     console.error('获取数据条数失败:', error);

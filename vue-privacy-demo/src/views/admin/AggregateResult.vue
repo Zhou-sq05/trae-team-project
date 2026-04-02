@@ -45,9 +45,20 @@
             <el-card shadow="hover">
               <template #header>
                 <div class="card-header">
-                  <div>
+                  <div style="display: flex; align-items: center; gap: 20px;">
                     <span>聚合结果</span>
                     <span class="total-count">总数据条数：{{ totalCount }}</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span>Task ID Selection:</span>
+                      <el-select v-model="selectedTaskId" placeholder="选择任务ID" style="width: 200px">
+                        <el-option 
+                          v-for="task in tasks" 
+                          :key="task.id" 
+                          :label="task.id" 
+                          :value="task.id"
+                        />
+                      </el-select>
+                    </div>
                   </div>
                   <el-select v-model="selectedData" placeholder="选择扰动数据" style="width: 200px">
                     <el-option 
@@ -153,16 +164,46 @@ const handleLogout = () => {
   router.push('/login')
 }
 
+// 加载任务列表
+const loadTasks = () => {
+  try {
+    const tasks = JSON.parse(localStorage.getItem('tasks') || '[]')
+    // 按创建时间排序，最新的在前
+    return tasks.sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime()
+      const timeB = new Date(b.createdAt || 0).getTime()
+      return timeB - timeA
+    })
+  } catch (error) {
+    console.error('加载任务失败:', error)
+    return []
+  }
+}
+
+// 任务列表
+const tasks = ref(loadTasks())
+
+// 选中的任务ID
+const selectedTaskId = ref('')
+
 // 加载聚合数据
 const loadAggregateData = () => {
-  return getAggregateResults()
+  perturbationData.value = getAggregateResults(selectedTaskId.value)
+  totalCount.value = getTotalDataCount(selectedTaskId.value)
+  
+  // 如果有数据，默认选择第一个属性
+  if (perturbationData.value.length > 0) {
+    selectedData.value = perturbationData.value[0].id
+  } else {
+    selectedData.value = null
+  }
 }
 
 // 扰动数据
-const perturbationData = ref(loadAggregateData())
+const perturbationData = ref([])
 
 // 总数据条数
-const totalCount = ref(getTotalDataCount())
+const totalCount = ref(0)
 
 const selectedData = ref(1)
 const comparisonChart = ref(null)
@@ -226,6 +267,17 @@ const updateComparisonChart = () => {
 }
 
 onMounted(() => {
+  // 加载任务列表
+  tasks.value = loadTasks()
+  
+  // 默认选择最新的任务ID
+  if (tasks.value.length > 0) {
+    selectedTaskId.value = tasks.value[0].id
+  }
+  
+  // 加载数据
+  loadAggregateData()
+  
   // 延迟初始化图表，确保DOM元素已渲染
   setTimeout(() => {
     initComparisonChart()
@@ -238,6 +290,16 @@ onMounted(() => {
   })
 })
 
+// 监听任务ID变化
+watch(selectedTaskId, () => {
+  loadAggregateData()
+  // 延迟更新图表，确保数据已加载
+  setTimeout(() => {
+    updateComparisonChart()
+  }, 100)
+})
+
+// 监听选中的数据变化
 watch(selectedData, () => {
   updateComparisonChart()
 })
