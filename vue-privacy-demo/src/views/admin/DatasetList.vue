@@ -163,7 +163,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -574,6 +574,19 @@ const batchDelete = () => {
     // 取消删除
   })
 }
+
+// 监听筛选任务ID变化，同步更新批量生成任务ID
+watch(filterTaskId, (newValue) => {
+  if (newValue) {
+    // 如果选择了特定任务ID，同步到批量生成任务ID
+    selectedTaskId.value = newValue
+  } else {
+    // 如果选择了"全部数据"，设置为最新的任务ID
+    if (tasks.value.length > 0) {
+      selectedTaskId.value = tasks.value[0].id
+    }
+  }
+})
 
 // 初始化
 onMounted(() => {
