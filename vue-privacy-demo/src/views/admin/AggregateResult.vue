@@ -60,7 +60,11 @@
                 </div>
               </template>
               
-              <div v-if="currentData" class="data-detail">
+              <div v-if="perturbationData.length === 0" class="no-data">
+                <el-empty description="暂无数据" />
+                <p style="margin-top: 20px; color: #909399;">请先在用户端提交数据，然后再查看聚合结果</p>
+              </div>
+              <div v-else-if="currentData" class="data-detail">
                 <h3>{{ currentData.attributeName }}</h3>
                 
                 <div class="config-info">

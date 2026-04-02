@@ -93,6 +93,84 @@ function mapMoodValue(mood) {
 }
 
 /**
+ * 从真实数据计算条件概率表
+ * @param {Array} data - 提交的数据数组
+ * @param {string} attributeName - 属性名称
+ * @param {number} domainSize - 定义域大小
+ * @returns {Array} 条件概率表
+ */
+function calculateConditionalProbs(data, attributeName, domainSize) {
+  // 敏感属性 S 默认为心情 (mood)
+  const sensitiveAttribute = 'mood';
+  const sensitiveDomainSize = 3; // 心情有 3 个值
+  
+  // 初始化联合频率表 N(S,A)
+  const jointCounts = Array(sensitiveDomainSize).fill().map(() => Array(domainSize).fill(0));
+  
+  // 计算联合频率表
+  data.forEach(item => {
+    // 获取敏感属性值 (S)
+    let sValue;
+    if (item.rawData[sensitiveAttribute]) {
+      sValue = mapMoodValue(item.rawData[sensitiveAttribute]);
+    } else {
+      // 如果没有敏感属性值，使用默认值
+      sValue = 1; // 默认为 normal
+    }
+    
+    // 获取目标属性值 (A)
+    let aValue;
+    if (attributeName === 'mood') {
+      // 如果目标属性就是心情，使用另一个属性作为敏感属性
+      // 这里使用 sleepHours 作为敏感属性
+      const sleepHours = parseFloat(item.rawData.sleepHours) || 0;
+      // 将睡眠时长分为 3 个区间
+      if (sleepHours < 6) {
+        sValue = 0;
+      } else if (sleepHours > 8) {
+        sValue = 2;
+      } else {
+        sValue = 1;
+      }
+      aValue = mapMoodValue(item.rawData[attributeName]);
+    } else {
+      aValue = parseInt(item.rawData[attributeName]) || 0;
+    }
+    
+    // 确保值在有效范围内
+    sValue = Math.max(0, Math.min(sensitiveDomainSize - 1, sValue));
+    aValue = Math.max(0, Math.min(domainSize - 1, aValue));
+    
+    // 更新联合频率表
+    jointCounts[sValue][aValue]++;
+  });
+  
+  // 计算边缘频率表 N(S)
+  const marginalCounts = jointCounts.map(row => row.reduce((sum, count) => sum + count, 0));
+  
+  // 初始化条件概率表 P(A|S)
+  const conditionalProbs = Array(sensitiveDomainSize).fill().map(() => Array(domainSize).fill(0));
+  
+  // 计算条件概率表
+  for (let s = 0; s < sensitiveDomainSize; s++) {
+    const totalCount = marginalCounts[s];
+    if (totalCount > 0) {
+      // 归一化，计算条件概率
+      for (let a = 0; a < domainSize; a++) {
+        conditionalProbs[s][a] = jointCounts[s][a] / totalCount;
+      }
+    } else {
+      // 如果没有数据，使用均匀分布
+      for (let a = 0; a < domainSize; a++) {
+        conditionalProbs[s][a] = 1 / domainSize;
+      }
+    }
+  }
+  
+  return conditionalProbs;
+}
+
+/**
  * 聚合单个属性的数据
  * @param {Array} data - 提交的数据数组
  * @param {string} attributeName - 属性名称
@@ -132,8 +210,8 @@ function aggregateAttribute(data, attributeName, epsilon, algorithm = 'agrr') {
   const domainSize = getDomainSize(attributeName);
   let aggregatedData = [];
   
-  // 生成模拟的条件概率表（实际应用中应该从真实数据计算）
-  const conditionalProbs = generateConditionalProbs(domainSize, 2);
+  // 从真实数据计算条件概率表
+  const conditionalProbs = calculateConditionalProbs(data, attributeName, domainSize);
   
   // 计算 alpha 和 beta 参数
   const { alpha, beta } = calculateAlphaBeta(conditionalProbs, epsilon);
@@ -179,6 +257,11 @@ export function getAggregateResults() {
   try {
     const data = loadDataFromLocalStorage();
     
+    // 如果没有数据，返回空数组
+    if (data.length === 0) {
+      return [];
+    }
+    
     // 定义属性配置
     const attributes = [
       { id: 1, name: 'sleepHours', displayName: '1. 睡眠时长' },
@@ -189,13 +272,13 @@ export function getAggregateResults() {
     ];
 
     // 计算隐私预算
-    const epsilon = data.length > 0 ? data[0].epsilon || 1.0 : 1.0;
+    const epsilon = data[0].epsilon || 1.0;
 
     // 为每个属性计算聚合结果
     return attributes.map(attr => {
       // 尝试从任务数据中获取算法配置
       let algorithm = 'agrr';
-      if (data.length > 0 && data[0].taskId) {
+      if (data[0].taskId) {
         // 从本地存储加载任务数据
         try {
           const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
@@ -228,6 +311,11 @@ export function getAggregateResults() {
         }
       }
 
+      // 计算条件概率表和 alpha、beta 参数
+      const domainSize = getDomainSize(attr.name);
+      const conditionalProbs = calculateConditionalProbs(data, attr.name, domainSize);
+      const { alpha, beta } = calculateAlphaBeta(conditionalProbs, epsilon);
+      
       const result = aggregateAttribute(data, attr.name, epsilon, algorithm);
       
       // 映射算法名称为显示名称
@@ -243,8 +331,8 @@ export function getAggregateResults() {
         attributeName: attr.displayName,
         protectionMode: '间接隐私风险防护',
         algorithm: algorithmDisplayMap[algorithm] || 'AGRR',
-        alpha: '0.5',
-        beta: '0.1',
+        alpha: alpha.toFixed(3),
+        beta: beta.toFixed(3),
         consistency: result.consistency.toFixed(2),
         mse: result.mse.toFixed(4),
         aggVariance: result.variance.toFixed(4),
@@ -258,26 +346,8 @@ export function getAggregateResults() {
     });
   } catch (error) {
     console.error('获取聚合结果失败:', error);
-    // 返回默认数据
-    return [
-      {
-        id: 1,
-        attributeName: '1. 睡眠时长',
-        protectionMode: '间接隐私风险防护',
-        algorithm: 'AGRR',
-        alpha: '0.5',
-        beta: '0.1',
-        consistency: '0.95',
-        mse: '0.02',
-        aggVariance: '0.01',
-        mae: '0.015',
-        estimationError: '0.03',
-        distributionFit: '0.98',
-        perturbationData: [10, 15, 12, 8, 11, 14, 9, 13, 16, 10],
-        originalData: [8, 12, 10, 7, 9, 11, 8, 10, 13, 9],
-        epsilon: '1.0'
-      }
-    ];
+    // 返回空数组
+    return [];
   }
 }
 

@@ -51,7 +51,17 @@
               <div class="dataset-header">
                 <div class="total-data">
                   总数据数: <span class="total-count">{{ totalDataCount }}</span>
-                  <el-button type="primary" @click="selectAllData" :disabled="datasets.length === 0" style="margin-left: 20px;">
+                  <span style="margin-left: 20px;">任务ID筛选:</span>
+                  <el-select v-model="filterTaskId" placeholder="选择任务ID" style="width: 200px; margin: 0 10px">
+                    <el-option label="全部数据" value="" />
+                    <el-option 
+                      v-for="task in tasks" 
+                      :key="task.id" 
+                      :label="task.id" 
+                      :value="task.id"
+                    />
+                  </el-select>
+                  <el-button type="primary" @click="selectAllData" :disabled="filteredDatasets.length === 0" style="margin-left: 20px;">
                     选择全部数据
                   </el-button>
                 </div>
@@ -109,7 +119,15 @@
                     <el-option label="100人" value="100" />
                     <el-option label="500人" value="500" />
                   </el-select>
-                  <span>模拟数据</span>
+                  <span>任务ID</span>
+                  <el-select v-model="selectedTaskId" placeholder="选择任务ID" style="width: 200px; margin: 0 10px">
+                    <el-option 
+                      v-for="task in tasks" 
+                      :key="task.id" 
+                      :label="task.id" 
+                      :value="task.id"
+                    />
+                  </el-select>
                   <span class="hint">(预先生成真实分布作为基准)</span>
                 </div>
                 <div class="generate-buttons">
@@ -166,7 +184,7 @@ const handleLogout = () => {
 const datasets = ref([])
 
 // 总数据数
-const totalDataCount = computed(() => datasets.value.length)
+const totalDataCount = computed(() => filteredDatasets.value.length)
 
 // 表格引用和选中行
 const tableRef = ref(null)
@@ -176,15 +194,32 @@ const selectedRows = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 
+// 过滤后的数据
+const filteredDatasets = computed(() => {
+  if (!filterTaskId.value) {
+    return datasets.value
+  }
+  return datasets.value.filter(item => item.taskId === filterTaskId.value)
+})
+
 // 分页后的数据
 const paginatedDatasets = computed(() => {
   const startIndex = (currentPage.value - 1) * pageSize.value
   const endIndex = startIndex + pageSize.value
-  return datasets.value.slice(startIndex, endIndex)
+  return filteredDatasets.value.slice(startIndex, endIndex)
 })
 
 // 批量生成人数
 const generateCount = ref('10')
+
+// 任务列表
+const tasks = ref([])
+
+// 选中的任务ID
+const selectedTaskId = ref('')
+
+// 过滤任务ID
+const filterTaskId = ref('')
 
 // 选中的数据集
 const selectedDataset = ref(null)
@@ -233,12 +268,55 @@ const loadDataFromStorage = () => {
   }
 }
 
+// 加载任务列表
+const loadTasks = () => {
+  try {
+    // 从本地存储加载任务数据
+    const taskStore = JSON.parse(localStorage.getItem('taskStore') || '{}')
+    const taskList = taskStore.taskList || []
+    
+    // 同时检查另一种存储方式
+    const tasksFromLocal = JSON.parse(localStorage.getItem('tasks') || '[]')
+    
+    // 合并两种来源的任务
+    const allTasks = [...taskList, ...tasksFromLocal]
+    
+    // 去重
+    const uniqueTasks = []
+    const taskIds = new Set()
+    
+    allTasks.forEach(task => {
+      if (task.id && !taskIds.has(task.id)) {
+        uniqueTasks.push(task)
+        taskIds.add(task.id)
+      }
+    })
+    
+    // 按创建时间排序，最新的在前
+    uniqueTasks.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0)
+      const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0)
+      return dateB - dateA
+    })
+    
+    tasks.value = uniqueTasks
+    
+    // 默认选择最新的任务
+    if (uniqueTasks.length > 0) {
+      selectedTaskId.value = uniqueTasks[0].id
+    }
+  } catch (error) {
+    console.error('加载任务列表失败:', error)
+  }
+}
+
 // 刷新数据
 const refreshData = () => {
   loading.value = true
   // 模拟网络请求延迟
   setTimeout(() => {
     loadDataFromStorage()
+    loadTasks() // 同时刷新任务列表
     ElMessage.success('数据刷新成功')
   }, 500)
 }
@@ -346,6 +424,11 @@ const getAttributeName = (key) => {
 
 // 生成数据
 const generateData = () => {
+  if (!selectedTaskId.value) {
+    ElMessage.warning('请选择任务ID')
+    return
+  }
+  
   loading.value = true
   // 模拟生成数据
   setTimeout(() => {
@@ -354,7 +437,7 @@ const generateData = () => {
     
     for (let i = 0; i < count; i++) {
       const userId = `模拟用户${String(datasets.value.length + i + 1).padStart(3, '0')}`
-      const taskId = 'Task_20260401'
+      const taskId = selectedTaskId.value
       const uploadTime = new Date().toLocaleString()
       
       generatedData.push({
@@ -373,24 +456,41 @@ const generateData = () => {
     try {
       const storedData = localStorage.getItem('submittedData') || '[]'
       const existingData = JSON.parse(storedData)
-      const newData = generatedData.map(item => ({
-        userId: item.userId,
-        taskId: item.taskId,
-        uploadTime: item.uploadTime,
-        perturbedData: {
-          sleepHours: (7 + Math.random() * 2).toFixed(1),
-          dailySteps: (10000 + Math.random() * 5000).toFixed(0),
-          exerciseFrequency: (3 + Math.floor(Math.random() * 4)).toString(),
-          heartRate: (60 + Math.floor(Math.random() * 30)).toString(),
-          mood: ['good', 'normal', 'tired'][Math.floor(Math.random() * 3)]
+      const newData = generatedData.map(item => {
+        // 生成原始数据
+        const rawSleepHours = (7 + Math.random() * 2).toFixed(1)
+        const rawDailySteps = (10000 + Math.random() * 5000).toFixed(0)
+        const rawExerciseFrequency = (3 + Math.floor(Math.random() * 4)).toString()
+        const rawHeartRate = (60 + Math.floor(Math.random() * 30)).toString()
+        const rawMood = ['good', 'normal', 'tired'][Math.floor(Math.random() * 3)]
+        
+        return {
+          userId: item.userId,
+          taskId: item.taskId,
+          uploadTime: item.uploadTime,
+          rawData: {
+            sleepHours: rawSleepHours,
+            dailySteps: rawDailySteps,
+            exerciseFrequency: rawExerciseFrequency,
+            heartRate: rawHeartRate,
+            mood: rawMood
+          },
+          perturbedData: {
+            sleepHours: rawSleepHours,
+            dailySteps: rawDailySteps,
+            exerciseFrequency: rawExerciseFrequency,
+            heartRate: rawHeartRate,
+            mood: rawMood
+          },
+          epsilon: 1.0 // 添加隐私预算
         }
-      }))
+      })
       localStorage.setItem('submittedData', JSON.stringify([...existingData, ...newData]))
     } catch (error) {
       console.error('保存数据失败:', error)
     }
     
-    ElMessage.success(`已生成 ${count} 人的模拟数据`)
+    ElMessage.success(`已为任务 ${selectedTaskId.value} 生成 ${count} 人的模拟数据`)
     loading.value = false
   }, 1000)
 }
@@ -422,8 +522,8 @@ const selectAllData = () => {
   if (tableRef.value) {
     // 先清空现有选择
     tableRef.value.clearSelection()
-    // 然后选择所有数据
-    datasets.value.forEach(row => {
+    // 然后选择过滤后的数据
+    filteredDatasets.value.forEach(row => {
       tableRef.value.toggleRowSelection(row, true)
     })
   }
@@ -478,6 +578,7 @@ const batchDelete = () => {
 // 初始化
 onMounted(() => {
   loadDataFromStorage()
+  loadTasks() // 加载任务列表
 })
 </script>
 
