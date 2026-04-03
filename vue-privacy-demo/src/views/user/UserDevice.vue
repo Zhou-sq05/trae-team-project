@@ -112,7 +112,7 @@
         </div>
       </div>
       <div class="raw-summary">
-        <h4>原始行为摘要</h4>
+        <h4>原始值</h4>
         <div class="card-grid">
           <div class="summary-card" v-for="(value, key) in parsedRawSummary" :key="key">
             <div class="card-header">
@@ -124,7 +124,7 @@
         </div>
       </div>
       <div class="perturbed-summary">
-        <h4>扰动后摘要</h4>
+        <h4>扰动值</h4>
         <div class="card-grid">
           <div class="summary-card" v-for="(value, key) in parsedPerturbedSummary" :key="key">
             <div class="card-header">
