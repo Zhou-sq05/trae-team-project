@@ -71,12 +71,12 @@
                       <el-table-column prop="name" label="采集属性" />
                       <el-table-column label="是否参与保护" width="120">
                         <template #default="scope">
-                          <el-checkbox v-model="scope.row.isProtected" />
+                          <el-radio v-model="selectedAttributeId" :label="scope.row.id" />
                         </template>
                       </el-table-column>
                       <el-table-column label="防护模式" width="150">
                         <template #default="scope">
-                          <el-select v-model="scope.row.protectionMode" placeholder="待选择" @change="handleProtectionModeChange(scope.row)">
+                          <el-select v-model="scope.row.protectionMode" placeholder="待选择" @change="handleProtectionModeChange(scope.row)" :disabled="selectedAttributeId !== scope.row.id">
                             <el-option label="间接隐私风险防护" value="indirect" />
                             <el-option label="混合隐私风险防护" value="hybrid" />
                           </el-select>
@@ -84,7 +84,7 @@
                       </el-table-column>
                       <el-table-column label="算法协议" width="120">
                         <template #default="scope">
-                          <el-select v-model="scope.row.algorithm" placeholder="默认">
+                          <el-select v-model="scope.row.algorithm" placeholder="默认" :disabled="selectedAttributeId !== scope.row.id">
                             <el-option label="ARR" value="arr" />
                             <el-option label="AGRR" value="agrr" />
                             <el-option label="AOUE" value="aoue" />
@@ -153,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -181,6 +181,9 @@ const basicConfig = ref({
   privacyBudget: 1.0
 })
 
+// 选中的属性ID（单选模式）
+const selectedAttributeId = ref(null)
+
 // 模拟属性数据
 const attributes = ref([
   { id: 1, name: '睡眠时长', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' },
@@ -189,6 +192,23 @@ const attributes = ref([
   { id: 4, name: '平均静息心率', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' },
   { id: 5, name: '今日感觉', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' }
 ])
+
+// 当选中属性变化时，更新isProtected状态
+const updateProtectionStatus = () => {
+  attributes.value.forEach(attr => {
+    attr.isProtected = attr.id === selectedAttributeId.value
+  })
+}
+
+// 监听选中属性变化
+watch(selectedAttributeId, () => {
+  updateProtectionStatus()
+})
+
+// 处理单选按钮变化
+const handleRadioChange = (id) => {
+  selectedAttributeId.value = id
+}
 
 
 
@@ -207,6 +227,12 @@ const handleProtectionModeChange = (row) => {
 
 // 保存配置
 const saveConfig = () => {
+  // 验证是否选择了属性
+  if (!selectedAttributeId.value) {
+    ElMessage.warning('请选择一个属性参与保护')
+    return
+  }
+  
   // 验证并生成任务ID
   let newTaskId = ''
   
@@ -245,7 +271,7 @@ const saveConfig = () => {
   
   // 更新属性状态
   attributes.value.forEach(attr => {
-    if (attr.isProtected && attr.protectionMode) {
+    if (attr.id === selectedAttributeId.value && attr.protectionMode) {
       attr.status = '已配置'
     } else {
       attr.status = '未配置'
@@ -275,6 +301,11 @@ const saveConfig = () => {
 const distributePolicy = () => {
   if (!taskId.value) {
     ElMessage.warning('请先保存配置生成任务ID')
+    return
+  }
+  
+  if (!selectedAttributeId.value) {
+    ElMessage.warning('请选择一个属性参与保护')
     return
   }
   

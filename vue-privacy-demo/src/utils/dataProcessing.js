@@ -165,3 +165,54 @@ export function convertToConditionalProbsArray(conditionalProbs) {
     });
   });
 }
+
+/**
+ * 加载CSV文件
+ * @param {string} filePath - CSV文件路径
+ * @returns {Promise<string>} CSV文件内容
+ */
+export async function loadCSVFile(filePath) {
+  try {
+    const response = await fetch(filePath);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.text();
+  } catch (error) {
+    console.error('加载CSV文件失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 生成聚合条件概率
+ * @param {Object} conditionalProbs - 条件概率对象
+ * @param {number} domainSize - 定义域大小
+ * @returns {Array} 聚合条件概率数组
+ */
+export function generateAggregateConditionalProbs(conditionalProbs, domainSize) {
+  // 简化实现：将条件概率对象转换为数组格式
+  const bpGroups = Object.keys(conditionalProbs);
+  const sleepGroups = [...new Set(Object.values(conditionalProbs).flatMap(probs => Object.keys(probs)))];
+  
+  const result = [];
+  
+  bpGroups.forEach(bpGroup => {
+    const row = [];
+    sleepGroups.forEach(sleepGroup => {
+      row.push(conditionalProbs[bpGroup][sleepGroup] || 0);
+    });
+    // 填充到定义域大小
+    while (row.length < domainSize) {
+      row.push(0);
+    }
+    result.push(row);
+  });
+  
+  // 确保结果数组长度足够
+  while (result.length < 3) { // 假设敏感属性有3个值
+    result.push(Array(domainSize).fill(1 / domainSize));
+  }
+  
+  return result;
+}
