@@ -20,7 +20,7 @@
     <div class="content">
       <div class="left-section">
         <div class="user-info">
-          <div class="user-id">用户 #001</div>
+          <div class="user-id">{{ user?.username || '用户 #001' }}</div>
           <div class="task-id-section">
             <span>当前绑定任务ID：</span>
             <el-select v-model="currentTaskId" placeholder="选择任务ID">
@@ -505,7 +505,7 @@ const submitData = () => {
     // 保存数据到本地存储
     try {
       const submittedData = {
-        userId: `用户001`, // 实际项目中应该使用真实的用户ID
+        userId: user.value?.username || `用户001`, // 使用当前登录用户的用户名
         taskId: currentTaskId.value,
         uploadTime: new Date().toISOString(),
         rawData: { ...dailyData },

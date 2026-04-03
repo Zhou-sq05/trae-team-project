@@ -112,6 +112,26 @@ const registerRules = {
   ]
 }
 
+// 从本地存储获取用户数据
+const getUsers = () => {
+  try {
+    const users = localStorage.getItem('users')
+    return users ? JSON.parse(users) : {}
+  } catch (error) {
+    console.error('获取用户数据失败:', error)
+    return {}
+  }
+}
+
+// 保存用户数据到本地存储
+const saveUsers = (users) => {
+  try {
+    localStorage.setItem('users', JSON.stringify(users))
+  } catch (error) {
+    console.error('保存用户数据失败:', error)
+  }
+}
+
 const handleLogin = async () => {
   errorMessage.value = ''
   if (!loginFormRef.value) return
@@ -119,7 +139,25 @@ const handleLogin = async () => {
   try {
     await loginFormRef.value.validate()
     loading.value = true
-    // 模拟登录请求
+    
+    // 获取存储的用户数据
+    const users = getUsers()
+    const userData = users[loginForm.username]
+    
+    // 验证用户是否存在且密码正确
+    if (!userData) {
+      loading.value = false
+      errorMessage.value = '用户不存在，请先注册'
+      return
+    }
+    
+    if (userData.password !== loginForm.password) {
+      loading.value = false
+      errorMessage.value = '密码错误'
+      return
+    }
+    
+    // 模拟登录请求延迟
     setTimeout(() => {
       loading.value = false
       // 使用Pinia store存储用户信息
@@ -139,6 +177,7 @@ const handleLogin = async () => {
     }, 1000)
   } catch (error) {
     console.error('登录验证失败:', error)
+    loading.value = false
   }
 }
 
@@ -149,14 +188,38 @@ const handleRegister = async () => {
   try {
     await registerFormRef.value.validate()
     loading.value = true
-    // 模拟注册请求
+    
+    // 获取存储的用户数据
+    const users = getUsers()
+    
+    // 检查用户名是否已存在
+    if (users[registerForm.username]) {
+      loading.value = false
+      errorMessage.value = '用户名已存在'
+      return
+    }
+    
+    // 保存新用户
+    users[registerForm.username] = {
+      password: registerForm.password,
+      type: userType.value,
+      createdAt: new Date().toISOString()
+    }
+    saveUsers(users)
+    
+    // 模拟注册请求延迟
     setTimeout(() => {
       loading.value = false
       errorMessage.value = '注册成功，请登录'
       activeTab.value = 'login'
+      // 清空注册表单
+      registerForm.username = ''
+      registerForm.password = ''
+      registerForm.confirmPassword = ''
     }, 1000)
   } catch (error) {
     console.error('注册验证失败:', error)
+    loading.value = false
   }
 }
 
