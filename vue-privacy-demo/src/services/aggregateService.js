@@ -12,6 +12,29 @@ import {
   calculateAlphaBeta,
   generateConditionalProbs 
 } from '../utils/ldpAlgorithms';
+import { loadCSVFile, processCSVData, generateAggregateConditionalProbs } from '../utils/dataProcessing';
+
+// 存储从CSV计算的条件概率表
+let csvConditionalProbs = null;
+
+// 加载CSV数据并计算条件概率
+async function loadCSVConditionalProbs() {
+  if (!csvConditionalProbs) {
+    try {
+      // 加载CSV文件
+      const csvContent = await loadCSVFile('/data/Sleep_Health_and_Lifestyle_Dataset.csv');
+      if (csvContent) {
+        // 处理CSV数据
+        const result = processCSVData(csvContent);
+        csvConditionalProbs = result.conditionalProbabilities;
+        console.log('CSV条件概率表加载成功:', csvConditionalProbs);
+      }
+    } catch (error) {
+      console.error('加载CSV条件概率表失败:', error);
+    }
+  }
+  return csvConditionalProbs;
+}
 
 // 计算指标的辅助函数
 function calculateMSE(original, estimated) {
@@ -108,6 +131,12 @@ function mapMoodValue(mood) {
  * @returns {Array} 条件概率表
  */
 function calculateConditionalProbs(data, attributeName, domainSize) {
+  // 优先使用从CSV文件计算的条件概率表
+  if (csvConditionalProbs && attributeName === 'sleepHours') {
+    console.log('使用CSV条件概率表');
+    return generateAggregateConditionalProbs(csvConditionalProbs, domainSize);
+  }
+  
   // 敏感属性 S 默认为心情 (mood)
   const sensitiveAttribute = 'mood';
   const sensitiveDomainSize = 3; // 心情有 3 个值
@@ -260,10 +289,13 @@ function aggregateAttribute(data, attributeName, epsilon, algorithm = 'agrr') {
 /**
  * 获取所有属性的聚合结果
  * @param {string} taskId - 任务ID，可选
- * @returns {Array} 所有属性的聚合结果数组
+ * @returns {Promise<Array>} 所有属性的聚合结果数组
  */
-export function getAggregateResults(taskId) {
+export async function getAggregateResults(taskId) {
   try {
+    // 首先加载CSV条件概率表
+    await loadCSVConditionalProbs();
+    
     const data = loadDataFromLocalStorage(taskId);
     
     // 如果没有数据，返回空数组
