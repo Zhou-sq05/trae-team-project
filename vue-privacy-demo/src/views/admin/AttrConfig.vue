@@ -82,7 +82,13 @@
                       </el-table-column>
                       <el-table-column label="防护模式" width="150">
                         <template #default="scope">
-                          <el-select v-model="scope.row.protectionMode" placeholder="待选择" @change="handleProtectionModeChange(scope.row)" :disabled="selectedAttributeId !== scope.row.id">
+                          <div v-if="scope.row.fixed" class="fixed-value">
+                            <el-tag type="primary">间接隐私风险</el-tag>
+                            <el-tooltip content="睡眠时长与血压存在关联关系，固定为间接隐私风险防护">
+                              <el-icon><QuestionFilled /></el-icon>
+                            </el-tooltip>
+                          </div>
+                          <el-select v-else v-model="scope.row.protectionMode" placeholder="待选择" @change="handleProtectionModeChange(scope.row)" :disabled="selectedAttributeId !== scope.row.id">
                             <el-option label="间接隐私风险防护" value="indirect" />
                             <el-option label="混合隐私风险防护" value="hybrid" />
                           </el-select>
@@ -90,7 +96,13 @@
                       </el-table-column>
                       <el-table-column label="算法协议" width="120">
                         <template #default="scope">
-                          <el-select v-model="scope.row.algorithm" placeholder="默认" :disabled="selectedAttributeId !== scope.row.id">
+                          <div v-if="scope.row.fixed" class="fixed-value">
+                            <el-tag type="success">AOUE</el-tag>
+                            <el-tooltip content="自适应优化一元编码协议，适用于间接隐私风险场景，在多值属性下效用更优">
+                              <el-icon><QuestionFilled /></el-icon>
+                            </el-tooltip>
+                          </div>
+                          <el-select v-else v-model="scope.row.algorithm" placeholder="默认" :disabled="selectedAttributeId !== scope.row.id">
                             <el-option label="ARR" value="arr" />
                             <el-option label="AGRR" value="agrr" />
                             <el-option label="AOUE" value="aoue" />
@@ -290,12 +302,12 @@
           </div>
           
           <div class="form-item">
-            <label>扰动参数重校准（间接隐私风险 - RR协议）：</label>
+            <label>扰动参数重校准（间接隐私风险 - AOUE协议）：</label>
             <div class="calibration-container">
               <div class="calibration-item">
                 <div class="param-group single-group">
                   <div class="param-item">
-                    <label>p（保持概率）：</label>
+                    <label>p（1→1概率）：</label>
                     <el-input 
                       :model-value="calibratedParams ? calibratedParams.p : ''" 
                       style="width: 100px;" 
@@ -304,7 +316,7 @@
                     />
                   </div>
                   <div class="param-item">
-                    <label>q（翻转概率）：</label>
+                    <label>q（0→1概率）：</label>
                     <el-input 
                       :model-value="calibratedParams ? calibratedParams.q : ''" 
                       style="width: 100px;" 
@@ -325,9 +337,10 @@
             </div>
             <div v-if="calibratedParams" class="calibration-info">
               <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
-              <p>域大小 k = {{ calibratedParams.k }}</p>
+              <p>域大小 k = {{ calibratedParams.k }}，编码长度 d = {{ calibratedParams.d }}</p>
               <p>协议：{{ calibratedParams.protocol }}</p>
-              <p class="formula">p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)</p>
+              <p class="formula">p = e^(ε/2) / (e^(ε/2) + 1), q = 1 / (e^(ε/2) + 1)</p>
+              <p class="description">{{ calibratedParams.description }}</p>
             </div>
           </div>
         </div>
@@ -419,7 +432,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor, Delete } from '@element-plus/icons-vue'
+import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor, Delete, QuestionFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../../store/user'
 import { useTaskStore } from '../../store/task'
@@ -450,12 +463,13 @@ const basicConfig = ref({
 const selectedAttributeId = ref(null)
 
 // 模拟属性数据
+// 睡眠时长固定为间接隐私风险 + AOUE协议（基于与血压的关联关系，AOUE在多值属性场景下效用更优）
 const attributes = ref([
-  { id: 1, name: '睡眠时长', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' },
-  { id: 2, name: '日均步数', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' },
-  { id: 3, name: '近7天运动频次', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' },
-  { id: 4, name: '平均静息心率', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' },
-  { id: 5, name: '今日感觉', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置' }
+  { id: 1, name: '睡眠时长', isProtected: false, protectionMode: 'indirect', algorithm: 'aoue', status: '已配置', fixed: true },
+  { id: 2, name: '日均步数', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false },
+  { id: 3, name: '近7天运动频次', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false },
+  { id: 4, name: '平均静息心率', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false },
+  { id: 5, name: '今日感觉', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false }
 ])
 
 // 当选中属性变化时，更新isProtected状态
@@ -724,8 +738,8 @@ const calculateUncertainty = () => {
 const calibratedParams = ref(null)
 const calibrationLoading = ref(false)
 
-// 扰动参数重校准（间接隐私风险 - 只有一组p和q）
-// 使用RR (Randomized Response) 协议: p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)
+// 扰动参数重校准（间接隐私风险 - AOUE协议）
+// AOUE (Adaptive Optimized Unary Encoding) 协议参数计算
 const calibrateParams = () => {
   if (!conditionalMatrixData.value) {
     ElMessage.warning('请先等待条件概率矩阵计算完成')
@@ -737,22 +751,28 @@ const calibrateParams = () => {
   try {
     // 获取A的分组数量（睡眠分组数）
     const aGroups = matrixHeaders.value
-    const k = aGroups.length  // 域大小
+    const k = aGroups.length  // 域大小（睡眠分组数）
+    const d = k  // 编码长度等于域大小（一元编码）
     
     // 隐私预算 ε (可以从基础配置中获取，这里使用默认值1.0)
     const epsilon = basicConfig.value.privacyBudget || 1.0
     
-    // RR协议参数计算
-    const expEpsilon = Math.exp(epsilon)
-    const p = expEpsilon / (expEpsilon + k - 1)  // 保持概率
-    const q = 1 / (expEpsilon + k - 1)  // 翻转概率
+    // AOUE协议参数计算
+    // AOUE使用优化的一元编码，每个比特独立扰动
+    // p: 原比特为1时，输出1的概率
+    // q: 原比特为0时，输出1的概率
+    const expEpsilon = Math.exp(epsilon / 2)  // AOUE使用ε/2
+    const p = expEpsilon / (expEpsilon + 1)   // 保持概率（比特为1时输出1）
+    const q = 1 / (expEpsilon + 1)            // 翻转概率（比特为0时输出1）
     
     calibratedParams.value = {
       p: p.toFixed(4),
       q: q.toFixed(4),
       epsilon: epsilon,
       k: k,
-      protocol: 'RR (Randomized Response)'
+      d: d,
+      protocol: 'AOUE (Adaptive Optimized Unary Encoding)',
+      description: '将属性值编码为d位二进制向量，每位独立以概率p/q扰动'
     }
     
     ElMessage.success('扰动参数重校准完成')
@@ -1090,6 +1110,18 @@ onMounted(() => {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed #dcdfe6;
+}
+
+/* 固定值显示样式 */
+.fixed-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fixed-value .el-icon {
+  color: #909399;
+  cursor: help;
 }
 
 /* 分组边界设置样式 */
