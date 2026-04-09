@@ -170,6 +170,58 @@
             <span style="font-weight: bold; margin-left: 10px;">血压</span>
           </div>
           
+          <!-- 分组边界设置 -->
+          <div class="form-item">
+            <label>分组边界设置：</label>
+            <div class="boundary-settings">
+              <!-- 睡眠时长分组 -->
+              <div class="boundary-group">
+                <div class="boundary-title">睡眠时长分组</div>
+                <div class="boundary-inputs">
+                  <div class="input-item">
+                    <span>b值：</span>
+                    <el-input-number v-model="sleepBoundaries.b" :min="1" :max="23" :precision="1" :step="0.5" style="width: 115px;" />
+                    <span>小时</span>
+                  </div>
+                  <div class="input-item">
+                    <span>c值：</span>
+                    <el-input-number v-model="sleepBoundaries.c" :min="1" :max="24" :precision="1" :step="0.5" style="width: 115px;" />
+                    <span>小时</span>
+                  </div>
+                </div>
+                <div class="group-display">
+                  <div v-for="group in sleepGroups" :key="group.name" class="group-item">
+                    <span class="group-name">{{ group.name }}：</span>
+                    <span class="group-range">{{ group.range }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 血压分组 -->
+              <div class="boundary-group">
+                <div class="boundary-title">血压分组</div>
+                <div class="boundary-inputs">
+                  <div class="input-item">
+                    <span>正常血压下限：</span>
+                    <el-input-number v-model="bpBoundaries.normal" :min="60" :max="100" :precision="0" style="width: 130px;" />
+                    <span>mmHg</span>
+                  </div>
+                  <div class="input-item">
+                    <span>高血压下限：</span>
+                    <el-input-number v-model="bpBoundaries.high" :min="100" :max="160" :precision="0" style="width: 130px;" />
+                    <span>mmHg</span>
+                  </div>
+                </div>
+                <div class="group-display">
+                  <div v-for="group in bpGroups" :key="group.name" class="group-item">
+                    <span class="group-name">{{ group.name }}：</span>
+                    <span class="group-range">{{ group.range }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div class="form-item">
             <label>S与A的条件分布矩阵：</label>
             <div class="matrix-container">
@@ -385,6 +437,38 @@ const handleRadioChange = (id) => {
 // 弹窗相关状态
 const dialogVisible = ref(false)
 const currentAttribute = ref(null)
+
+// 睡眠时长分组边界
+const sleepBoundaries = ref({
+  b: 7,  // 睡眠不足与正常睡眠的分界
+  c: 10  // 正常睡眠与睡眠过多的分界
+})
+
+// 血压分组边界
+const bpBoundaries = ref({
+  normal: 90,   // 低血压与正常血压的分界
+  high: 120     // 正常血压与高血压的分界
+})
+
+// 计算睡眠时长分组显示
+const sleepGroups = computed(() => {
+  const { b, c } = sleepBoundaries.value
+  return [
+    { name: '睡眠不足', range: `0h ~ ${b}h` },
+    { name: '正常睡眠', range: `${b}h ~ ${c}h` },
+    { name: '睡眠过多', range: `${c}h ~ 24h` }
+  ]
+})
+
+// 计算血压分组显示
+const bpGroups = computed(() => {
+  const { normal, high } = bpBoundaries.value
+  return [
+    { name: '低血压', range: `<${normal}` },
+    { name: '正常血压', range: `${normal}-${high-1}` },
+    { name: '高血压', range: `≥${high}` }
+  ]
+})
 
 // 处理属性点击事件
 const handleAttributeClick = (attribute) => {
@@ -675,5 +759,73 @@ onMounted(() => {
   text-align: center;
   padding: 40px 0;
   color: #909399;
+}
+
+/* 分组边界设置样式 */
+.boundary-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 10px;
+  padding: 15px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.boundary-group {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #fff;
+}
+
+.boundary-title {
+  font-weight: bold;
+  font-size: 16px;
+  color: #303133;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.boundary-inputs {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 15px;
+}
+
+.input-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-item span {
+  color: #606266;
+}
+
+.group-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.group-name {
+  font-weight: bold;
+  color: #303133;
+  min-width: 100px;
+}
+
+.group-range {
+  color: #409EFF;
+  font-weight: 500;
 }
 </style>
