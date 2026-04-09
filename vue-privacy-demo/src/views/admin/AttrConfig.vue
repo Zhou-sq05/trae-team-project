@@ -203,12 +203,12 @@
                 <div class="boundary-inputs">
                   <div class="input-item">
                     <span>正常血压下限：</span>
-                    <el-input-number v-model="bpBoundaries.normal" :min="60" :max="100" :precision="0" style="width: 130px;" />
+                    <el-input-number v-model="bpBoundaries.normal" :min="60" :max="100" :precision="0" style="width: 115px;" />
                     <span>mmHg</span>
                   </div>
                   <div class="input-item">
                     <span>高血压下限：</span>
-                    <el-input-number v-model="bpBoundaries.high" :min="100" :max="160" :precision="0" style="width: 130px;" />
+                    <el-input-number v-model="bpBoundaries.high" :min="100" :max="160" :precision="0" style="width: 115px;" />
                     <span>mmHg</span>
                   </div>
                 </div>
@@ -223,27 +223,33 @@
           </div>
           
           <div class="form-item">
-            <label>S与A的条件分布矩阵：</label>
-            <div class="matrix-container">
+            <label>S与A的条件分布矩阵 Pr(A|S)：</label>
+            <div v-if="matrixLoading" class="matrix-loading">
+              <el-loading-spinner />
+              <span>正在计算...</span>
+            </div>
+            <div v-else-if="conditionalMatrixData" class="matrix-container">
               <table class="matrix-table">
                 <thead>
                   <tr>
-                    <th></th>
-                    <th>A1</th>
-                    <th>A2</th>
-                    <th>...</th>
-                    <th>An</th>
+                    <th>血压分组(S) \ 睡眠分组(A)</th>
+                    <th v-for="header in matrixHeaders" :key="header">{{ header }}</th>
+                    <th>行和</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="i in 3" :key="i">
-                    <th>S{{ i }}</th>
-                    <td v-for="j in 4" :key="j">
-                      <el-input size="small" style="width: 60px;" />
+                  <tr v-for="(row, index) in matrixRows" :key="index">
+                    <th>{{ row.s }}</th>
+                    <td v-for="header in matrixHeaders" :key="header">
+                      {{ row[header].toFixed(4) }}
                     </td>
+                    <td>{{ matrixHeaders.reduce((sum, h) => sum + row[h], 0).toFixed(4) }}</td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div v-else class="matrix-placeholder">
+              <p>点击"计算矩阵"按钮或重新打开弹窗以显示数据</p>
             </div>
           </div>
           
@@ -252,42 +258,76 @@
             <div class="uncertainty-container">
               <div class="uncertainty-item">
                 <label>α：</label>
-                <el-input style="width: 100px;" />
+                <el-input 
+                  v-model="alphaValue" 
+                  style="width: 100px;" 
+                  readonly 
+                  placeholder="点击计算"
+                />
               </div>
               <div class="uncertainty-item">
                 <label>β：</label>
-                <el-input style="width: 100px;" />
+                <el-input 
+                  v-model="betaValue" 
+                  style="width: 100px;" 
+                  readonly 
+                  placeholder="点击计算"
+                />
               </div>
-              <el-button type="primary" style="margin-left: 20px;">计算</el-button>
+              <el-button 
+                type="primary" 
+                style="margin-left: 20px;" 
+                :loading="uncertaintyLoading"
+                @click="calculateUncertainty"
+              >
+                计算
+              </el-button>
+            </div>
+            <div v-if="alphaValue !== null" class="uncertainty-info">
+              <p>α = max_s min_a Pr(A|S) = {{ alphaValue }}</p>
+              <p>β = min_s max_a Pr(A|S) = {{ betaValue }}</p>
             </div>
           </div>
           
           <div class="form-item">
-            <label>扰动参数重校准（对比）：</label>
+            <label>扰动参数重校准（间接隐私风险 - RR协议）：</label>
             <div class="calibration-container">
               <div class="calibration-item">
-                <div class="param-group">
+                <div class="param-group single-group">
                   <div class="param-item">
-                    <label>p：</label>
-                    <el-input style="width: 80px;" />
+                    <label>p（保持概率）：</label>
+                    <el-input 
+                      :model-value="calibratedParams ? calibratedParams.p : ''" 
+                      style="width: 100px;" 
+                      readonly 
+                      placeholder="点击校准"
+                    />
                   </div>
                   <div class="param-item">
-                    <label>q：</label>
-                    <el-input style="width: 80px;" />
-                  </div>
-                </div>
-                <div class="param-group">
-                  <div class="param-item">
-                    <label>p：</label>
-                    <el-input style="width: 80px;" />
-                  </div>
-                  <div class="param-item">
-                    <label>q：</label>
-                    <el-input style="width: 80px;" />
+                    <label>q（翻转概率）：</label>
+                    <el-input 
+                      :model-value="calibratedParams ? calibratedParams.q : ''" 
+                      style="width: 100px;" 
+                      readonly 
+                      placeholder="点击校准"
+                    />
                   </div>
                 </div>
               </div>
-              <el-button type="primary" style="margin-left: 20px;">校准</el-button>
+              <el-button 
+                type="primary" 
+                style="margin-left: 20px;" 
+                :loading="calibrationLoading"
+                @click="calibrateParams"
+              >
+                校准
+              </el-button>
+            </div>
+            <div v-if="calibratedParams" class="calibration-info">
+              <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
+              <p>域大小 k = {{ calibratedParams.k }}</p>
+              <p>协议：{{ calibratedParams.protocol }}</p>
+              <p class="formula">p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)</p>
             </div>
           </div>
         </div>
@@ -383,6 +423,7 @@ import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor, Delete } fr
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../../store/user'
 import { useTaskStore } from '../../store/task'
+import { loadCSVFile, processDataToTwoColumns, calculateConditionalProbabilityMatrix } from '../../utils/dataProcessor'
 
 const route = useRoute()
 const router = useRouter()
@@ -470,10 +511,257 @@ const bpGroups = computed(() => {
   ]
 })
 
+// 条件概率矩阵数据
+const conditionalMatrixData = ref(null)
+const matrixLoading = ref(false)
+
+// 根据用户设置的分组边界对数据进行分组
+const getCustomSleepGroup = (sleepDuration) => {
+  const { b, c } = sleepBoundaries.value
+  if (sleepDuration < b) return '睡眠不足'
+  if (sleepDuration < c) return '正常睡眠'
+  return '睡眠过多'
+}
+
+const getCustomBPGroup = (bloodPressure) => {
+  const { normal, high } = bpBoundaries.value
+  if (bloodPressure < normal) return '低血压'
+  if (bloodPressure < high) return '正常血压'
+  return '高血压'
+}
+
+// 基于自定义分组边界计算条件概率矩阵
+const calculateCustomMatrix = (rawData) => {
+  // 统计联合频率 N(S,A)
+  const jointCounts = {}
+  const sCounts = {}
+  
+  rawData.forEach(row => {
+    const sleepDuration = parseFloat(row['Sleep Duration'])
+    const bloodPressure = row['Blood Pressure']
+    const [systolic] = bloodPressure.split('/').map(Number)
+    
+    const s = getCustomBPGroup(systolic)
+    const a = getCustomSleepGroup(sleepDuration)
+    
+    // 初始化联合计数
+    if (!jointCounts[s]) {
+      jointCounts[s] = {}
+    }
+    if (!jointCounts[s][a]) {
+      jointCounts[s][a] = 0
+    }
+    jointCounts[s][a]++
+    
+    // 统计S的总数
+    if (!sCounts[s]) {
+      sCounts[s] = 0
+    }
+    sCounts[s]++
+  })
+  
+  // 计算条件概率 P(A|S) = N(S,A) / N(S)
+  const conditionalProbs = {}
+  
+  Object.keys(jointCounts).forEach(s => {
+    conditionalProbs[s] = {}
+    const totalCount = sCounts[s]
+    
+    Object.keys(jointCounts[s]).forEach(a => {
+      conditionalProbs[s][a] = jointCounts[s][a] / totalCount
+    })
+  })
+  
+  return {
+    conditionalProbs,
+    jointCounts,
+    sCounts
+  }
+}
+
+// 计算条件概率矩阵
+const calculateMatrix = async () => {
+  matrixLoading.value = true
+  try {
+    const csvContent = await loadCSVFile('/data/Sleep_Health_and_Lifestyle_Dataset.csv')
+    if (csvContent) {
+      // 解析原始数据
+      const lines = csvContent.split('\n')
+      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
+      const rawData = []
+      
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i].trim() === '') continue
+        const values = lines[i].split(',').map(v => v.replace(/"/g, '').trim())
+        const row = {}
+        headers.forEach((h, idx) => row[h] = values[idx])
+        rawData.push(row)
+      }
+      
+      // 使用自定义分组边界计算矩阵
+      const matrixResult = calculateCustomMatrix(rawData)
+      conditionalMatrixData.value = matrixResult
+    }
+  } catch (error) {
+    console.error('计算条件概率矩阵失败:', error)
+    ElMessage.error('计算条件概率矩阵失败')
+  } finally {
+    matrixLoading.value = false
+  }
+}
+
+// 获取矩阵的表头（A的分组）- 按照睡眠分组的逻辑顺序
+const matrixHeaders = computed(() => {
+  if (!conditionalMatrixData.value) return []
+  const aGroups = [...new Set(
+    Object.values(conditionalMatrixData.value.conditionalProbs).flatMap(probs => Object.keys(probs))
+  )]
+  // 按照逻辑顺序排序：睡眠不足、正常睡眠、睡眠过多
+  const order = { '睡眠不足': 0, '正常睡眠': 1, '睡眠过多': 2 }
+  return aGroups.sort((a, b) => {
+    const orderA = order[a] !== undefined ? order[a] : 99
+    const orderB = order[b] !== undefined ? order[b] : 99
+    return orderA - orderB
+  })
+})
+
+// 获取矩阵的行数据 - 按照血压分组的逻辑顺序
+const matrixRows = computed(() => {
+  if (!conditionalMatrixData.value) return []
+  const sGroups = Object.keys(conditionalMatrixData.value.conditionalProbs)
+  const aGroups = matrixHeaders.value
+  
+  // 按照逻辑顺序排序：低血压、正常血压、高血压
+  const order = { '低血压': 0, '正常血压': 1, '高血压': 2 }
+  const sortedSGroups = sGroups.sort((a, b) => {
+    const orderA = order[a] !== undefined ? order[a] : 99
+    const orderB = order[b] !== undefined ? order[b] : 99
+    return orderA - orderB
+  })
+  
+  return sortedSGroups.map(s => {
+    const row = { s }
+    aGroups.forEach(a => {
+      row[a] = conditionalMatrixData.value.conditionalProbs[s][a] || 0
+    })
+    return row
+  })
+})
+
+// 监听分组边界变化，自动重新计算矩阵
+watch([sleepBoundaries, bpBoundaries], () => {
+  if (currentAttribute.value?.name === '睡眠时长' && dialogVisible.value) {
+    calculateMatrix()
+    // 清空之前的计算结果
+    alphaValue.value = null
+    betaValue.value = null
+    calibratedParams.value = null
+  }
+}, { deep: true })
+
 // 处理属性点击事件
 const handleAttributeClick = (attribute) => {
   currentAttribute.value = attribute
   dialogVisible.value = true
+  // 如果点击的是睡眠时长，自动计算矩阵
+  if (attribute.name === '睡眠时长') {
+    calculateMatrix()
+  }
+}
+
+// 内在不确定性参数
+const alphaValue = ref(null)
+const betaValue = ref(null)
+const uncertaintyLoading = ref(false)
+
+// 计算内在不确定性参数 α 和 β
+// α = max_s min_a Pr(A=a|S=s) - 最小条件概率的最大值
+// β = min_s max_a Pr(A=a|S=s) - 最大条件概率的最小值
+const calculateUncertainty = () => {
+  if (!conditionalMatrixData.value) {
+    ElMessage.warning('请先等待条件概率矩阵计算完成')
+    return
+  }
+  
+  uncertaintyLoading.value = true
+  
+  try {
+    const conditionalProbs = conditionalMatrixData.value.conditionalProbs
+    const sGroups = Object.keys(conditionalProbs)
+    
+    let minProbMax = 0  // α = max_s min_a Pr(A|S)
+    let maxProbMin = 1  // β = min_s max_a Pr(A|S)
+    
+    sGroups.forEach(s => {
+      const probs = Object.values(conditionalProbs[s])
+      const minProb = Math.min(...probs)
+      const maxProb = Math.max(...probs)
+      
+      // α: 对每个S，找到最小概率，然后取这些最小值中的最大值
+      if (minProb > minProbMax) {
+        minProbMax = minProb
+      }
+      
+      // β: 对每个S，找到最大概率，然后取这些最大值中的最小值
+      if (maxProb < maxProbMin) {
+        maxProbMin = maxProb
+      }
+    })
+    
+    alphaValue.value = minProbMax
+    betaValue.value = maxProbMin
+    
+    ElMessage.success('内在不确定性参数计算完成')
+  } catch (error) {
+    console.error('计算内在不确定性失败:', error)
+    ElMessage.error('计算内在不确定性失败')
+  } finally {
+    uncertaintyLoading.value = false
+  }
+}
+
+// 扰动参数重校准结果
+const calibratedParams = ref(null)
+const calibrationLoading = ref(false)
+
+// 扰动参数重校准（间接隐私风险 - 只有一组p和q）
+// 使用RR (Randomized Response) 协议: p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)
+const calibrateParams = () => {
+  if (!conditionalMatrixData.value) {
+    ElMessage.warning('请先等待条件概率矩阵计算完成')
+    return
+  }
+  
+  calibrationLoading.value = true
+  
+  try {
+    // 获取A的分组数量（睡眠分组数）
+    const aGroups = matrixHeaders.value
+    const k = aGroups.length  // 域大小
+    
+    // 隐私预算 ε (可以从基础配置中获取，这里使用默认值1.0)
+    const epsilon = basicConfig.value.privacyBudget || 1.0
+    
+    // RR协议参数计算
+    const expEpsilon = Math.exp(epsilon)
+    const p = expEpsilon / (expEpsilon + k - 1)  // 保持概率
+    const q = 1 / (expEpsilon + k - 1)  // 翻转概率
+    
+    calibratedParams.value = {
+      p: p.toFixed(4),
+      q: q.toFixed(4),
+      epsilon: epsilon,
+      k: k,
+      protocol: 'RR (Randomized Response)'
+    }
+    
+    ElMessage.success('扰动参数重校准完成')
+  } catch (error) {
+    console.error('扰动参数校准失败:', error)
+    ElMessage.error('扰动参数校准失败')
+  } finally {
+    calibrationLoading.value = false
+  }
 }
 
 
@@ -755,10 +1043,53 @@ onMounted(() => {
   gap: 5px;
 }
 
+.param-group.single-group {
+  flex-direction: row;
+  gap: 20px;
+}
+
 .empty-details {
   text-align: center;
   padding: 40px 0;
   color: #909399;
+}
+
+/* 不确定性计算信息样式 */
+.uncertainty-info {
+  margin-top: 10px;
+  padding: 10px 15px;
+  background-color: #f0f9ff;
+  border-left: 4px solid #409EFF;
+  border-radius: 4px;
+}
+
+.uncertainty-info p {
+  margin: 5px 0;
+  color: #303133;
+  font-family: 'Courier New', monospace;
+}
+
+/* 校准信息样式 */
+.calibration-info {
+  margin-top: 10px;
+  padding: 10px 15px;
+  background-color: #f0fff4;
+  border-left: 4px solid #67C23A;
+  border-radius: 4px;
+}
+
+.calibration-info p {
+  margin: 5px 0;
+  color: #303133;
+}
+
+.calibration-info .formula {
+  font-family: 'Courier New', monospace;
+  color: #606266;
+  font-style: italic;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #dcdfe6;
 }
 
 /* 分组边界设置样式 */
@@ -827,5 +1158,51 @@ onMounted(() => {
 .group-range {
   color: #409EFF;
   font-weight: 500;
+}
+
+/* 矩阵加载和占位样式 */
+.matrix-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: #909399;
+}
+
+.matrix-placeholder {
+  text-align: center;
+  padding: 40px;
+  color: #909399;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  margin-top: 10px;
+}
+
+.matrix-container {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.matrix-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 400px;
+}
+
+.matrix-table th,
+.matrix-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: center;
+}
+
+.matrix-table th {
+  background-color: #f5f7fa;
+  font-weight: bold;
+}
+
+.matrix-table td {
+  font-family: 'Courier New', monospace;
 }
 </style>
