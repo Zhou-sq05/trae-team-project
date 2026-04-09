@@ -68,8 +68,14 @@
                 <el-tab-pane label="属性配置" name="attributes">
                   <div class="attr-config">
                     <el-table :data="attributes" style="width: 100%">
-                      <el-table-column prop="name" label="采集属性" />
-                      <el-table-column label="是否参与保护" width="120">
+                      <el-table-column prop="name" label="采集属性">
+                        <template #default="scope">
+                          <span @click="handleAttributeClick(scope.row)" style="cursor: pointer; text-decoration: underline; color: #409EFF;">
+                            {{ scope.row.name }}
+                          </span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="参与保护" width="120">
                         <template #default="scope">
                           <el-radio v-model="selectedAttributeId" :label="scope.row.id" />
                         </template>
@@ -149,8 +155,174 @@
         </el-main>
       </el-container>
     </el-container>
+    
+    <!-- 属性详情弹窗 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="currentAttribute ? currentAttribute.name + ' 详情' : '属性详情'"
+      width="800px"
+    >
+      <div v-if="currentAttribute" style="font-size: 16px;">
+        <!-- 睡眠时长的详细内容 -->
+        <div v-if="currentAttribute.name === '睡眠时长'" class="attribute-details">
+          <div class="form-item" style="display: flex; flex-direction: row; justify-content: left; align-items: center;">
+            <span style="font-weight: bold; ">相关敏感属性 S：</span>
+            <span style="font-weight: bold; margin-left: 10px;">血压</span>
+          </div>
+          
+          <div class="form-item">
+            <label>S与A的条件分布矩阵：</label>
+            <div class="matrix-container">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>A1</th>
+                    <th>A2</th>
+                    <th>...</th>
+                    <th>An</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="i in 3" :key="i">
+                    <th>S{{ i }}</th>
+                    <td v-for="j in 4" :key="j">
+                      <el-input size="small" style="width: 60px;" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div class="form-item">
+            <label>内在不确定性计算：</label>
+            <div class="uncertainty-container">
+              <div class="uncertainty-item">
+                <label>α：</label>
+                <el-input style="width: 100px;" />
+              </div>
+              <div class="uncertainty-item">
+                <label>β：</label>
+                <el-input style="width: 100px;" />
+              </div>
+              <el-button type="primary" style="margin-left: 20px;">计算</el-button>
+            </div>
+          </div>
+          
+          <div class="form-item">
+            <label>扰动参数重校准（对比）：</label>
+            <div class="calibration-container">
+              <div class="calibration-item">
+                <div class="param-group">
+                  <div class="param-item">
+                    <label>p：</label>
+                    <el-input style="width: 80px;" />
+                  </div>
+                  <div class="param-item">
+                    <label>q：</label>
+                    <el-input style="width: 80px;" />
+                  </div>
+                </div>
+                <div class="param-group">
+                  <div class="param-item">
+                    <label>p：</label>
+                    <el-input style="width: 80px;" />
+                  </div>
+                  <div class="param-item">
+                    <label>q：</label>
+                    <el-input style="width: 80px;" />
+                  </div>
+                </div>
+              </div>
+              <el-button type="primary" style="margin-left: 20px;">校准</el-button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 其他属性的空白内容 -->
+        <div v-else class="empty-details">
+          <p>该属性的详细信息正在开发中...</p>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
+
+<style scoped>
+.attribute-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-item label {
+  font-weight: bold;
+}
+
+.matrix-container {
+  margin-top: 10px;
+}
+
+.matrix-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.matrix-table th,
+.matrix-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.matrix-table th {
+  background-color: #f5f7fa;
+}
+
+.uncertainty-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.uncertainty-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.calibration-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.calibration-item {
+  display: flex;
+  gap: 20px;
+}
+
+.param-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.param-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+</style>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
@@ -208,6 +380,16 @@ watch(selectedAttributeId, () => {
 // 处理单选按钮变化
 const handleRadioChange = (id) => {
   selectedAttributeId.value = id
+}
+
+// 弹窗相关状态
+const dialogVisible = ref(false)
+const currentAttribute = ref(null)
+
+// 处理属性点击事件
+const handleAttributeClick = (attribute) => {
+  currentAttribute.value = attribute
+  dialogVisible.value = true
 }
 
 
@@ -415,5 +597,83 @@ onMounted(() => {
   font-weight: 500;
 }
 
+/* 属性详情弹窗样式 */
+.attribute-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-item label {
+  font-weight: bold;
+}
+
+.matrix-container {
+  margin-top: 10px;
+}
+
+.matrix-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.matrix-table th,
+.matrix-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.matrix-table th {
+  background-color: #f5f7fa;
+}
+
+.uncertainty-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.uncertainty-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.calibration-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.calibration-item {
+  display: flex;
+  gap: 20px;
+}
+
+.param-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.param-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.empty-details {
+  text-align: center;
+  padding: 40px 0;
+  color: #909399;
+}
 </style>
