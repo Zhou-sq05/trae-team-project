@@ -191,6 +191,23 @@
             <span class="relation-label">相关敏感属性 S：</span>
             <span class="relation-value">年龄段分组</span>
           </div>
+          
+          <div class="form-item">
+            <label>隐私预算 ε</label>
+            <div class="privacy-budget-input">
+              <el-input 
+                v-model.number="dialogPrivacyBudget" 
+                placeholder="请输入隐私预算" 
+                style="width: 200px;" 
+                :min="0.1" 
+                :step="0.1"
+              />
+              <el-button type="primary" @click="savePrivacyBudget">保存</el-button>
+            </div>
+            <div v-if="savedPrivacyBudget" class="budget-info">
+              <p>当前使用的隐私预算：{{ savedPrivacyBudget }}</p>
+            </div>
+          </div>
 
           <div class="form-item">
             <label>年龄段分组</label>
@@ -338,10 +355,13 @@ import {
   AGE_GROUP_DISPLAY,
   FALL_ALARM_DATA_PATH,
   FALL_ALARM_ORDER,
-  calculateAlphaBeta,
   buildMatrixRows,
   loadFallAlarmMatrixFromCSV
 } from '../../utils/fallAlarmMatrix.js';
+import {
+  calculateAlphaBeta as calculateAlphaBetaOptimized,
+  calculateARRParameters
+} from '../../utils/ldpAlgorithms.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -399,6 +419,10 @@ const uncertaintyLoading = ref(false);
 const calibratedParams = ref(null);
 const calibrationLoading = ref(false);
 
+// 弹窗中的隐私预算
+const dialogPrivacyBudget = ref(null);
+const savedPrivacyBudget = ref(null);
+
 const matrixHeaders = FALL_ALARM_ORDER;
 const matrixRows = computed(() => buildMatrixRows(fallAlarmMatrixData.value));
 
@@ -441,6 +465,17 @@ function resetFallAlarmResults() {
   alphaValue.value = null;
   betaValue.value = null;
   calibratedParams.value = null;
+  dialogPrivacyBudget.value = null;
+  savedPrivacyBudget.value = null;
+}
+
+function savePrivacyBudget() {
+  if (dialogPrivacyBudget.value === null || dialogPrivacyBudget.value <= 0) {
+    ElMessage.warning('请输入有效的隐私预算');
+    return;
+  }
+  savedPrivacyBudget.value = dialogPrivacyBudget.value;
+  ElMessage.success('隐私预算保存成功');
 }
 
 async function loadFallAlarmMatrix() {
@@ -471,14 +506,31 @@ function calculateUncertainty() {
     ElMessage.warning('请先等待条件分布矩阵加载完成');
     return;
   }
+  
+  if (savedPrivacyBudget.value === null) {
+    ElMessage.warning('请先设置并保存隐私预算');
+    return;
+  }
 
   uncertaintyLoading.value = true;
 
   try {
-    const { alpha, beta } = calculateAlphaBeta(fallAlarmMatrixData.value);
+    // 构建条件概率数组格式，用于优化版本的计算
+    const conditionalProbs = [];
+    const rows = buildMatrixRows(fallAlarmMatrixData.value);
+    
+    rows.forEach(row => {
+      const probs = FALL_ALARM_ORDER.map(label => row[label] || 0);
+      conditionalProbs.push(probs);
+    });
+    
+    // 使用保存的隐私预算进行计算
+    const epsilon = Number(savedPrivacyBudget.value) || 1.0;
+    const { alpha, beta } = calculateAlphaBetaOptimized(conditionalProbs, epsilon);
+    
     alphaValue.value = alpha;
     betaValue.value = beta;
-    ElMessage.success('α、β 计算完成');
+    ElMessage.success('α、β 计算完成（优化版本）');
   } catch (error) {
     console.error('计算 α、β 失败:', error);
     ElMessage.error('计算 α、β 失败');
@@ -488,19 +540,24 @@ function calculateUncertainty() {
 }
 
 function calibrateParams() {
-  if (!fallAlarmMatrixData.value) {
-    ElMessage.warning('请先等待条件分布矩阵加载完成');
+  if (!fallAlarmMatrixData.value || alphaValue.value === null || betaValue.value === null) {
+    ElMessage.warning('请先计算 α、β 参数');
+    return;
+  }
+  
+  if (savedPrivacyBudget.value === null) {
+    ElMessage.warning('请先设置并保存隐私预算');
     return;
   }
 
   calibrationLoading.value = true;
 
   try {
-    const epsilon = Number(basicConfig.value.privacyBudget) || 1.0;
+    const epsilon = Number(savedPrivacyBudget.value) || 1.0;
     const k = matrixHeaders.length;
-    const expEpsilon = Math.exp(epsilon);
-    const p = expEpsilon / (expEpsilon + k - 1);
-    const q = 1 / (expEpsilon + k - 1);
+    
+    // 使用考虑 α、β 的优化版本计算 ARR 参数
+    const { p, q } = calculateARRParameters(alphaValue.value, betaValue.value, epsilon, k);
 
     calibratedParams.value = {
       p: p.toFixed(4),
@@ -508,11 +565,11 @@ function calibrateParams() {
       epsilon,
       k,
       protocol: 'ARR (Adaptive Randomized Response)',
-      description: '对二值告警属性执行随机响应，保留值概率为 p，翻转值概率为 q。',
+      description: '基于 α、β 优化的随机响应，保留值概率为 p，翻转值概率为 q。',
       dataSource: 'temp_fall_alarm_age_200.csv'
     };
 
-    ElMessage.success('扰动参数校准完成');
+    ElMessage.success('扰动参数校准完成（优化版本）');
   } catch (error) {
     console.error('校准扰动参数失败:', error);
     ElMessage.error('校准扰动参数失败');
@@ -860,6 +917,23 @@ onMounted(() => {
 .fixed-value .el-icon {
   color: #909399;
   cursor: help;
+}
+
+.privacy-budget-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.budget-info {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #409eff;
 }
 </style>
 
