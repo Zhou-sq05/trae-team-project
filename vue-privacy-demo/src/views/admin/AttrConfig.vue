@@ -1,4 +1,4 @@
-﻿<template>
+﻿﻿<template>
   <div class="admin-container">
     <el-container>
       <el-header>
@@ -191,26 +191,8 @@
             <span class="relation-label">相关敏感属性 S：</span>
             <span class="relation-value">年龄段分组</span>
           </div>
-          
-          <div class="form-item">
-            <label>隐私预算 ε</label>
-            <div class="privacy-budget-input">
-              <el-input 
-                v-model.number="dialogPrivacyBudget" 
-                placeholder="请输入隐私预算" 
-                style="width: 200px;" 
-                :min="0.1" 
-                :step="0.1"
-              />
-              <el-button type="primary" @click="savePrivacyBudget">保存</el-button>
-            </div>
-            <div v-if="savedPrivacyBudget" class="budget-info">
-              <p>当前使用的隐私预算：{{ savedPrivacyBudget }}</p>
-            </div>
-          </div>
 
           <div class="form-item">
-            <label>年龄段分组</label>
             <div class="boundary-settings">
               <div class="boundary-group">
                 <div class="boundary-title">年龄段分组</div>
@@ -224,83 +206,110 @@
             </div>
           </div>
 
-          <div class="form-item">
-            <label>S 与 A 的条件分布矩阵 Pr(A|S)</label>
-            <div v-if="matrixLoading" class="matrix-loading">
-              <span>正在从测试 CSV 统计矩阵...</span>
+          <!-- 条件分布矩阵和内在不确定性计算分组 -->
+          <div class="module-group matrix-uncertainty-group">
+            <h3 class="module-title">条件分布与内在不确定性</h3>
+            
+            <div class="form-item">
+              <label>S 与 A 的条件分布矩阵 Pr(A|S)</label>
+              <div v-if="matrixLoading" class="matrix-loading">
+                <span>正在从测试 CSV 统计矩阵...</span>
+              </div>
+              <div v-else-if="fallAlarmMatrixData" class="matrix-container">
+                <table class="matrix-table">
+                  <thead>
+                    <tr>
+                      <th>年龄段分组(S) \ 是否触发异常跌倒告警(A)</th>
+                      <th v-for="header in matrixHeaders" :key="header">{{ header }}</th>
+                      <th>行和</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in matrixRows" :key="row.s">
+                      <th>{{ row.s }}</th>
+                      <td v-for="header in matrixHeaders" :key="header">
+                        {{ formatProbability(row[header]) }}
+                      </td>
+                      <td>{{ formatProbability(rowSum(row)) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="matrix-placeholder">
+                <p>暂无矩阵数据，请重新打开弹窗或检查测试 CSV。</p>
+              </div>
             </div>
-            <div v-else-if="fallAlarmMatrixData" class="matrix-container">
-              <table class="matrix-table">
-                <thead>
-                  <tr>
-                    <th>年龄段分组(S) \ 是否触发异常跌倒告警(A)</th>
-                    <th v-for="header in matrixHeaders" :key="header">{{ header }}</th>
-                    <th>行和</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in matrixRows" :key="row.s">
-                    <th>{{ row.s }}</th>
-                    <td v-for="header in matrixHeaders" :key="header">
-                      {{ formatProbability(row[header]) }}
-                    </td>
-                    <td>{{ formatProbability(rowSum(row)) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div v-else class="matrix-placeholder">
-              <p>暂无矩阵数据，请重新打开弹窗或检查测试 CSV。</p>
+
+            <div class="form-item">
+              <label>内在不确定性计算</label>
+              <div class="uncertainty-container">
+                <div class="uncertainty-item">
+                  <label>α：</label>
+                  <el-input :model-value="displayAlpha" style="width: 120px" readonly placeholder="点击计算" />
+                </div>
+                <div class="uncertainty-item">
+                  <label>β：</label>
+                  <el-input :model-value="displayBeta" style="width: 120px" readonly placeholder="点击计算" />
+                </div>
+                <el-button type="primary" :loading="uncertaintyLoading" @click="calculateUncertainty">
+                  计算
+                </el-button>
+              </div>
+              <div v-if="alphaValue !== null" class="uncertainty-info">
+                <p>α = max Pr(A=a|S=s) = {{ displayAlpha }}</p>
+                <p>β = min Pr(A=a|S=s) = {{ displayBeta }}</p>
+              </div>
             </div>
           </div>
-
-          <div class="form-item">
-            <label>内在不确定性计算</label>
-            <div class="uncertainty-container">
-              <div class="uncertainty-item">
-                <label>α：</label>
-                <el-input :model-value="displayAlpha" style="width: 120px" readonly placeholder="点击计算" />
+          
+          <!-- 隐私预算和扰动参数重校准分组 -->
+          <div class="module-group privacy-calibration-group">
+            <h3 class="module-title">隐私预算与扰动参数</h3>
+            
+            <div class="form-item">
+              <label>隐私预算 ε</label>
+              <div class="privacy-budget-input">
+                <el-input 
+                  v-model.number="dialogPrivacyBudget" 
+                  placeholder="请输入隐私预算" 
+                  style="width: 200px;" 
+                  :min="0.1" 
+                  :step="0.1"
+                />
+                <el-button type="primary" @click="savePrivacyBudget">保存</el-button>
               </div>
-              <div class="uncertainty-item">
-                <label>β：</label>
-                <el-input :model-value="displayBeta" style="width: 120px" readonly placeholder="点击计算" />
+              <div v-if="savedPrivacyBudget" class="budget-info">
+                <p>当前使用的隐私预算：{{ savedPrivacyBudget }}</p>
               </div>
-              <el-button type="primary" :loading="uncertaintyLoading" @click="calculateUncertainty">
-                计算
-              </el-button>
             </div>
-            <div v-if="alphaValue !== null" class="uncertainty-info">
-              <p>α = max_s min_a Pr(A=a|S=s) = {{ displayAlpha }}</p>
-              <p>β = min_s max_a Pr(A=a|S=s) = {{ displayBeta }}</p>
-            </div>
-          </div>
 
-          <div class="form-item">
-            <label>扰动参数重校准（间接隐私风险 - ARR 协议）</label>
-            <div class="calibration-container">
-              <div class="calibration-item">
-                <div class="param-group single-group">
-                  <div class="param-item">
-                    <label>p（保持概率）：</label>
-                    <el-input :model-value="calibratedParams?.p || ''" style="width: 120px" readonly placeholder="点击校准" />
-                  </div>
-                  <div class="param-item">
-                    <label>q（翻转概率）：</label>
-                    <el-input :model-value="calibratedParams?.q || ''" style="width: 120px" readonly placeholder="点击校准" />
+            <div class="form-item">
+              <label>扰动参数重校准（间接隐私风险 - ARR 协议）</label>
+              <div class="calibration-container">
+                <div class="calibration-item">
+                  <div class="param-group single-group">
+                    <div class="param-item">
+                      <label>p（保持概率）：</label>
+                      <el-input :model-value="calibratedParams?.p || ''" style="width: 120px" readonly placeholder="点击校准" />
+                    </div>
+                    <div class="param-item">
+                      <label>q（翻转概率）：</label>
+                      <el-input :model-value="calibratedParams?.q || ''" style="width: 120px" readonly placeholder="点击校准" />
+                    </div>
                   </div>
                 </div>
+                <el-button type="primary" :loading="calibrationLoading" @click="calibrateParams">
+                  校准
+                </el-button>
               </div>
-              <el-button type="primary" :loading="calibrationLoading" @click="calibrateParams">
-                校准
-              </el-button>
-            </div>
-            <div v-if="calibratedParams" class="calibration-info">
-              <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
-              <p>域大小 k = {{ calibratedParams.k }}</p>
-              <p>协议 = {{ calibratedParams.protocol }}</p>
-              <p class="formula">p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)</p>
-              <p>{{ calibratedParams.description }}</p>
-              <p>数据源：{{ calibratedParams.dataSource }}</p>
+              <div v-if="calibratedParams" class="calibration-info">
+                <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
+                <p>域大小 k = {{ calibratedParams.k }}</p>
+                <p>协议 = {{ calibratedParams.protocol }}</p>
+                <p class="formula">p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)</p>
+                <p>{{ calibratedParams.description }}</p>
+                <p>数据源：{{ calibratedParams.dataSource }}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -506,11 +515,6 @@ function calculateUncertainty() {
     ElMessage.warning('请先等待条件分布矩阵加载完成');
     return;
   }
-  
-  if (savedPrivacyBudget.value === null) {
-    ElMessage.warning('请先设置并保存隐私预算');
-    return;
-  }
 
   uncertaintyLoading.value = true;
 
@@ -524,8 +528,8 @@ function calculateUncertainty() {
       conditionalProbs.push(probs);
     });
     
-    // 使用保存的隐私预算进行计算
-    const epsilon = Number(savedPrivacyBudget.value) || 1.0;
+    // 内在不确定性计算不依赖隐私预算，使用默认值 1.0
+    const epsilon = 1.0;
     const { alpha, beta } = calculateAlphaBetaOptimized(conditionalProbs, epsilon);
     
     alphaValue.value = alpha;
@@ -934,6 +938,43 @@ onMounted(() => {
   border-radius: 4px;
   font-size: 14px;
   color: #409eff;
+}
+
+/* 模块组样式 */
+.module-group {
+  margin: 20px 0;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.matrix-uncertainty-group {
+  background-color: #f9f9f9;
+  border: 1px solid #e4e7ed;
+}
+
+.privacy-calibration-group {
+  background-color: #f0f9ff;
+  border: 1px solid #d9ecff;
+}
+
+.module-title {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  border-bottom: 1px solid #e4e7ed;
+  padding-bottom: 10px;
+}
+
+/* 调整模块组内的表单项间距 */
+.module-group .form-item {
+  margin-bottom: 16px;
+}
+
+.module-group .form-item:last-child {
+  margin-bottom: 0;
 }
 </style>
 
