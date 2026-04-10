@@ -220,17 +220,20 @@
                   <thead>
                     <tr>
                       <th>年龄段分组(S) \ 是否触发异常跌倒告警(A)</th>
-                      <th v-for="header in matrixHeaders" :key="header">{{ header }}</th>
-                      <th>行和</th>
+                      <th v-for="(header, index) in matrixHeaders" :key="header" :class="{ 'highlight-column': index === 1 }">
+                        {{ header }}
+                        <span v-if="index === 1" class="selected-mark">✓</span>
+                      </th>
+                      <th class="row-sum-column">行和</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-for="row in matrixRows" :key="row.s">
                       <th>{{ row.s }}</th>
-                      <td v-for="header in matrixHeaders" :key="header">
+                      <td v-for="(header, index) in matrixHeaders" :key="header" :class="{ 'highlight-column': index === 1 }">
                         {{ formatProbability(row[header]) }}
                       </td>
-                      <td>{{ formatProbability(rowSum(row)) }}</td>
+                      <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -245,19 +248,30 @@
               <div class="uncertainty-container">
                 <div class="uncertainty-item">
                   <label>α：</label>
-                  <el-input :model-value="displayAlpha" style="width: 120px" readonly placeholder="点击计算" />
+                  <div class="result-card">{{ displayAlpha }}</div>
                 </div>
                 <div class="uncertainty-item">
                   <label>β：</label>
-                  <el-input :model-value="displayBeta" style="width: 120px" readonly placeholder="点击计算" />
+                  <div class="result-card">{{ displayBeta }}</div>
                 </div>
                 <el-button type="primary" :loading="uncertaintyLoading" @click="calculateUncertainty">
                   计算
                 </el-button>
               </div>
               <div v-if="alphaValue !== null" class="uncertainty-info">
-                <p>α = max Pr(A=a|S=s) = {{ displayAlpha }}</p>
-                <p>β = min Pr(A=a|S=s) = {{ displayBeta }}</p>
+                <p>选定列：触发（A=1）</p>
+                <p>α = max_s Pr(A=1|S=s) = {{ displayAlpha }}</p>
+                <p>β = min_s Pr(A=1|S=s) = {{ displayBeta }}</p>
+              </div>
+              
+              <!-- 计算依据说明区域 -->
+              <div v-if="alphaValue !== null" class="calculation-basis">
+                <h4 class="basis-title">计算依据</h4>
+                <div class="basis-content">
+                  <p>A=0 列：max={{ basisA0Max }}, min={{ basisA0Min }}, ratio={{ basisA0Ratio }}</p>
+                  <p>A=1 列：max={{ basisA1Max }}, min={{ basisA1Min }}, ratio={{ basisA1Ratio }}</p>
+                  <p class="selected-reason">因 A={{ calculationBasis.selectedColumn === 'a1' ? '1' : '0' }} 对应 ratio 更大，因此选取 A={{ calculationBasis.selectedColumn === 'a1' ? '1' : '0' }} 列作为 α、β 来源</p>
+                </div>
               </div>
             </div>
           </div>
@@ -428,6 +442,21 @@ const uncertaintyLoading = ref(false);
 const calibratedParams = ref(null);
 const calibrationLoading = ref(false);
 
+// 计算依据数据
+const calculationBasis = ref({
+  a0: {
+    max: null,
+    min: null,
+    ratio: null
+  },
+  a1: {
+    max: null,
+    min: null,
+    ratio: null
+  },
+  selectedColumn: 'a1'
+});
+
 // 弹窗中的隐私预算
 const dialogPrivacyBudget = ref(null);
 const savedPrivacyBudget = ref(null);
@@ -437,6 +466,14 @@ const matrixRows = computed(() => buildMatrixRows(fallAlarmMatrixData.value));
 
 const displayAlpha = computed(() => (alphaValue.value === null ? '' : formatProbability(alphaValue.value)));
 const displayBeta = computed(() => (betaValue.value === null ? '' : formatProbability(betaValue.value)));
+
+// 计算依据的显示值
+const basisA0Max = computed(() => calculationBasis.value.a0.max ? formatProbability(calculationBasis.value.a0.max) : '0.0000');
+const basisA0Min = computed(() => calculationBasis.value.a0.min ? formatProbability(calculationBasis.value.a0.min) : '0.0000');
+const basisA0Ratio = computed(() => calculationBasis.value.a0.ratio ? calculationBasis.value.a0.ratio.toFixed(4) : '0.0000');
+const basisA1Max = computed(() => calculationBasis.value.a1.max ? formatProbability(calculationBasis.value.a1.max) : '0.0000');
+const basisA1Min = computed(() => calculationBasis.value.a1.min ? formatProbability(calculationBasis.value.a1.min) : '0.0000');
+const basisA1Ratio = computed(() => calculationBasis.value.a1.ratio ? calculationBasis.value.a1.ratio.toFixed(4) : '0.0000');
 
 watch(selectedAttributeId, value => {
   attributes.value.forEach(attribute => {
@@ -476,6 +513,20 @@ function resetFallAlarmResults() {
   calibratedParams.value = null;
   dialogPrivacyBudget.value = null;
   savedPrivacyBudget.value = null;
+  // 重置计算依据数据
+  calculationBasis.value = {
+    a0: {
+      max: null,
+      min: null,
+      ratio: null
+    },
+    a1: {
+      max: null,
+      min: null,
+      ratio: null
+    },
+    selectedColumn: 'a1'
+  };
 }
 
 function savePrivacyBudget() {
@@ -523,10 +574,49 @@ function calculateUncertainty() {
     const conditionalProbs = [];
     const rows = buildMatrixRows(fallAlarmMatrixData.value);
     
+    // 收集A=0和A=1列的数据
+    const a0Values = [];
+    const a1Values = [];
+    
     rows.forEach(row => {
       const probs = FALL_ALARM_ORDER.map(label => row[label] || 0);
       conditionalProbs.push(probs);
+      
+      // 假设FALL_ALARM_ORDER[0]是"未触发"(A=0)，FALL_ALARM_ORDER[1]是"触发"(A=1)
+      a0Values.push(probs[0] || 0);
+      a1Values.push(probs[1] || 0);
     });
+    
+    // 计算A=0列的max、min、ratio
+    const a0Max = Math.max(...a0Values);
+    const a0Min = Math.min(...a0Values);
+    const a0Ratio = a0Max / a0Min;
+    
+    // 计算A=1列的max、min、ratio
+    const a1Max = Math.max(...a1Values);
+    const a1Min = Math.min(...a1Values);
+    const a1Ratio = a1Max / a1Min;
+    
+    // 确定选择哪一列作为alpha和beta的来源（选择ratio较大的列）
+    let selectedColumn = 'a1'; // 默认选择A=1
+    if (a0Ratio > a1Ratio) {
+      selectedColumn = 'a0';
+    }
+    
+    // 更新计算依据数据
+    calculationBasis.value = {
+      a0: {
+        max: a0Max,
+        min: a0Min,
+        ratio: a0Ratio
+      },
+      a1: {
+        max: a1Max,
+        min: a1Min,
+        ratio: a1Ratio
+      },
+      selectedColumn: selectedColumn
+    };
     
     // 内在不确定性计算不依赖隐私预算，使用默认值 1.0
     const epsilon = 1.0;
@@ -975,6 +1065,72 @@ onMounted(() => {
 
 .module-group .form-item:last-child {
   margin-bottom: 0;
+}
+
+/* 结果卡片样式 */
+.result-card {
+  width: 120px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border: 1px solid #d9ecff;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 500;
+  color: #409eff;
+}
+
+/* 高亮列样式 */
+.highlight-column {
+  background-color: #e6f7ff;
+  border-left: 2px solid #1890ff;
+  border-right: 2px solid #1890ff;
+}
+
+/* 行和列样式 */
+.row-sum-column {
+  color: #909399;
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+/* 计算依据区域样式 */
+.calculation-basis {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background-color: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 6px;
+}
+
+.basis-title {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #52c41a;
+}
+
+.basis-content p {
+  margin: 6px 0;
+  font-size: 13px;
+  color: #595959;
+}
+
+.selected-reason {
+  font-weight: 500;
+  color: #52c41a;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #b7eb8f;
+}
+
+/* 选中标记样式 */
+.selected-mark {
+  display: inline-block;
+  margin-left: 6px;
+  color: #52c41a;
+  font-weight: bold;
+  font-size: 12px;
 }
 </style>
 
