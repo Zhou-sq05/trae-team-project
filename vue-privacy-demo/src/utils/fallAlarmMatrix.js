@@ -1,4 +1,4 @@
-export const YOUNG_MIN = 18;
+﻿export const YOUNG_MIN = 18;
 export const YOUNG_MAX = 44;
 export const MIDDLE_MIN = 45;
 export const MIDDLE_MAX = 59;
@@ -18,15 +18,9 @@ export const AGE_GROUP_DISPLAY = [
 export function getAgeGroup(age) {
   const numericAge = Number(age);
 
-  if (numericAge >= YOUNG_MIN && numericAge <= YOUNG_MAX) {
-    return '青年';
-  }
-  if (numericAge >= MIDDLE_MIN && numericAge <= MIDDLE_MAX) {
-    return '中年';
-  }
-  if (numericAge >= OLD_MIN) {
-    return '老年';
-  }
+  if (numericAge >= YOUNG_MIN && numericAge <= YOUNG_MAX) return '青年';
+  if (numericAge >= MIDDLE_MIN && numericAge <= MIDDLE_MAX) return '中年';
+  if (numericAge >= OLD_MIN) return '老年';
 
   return null;
 }
@@ -41,9 +35,7 @@ export function parseCSV(csvContent) {
     .map(line => line.trim())
     .filter(Boolean);
 
-  if (lines.length === 0) {
-    return [];
-  }
+  if (lines.length === 0) return [];
 
   const headers = lines[0].split(',').map(header => header.trim());
 
@@ -61,11 +53,9 @@ export function parseCSV(csvContent) {
 
 export async function loadCSVFile(filePath) {
   const response = await fetch(filePath);
-
   if (!response.ok) {
     throw new Error(`加载 CSV 失败: ${response.status}`);
   }
-
   return response.text();
 }
 
@@ -97,14 +87,8 @@ export function calculatePrAGivenS(rows) {
   const sCounts = {};
 
   AGE_GROUP_ORDER.forEach(group => {
-    conditionalProbs[group] = {
-      '未触发（A=0）': 0,
-      '触发（A=1）': 0
-    };
-    jointCounts[group] = {
-      '未触发（A=0）': 0,
-      '触发（A=1）': 0
-    };
+    conditionalProbs[group] = { '未触发（A=0）': 0, '触发（A=1）': 0 };
+    jointCounts[group] = { '未触发（A=0）': 0, '触发（A=1）': 0 };
     sCounts[group] = 0;
   });
 
@@ -115,57 +99,62 @@ export function calculatePrAGivenS(rows) {
 
   AGE_GROUP_ORDER.forEach(group => {
     const total = sCounts[group];
-
-    if (total === 0) {
-      return;
-    }
+    if (total === 0) return;
 
     FALL_ALARM_ORDER.forEach(label => {
       conditionalProbs[group][label] = jointCounts[group][label] / total;
     });
   });
 
-  return {
-    conditionalProbs,
-    jointCounts,
-    sCounts
-  };
+  return { conditionalProbs, jointCounts, sCounts };
 }
 
 export function buildMatrixRows(conditionalMatrixData) {
-  if (!conditionalMatrixData) {
-    return [];
-  }
+  if (!conditionalMatrixData) return [];
 
   return AGE_GROUP_ORDER.map(group => {
     const row = { s: group };
-
     FALL_ALARM_ORDER.forEach(label => {
       row[label] = conditionalMatrixData.conditionalProbs[group]?.[label] ?? 0;
     });
-
     return row;
   });
 }
 
-export function calculateAlphaBeta(conditionalMatrixData) {
+export function calculateColumnStats(conditionalMatrixData) {
   const rows = buildMatrixRows(conditionalMatrixData);
 
-  let alpha = 0;
-  let beta = 1;
+  return FALL_ALARM_ORDER.map(label => {
+    const values = rows.map(row => row[label] ?? 0);
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const ratio = min === 0 ? Number.POSITIVE_INFINITY : max / min;
 
-  rows.forEach(row => {
-    const probabilities = FALL_ALARM_ORDER.map(label => row[label] ?? 0);
-    const rowMin = Math.min(...probabilities);
-    const rowMax = Math.max(...probabilities);
-
-    alpha = Math.max(alpha, rowMin);
-    beta = Math.min(beta, rowMax);
+    return { label, max, min, ratio };
   });
+}
+
+export function selectAlphaBetaSourceColumn(conditionalMatrixData) {
+  const stats = calculateColumnStats(conditionalMatrixData);
+  const selected = stats[1].ratio > stats[0].ratio ? stats[1] : stats[0];
 
   return {
-    alpha,
-    beta
+    selectedLabel: selected.label,
+    stats
+  };
+}
+
+export function calculateAlphaBeta(conditionalMatrixData) {
+  const rows = buildMatrixRows(conditionalMatrixData);
+  const { selectedLabel, stats } = selectAlphaBetaSourceColumn(conditionalMatrixData);
+  const values = rows.map(row => row[selectedLabel] ?? 0);
+
+  return {
+    selectedLabel,
+    alpha: Math.max(...values),
+    beta: Math.min(...values),
+    stats,
+    selectedStat: stats.find(item => item.label === selectedLabel)
   };
 }
 

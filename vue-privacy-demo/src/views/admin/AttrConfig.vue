@@ -1,4 +1,4 @@
-﻿﻿<template>
+﻿<template>
   <div class="admin-container">
     <el-container>
       <el-header>
@@ -71,7 +71,7 @@
 
                 <el-tab-pane label="属性配置" name="attributes">
                   <div class="attr-config">
-                    <el-table :data="attributes" style="width: 100%">
+                    <el-table :data="tableAttributes" style="width: 100%">
                       <el-table-column prop="name" label="采集属性">
                         <template #default="scope">
                           <span class="attribute-link" @click="handleAttributeClick(scope.row)">
@@ -123,9 +123,26 @@
                       </el-table-column>
                       <el-table-column label="状态" width="100">
                         <template #default="scope">
-                          <el-tag :type="scope.row.status === '已配置' ? 'success' : 'info'">
-                            {{ scope.row.status }}
+                          <el-tag :type="scope.row.configStatus === '已配置' ? 'success' : 'info'">
+                            {{ scope.row.configStatus }}
                           </el-tag>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="操作" width="180">
+                        <template #default="scope">
+                          <div class="action-cell">
+                            <el-button type="primary" link @click="handleAttributeClick(scope.row)">
+                              {{ scope.row.configStatus === '已配置' ? '编辑配置' : '配置' }}
+                            </el-button>
+                            <el-button
+                              v-if="scope.row.configStatus === '已配置'"
+                              type="danger"
+                              link
+                              @click="handleDeleteConfig(scope.row)"
+                            >
+                              删除
+                            </el-button>
+                          </div>
                         </template>
                       </el-table-column>
                     </el-table>
@@ -183,7 +200,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="currentAttribute ? `${currentAttribute.name} 详情` : '属性详情'"
-      width="820px"
+      width="860px"
     >
       <div v-if="currentAttribute" class="attribute-details">
         <div v-if="currentAttribute.name === '是否触发异常跌倒告警'" class="attribute-details">
@@ -193,6 +210,7 @@
           </div>
 
           <div class="form-item">
+            <label>年龄段分组</label>
             <div class="boundary-settings">
               <div class="boundary-group">
                 <div class="boundary-title">年龄段分组</div>
@@ -206,124 +224,156 @@
             </div>
           </div>
 
-          <!-- 条件分布矩阵和内在不确定性计算分组 -->
-          <div class="module-group matrix-uncertainty-group">
-            <h3 class="module-title">条件分布与内在不确定性</h3>
-            
-            <div class="form-item">
-              <label>S 与 A 的条件分布矩阵 Pr(A|S)</label>
-              <div v-if="matrixLoading" class="matrix-loading">
-                <span>正在从测试 CSV 统计矩阵...</span>
-              </div>
-              <div v-else-if="fallAlarmMatrixData" class="matrix-container">
-                <table class="matrix-table">
-                  <thead>
-                    <tr>
-                      <th>年龄段分组(S) \ 是否触发异常跌倒告警(A)</th>
-                      <th v-for="(header, index) in matrixHeaders" :key="header" :class="{ 'highlight-column': index === 1 }">
-                        {{ header }}
-                        <span v-if="index === 1" class="selected-mark">✓</span>
-                      </th>
-                      <th class="row-sum-column">行和</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="row in matrixRows" :key="row.s">
-                      <th>{{ row.s }}</th>
-                      <td v-for="(header, index) in matrixHeaders" :key="header" :class="{ 'highlight-column': index === 1 }">
-                        {{ formatProbability(row[header]) }}
-                      </td>
-                      <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div v-else class="matrix-placeholder">
-                <p>暂无矩阵数据，请重新打开弹窗或检查测试 CSV。</p>
-              </div>
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">S 与 A 的条件分布矩阵 Pr(A|S)</h3>
+              <el-button type="primary" plain :loading="matrixLoading" @click="recalculateMatrix">
+                {{ fallAlarmMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+              </el-button>
             </div>
 
-            <div class="form-item">
-              <label>内在不确定性计算</label>
-              <div class="uncertainty-container">
-                <div class="uncertainty-item">
-                  <label>α：</label>
-                  <div class="result-card">{{ displayAlpha }}</div>
-                </div>
-                <div class="uncertainty-item">
-                  <label>β：</label>
-                  <div class="result-card">{{ displayBeta }}</div>
-                </div>
-                <el-button type="primary" :loading="uncertaintyLoading" @click="calculateUncertainty">
-                  计算
-                </el-button>
-              </div>
-              <div v-if="alphaValue !== null" class="uncertainty-info">
-                <p>选定列：触发（A=1）</p>
-                <p>α = max_s Pr(A=1|S=s) = {{ displayAlpha }}</p>
-                <p>β = min_s Pr(A=1|S=s) = {{ displayBeta }}</p>
-              </div>
-              
-              <!-- 计算依据说明区域 -->
-              <div v-if="alphaValue !== null" class="calculation-basis">
-                <h4 class="basis-title">计算依据</h4>
-                <div class="basis-content">
-                  <p>A=0 列：max={{ basisA0Max }}, min={{ basisA0Min }}, ratio={{ basisA0Ratio }}</p>
-                  <p>A=1 列：max={{ basisA1Max }}, min={{ basisA1Min }}, ratio={{ basisA1Ratio }}</p>
-                  <p class="selected-reason">因 A={{ calculationBasis.selectedColumn === 'a1' ? '1' : '0' }} 对应 ratio 更大，因此选取 A={{ calculationBasis.selectedColumn === 'a1' ? '1' : '0' }} 列作为 α、β 来源</p>
-                </div>
-              </div>
+            <div v-if="matrixLoading" class="matrix-loading">
+              <span>正在根据当前 CSV 重新统计条件分布矩阵...</span>
+            </div>
+            <div v-else-if="fallAlarmMatrixData" class="matrix-container">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>年龄段分组(S) \ 是否触发异常跌倒告警(A)</th>
+                    <th
+                      v-for="header in matrixHeaders"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isSelectedColumn(header) }]"
+                    >
+                      <div class="header-cell">
+                        <span>{{ header }}</span>
+                        <el-tag v-if="isSelectedColumn(header)" size="small" type="success" effect="light">αβ来源</el-tag>
+                      </div>
+                    </th>
+                    <th class="row-sum-column">行和</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in matrixRows" :key="row.s">
+                    <th>{{ row.s }}</th>
+                    <td
+                      v-for="header in matrixHeaders"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isSelectedColumn(header) }]"
+                    >
+                      {{ formatProbability(row[header]) }}
+                    </td>
+                    <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="matrix-placeholder">
+              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(A|S)。</p>
             </div>
           </div>
-          
-          <!-- 隐私预算和扰动参数重校准分组 -->
-          <div class="module-group privacy-calibration-group">
-            <h3 class="module-title">隐私预算与扰动参数</h3>
-            
-            <div class="form-item">
-              <label>隐私预算 ε</label>
-              <div class="privacy-budget-input">
-                <el-input 
-                  v-model.number="dialogPrivacyBudget" 
-                  placeholder="请输入隐私预算" 
-                  style="width: 200px;" 
-                  :min="0.1" 
-                  :step="0.1"
-                />
-                <el-button type="primary" @click="savePrivacyBudget">保存</el-button>
-              </div>
-              <div v-if="savedPrivacyBudget" class="budget-info">
-                <p>当前使用的隐私预算：{{ savedPrivacyBudget }}</p>
+
+          <div class="module-group">
+            <h3 class="module-title">计算依据</h3>
+            <div v-if="columnStats.length" class="basis-card">
+              <table class="basis-table">
+                <thead>
+                  <tr>
+                    <th>候选列</th>
+                    <th>max</th>
+                    <th>min</th>
+                    <th>ratio</th>
+                    <th>是否选中</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="stat in columnStats" :key="stat.label">
+                    <td>{{ stat.label }}</td>
+                    <td>{{ formatProbability(stat.max) }}</td>
+                    <td>{{ formatProbability(stat.min) }}</td>
+                    <td>{{ formatRatio(stat.ratio) }}</td>
+                    <td>
+                      <el-tag v-if="alphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">
+                        已选
+                      </el-tag>
+                      <span v-else class="muted-text">未选</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="final-selection-card">
+                <div class="final-selection-title">最终选择结果</div>
+                <div class="final-selection-line">最终选定列：{{ alphaBetaResult?.selectedLabel }}</div>
+                <div class="final-selection-line">
+                  选择原因：该列对应 ratio = {{ formatRatio(selectedColumnRatio) }}，大于另一列的 {{ formatRatio(unselectedColumnRatio) }}，因此作为 α、β 来源列。
+                </div>
               </div>
             </div>
+            <div v-else class="empty-state-panel">
+              <p>矩阵尚未计算，暂时无法展示 max / min / ratio 的比较结果。</p>
+            </div>
+          </div>
 
-            <div class="form-item">
-              <label>扰动参数重校准（间接隐私风险 - ARR 协议）</label>
-              <div class="calibration-container">
-                <div class="calibration-item">
-                  <div class="param-group single-group">
-                    <div class="param-item">
-                      <label>p（保持概率）：</label>
-                      <el-input :model-value="calibratedParams?.p || ''" style="width: 120px" readonly placeholder="点击校准" />
-                    </div>
-                    <div class="param-item">
-                      <label>q（翻转概率）：</label>
-                      <el-input :model-value="calibratedParams?.q || ''" style="width: 120px" readonly placeholder="点击校准" />
-                    </div>
-                  </div>
-                </div>
-                <el-button type="primary" :loading="calibrationLoading" @click="calibrateParams">
-                  校准
-                </el-button>
+          <div class="module-group">
+            <h3 class="module-title">内在不确定性参数</h3>
+            <div v-if="alphaBetaResult" class="result-grid">
+              <div class="result-panel accent-panel">
+                <div class="result-label">选定列</div>
+                <div class="result-value">{{ alphaBetaResult.selectedLabel }}</div>
+                <div class="result-subtext">后续 α、β 都基于这一列的条件概率推导。</div>
               </div>
-              <div v-if="calibratedParams" class="calibration-info">
-                <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
-                <p>域大小 k = {{ calibratedParams.k }}</p>
-                <p>协议 = {{ calibratedParams.protocol }}</p>
-                <p class="formula">p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)</p>
-                <p>{{ calibratedParams.description }}</p>
-                <p>数据源：{{ calibratedParams.dataSource }}</p>
+              <div class="result-panel">
+                <div class="result-label">α（最大条件概率）</div>
+                <div class="result-value">{{ formatProbability(alphaBetaResult.alpha) }}</div>
+                <div class="result-subtext">在选定列中，对所有年龄段取最大的 Pr(A=a*|S=s)。</div>
               </div>
+              <div class="result-panel">
+                <div class="result-label">β（最小条件概率）</div>
+                <div class="result-value">{{ formatProbability(alphaBetaResult.beta) }}</div>
+                <div class="result-subtext">在选定列中，对所有年龄段取最小的 Pr(A=a*|S=s)。</div>
+              </div>
+            </div>
+            <div v-else class="empty-state-panel">
+              <p>条件分布矩阵计算完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">隐私预算 ε</h3>
+            <div class="epsilon-card">
+              <div class="epsilon-item">
+                <span class="epsilon-label">当前隐私预算</span>
+                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
+              </div>
+              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
+            </div>
+            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">扰动参数重校准</h3>
+              <el-button type="primary" :loading="calibrationLoading" @click="calibrateParams">校准扰动参数</el-button>
+            </div>
+            <div class="result-grid compact-grid">
+              <div class="result-panel">
+                <div class="result-label">p（保持概率）</div>
+                <div class="result-value">{{ calibratedParams ? calibratedParams.p : '--' }}</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">q（翻转概率）</div>
+                <div class="result-value">{{ calibratedParams ? calibratedParams.q : '--' }}</div>
+              </div>
+            </div>
+            <div class="calibration-tip">由 ε、α、β 自动校准</div>
+            <div class="calibration-tip">满足 p + q = 1</div>
+            <div v-if="calibratedParams" class="calibration-info">
+              <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
+              <p>域大小 k = {{ calibratedParams.k }}</p>
+              <p>协议 = {{ calibratedParams.protocol }}</p>
+              <p class="formula">p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)</p>
+              <p>{{ calibratedParams.description }}</p>
+              <p>数据源：{{ calibratedParams.dataSource }}</p>
             </div>
           </div>
         </div>
@@ -363,6 +413,14 @@
           <p>该属性的详细信息正在整理中。</p>
         </div>
       </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleDialogCancel">取消</el-button>
+          <el-button type="primary" :disabled="!canSaveCurrentConfig" @click="handleSaveAttributeConfig">
+            保存配置
+          </el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -372,6 +430,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowDown, DataAnalysis, Delete, Document, House, QuestionFilled, Setting } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { useAttributeConfigStore } from '../../store/attributeConfig';
 import { useTaskStore } from '../../store/task';
 import { useUserStore } from '../../store/user';
 import {
@@ -379,17 +438,16 @@ import {
   FALL_ALARM_DATA_PATH,
   FALL_ALARM_ORDER,
   buildMatrixRows,
+  calculateAlphaBeta,
   loadFallAlarmMatrixFromCSV
 } from '../../utils/fallAlarmMatrix.js';
-import {
-  calculateAlphaBeta as calculateAlphaBetaOptimized,
-  calculateARRParameters
-} from '../../utils/ldpAlgorithms.js';
+import { calculateARRParameters } from '../../utils/ldpAlgorithms.js';
 
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
 const taskStore = useTaskStore();
+const attributeConfigStore = useAttributeConfigStore();
 
 const activeMenu = computed(() => route.path);
 const user = computed(() => userStore.user);
@@ -400,11 +458,16 @@ const dialogVisible = ref(false);
 const currentAttribute = ref(null);
 const taskId = ref('');
 const customTaskId = ref('');
+const hasGeneratedMatrix = ref(false);
+const privacyBudgetSaved = ref(false);
 
 const basicConfig = ref({
   dataSource: '模拟数据',
   privacyBudget: 1.0
 });
+
+const dialogPrivacyBudget = ref(1.0);
+const savedPrivacyBudget = ref(1.0);
 
 const attributes = ref([
   {
@@ -413,7 +476,7 @@ const attributes = ref([
     isProtected: false,
     protectionMode: 'indirect',
     algorithm: 'aoue',
-    status: '已配置',
+    status: '未配置',
     fixed: true,
     tooltip: '睡眠时长与血压存在关联关系，保留原有间接隐私风险配置。'
   },
@@ -423,7 +486,7 @@ const attributes = ref([
     isProtected: false,
     protectionMode: 'indirect',
     algorithm: 'arr',
-    status: '已配置',
+    status: '未配置',
     fixed: true,
     tooltip: '是否触发异常跌倒告警与年龄段分组存在关联关系，固定采用间接隐私风险配置。'
   },
@@ -433,47 +496,43 @@ const attributes = ref([
 ]);
 
 const ageGroupDisplay = AGE_GROUP_DISPLAY;
+const matrixHeaders = FALL_ALARM_ORDER;
+
+const tableAttributes = computed(() =>
+  attributes.value.map(attribute => ({
+    ...attribute,
+    configStatus: attributeConfigStore.hasConfigById(attribute.id) ? '已配置' : '未配置'
+  }))
+);
 
 const matrixLoading = ref(false);
 const fallAlarmMatrixData = ref(null);
-const alphaValue = ref(null);
-const betaValue = ref(null);
-const uncertaintyLoading = ref(false);
-const calibratedParams = ref(null);
+const alphaBetaResult = ref(null);
+const columnStats = ref([]);
 const calibrationLoading = ref(false);
+const calibratedParams = ref(null);
 
-// 计算依据数据
-const calculationBasis = ref({
-  a0: {
-    max: null,
-    min: null,
-    ratio: null
-  },
-  a1: {
-    max: null,
-    min: null,
-    ratio: null
-  },
-  selectedColumn: 'a1'
-});
-
-// 弹窗中的隐私预算
-const dialogPrivacyBudget = ref(null);
-const savedPrivacyBudget = ref(null);
-
-const matrixHeaders = FALL_ALARM_ORDER;
 const matrixRows = computed(() => buildMatrixRows(fallAlarmMatrixData.value));
+const selectedColumnRatio = computed(() => alphaBetaResult.value?.selectedStat?.ratio ?? null);
+const unselectedColumnRatio = computed(() => {
+  if (!alphaBetaResult.value) return null;
+  const other = columnStats.value.find(stat => stat.label !== alphaBetaResult.value.selectedLabel);
+  return other?.ratio ?? null;
+});
+const canSaveCurrentConfig = computed(() => {
+  if (!currentAttribute.value) return false;
 
-const displayAlpha = computed(() => (alphaValue.value === null ? '' : formatProbability(alphaValue.value)));
-const displayBeta = computed(() => (betaValue.value === null ? '' : formatProbability(betaValue.value)));
+  if (currentAttribute.value.name === '是否触发异常跌倒告警') {
+    return Boolean(
+      hasGeneratedMatrix.value &&
+      alphaBetaResult.value &&
+      privacyBudgetSaved.value &&
+      calibratedParams.value
+    );
+  }
 
-// 计算依据的显示值
-const basisA0Max = computed(() => calculationBasis.value.a0.max ? formatProbability(calculationBasis.value.a0.max) : '0.0000');
-const basisA0Min = computed(() => calculationBasis.value.a0.min ? formatProbability(calculationBasis.value.a0.min) : '0.0000');
-const basisA0Ratio = computed(() => calculationBasis.value.a0.ratio ? calculationBasis.value.a0.ratio.toFixed(4) : '0.0000');
-const basisA1Max = computed(() => calculationBasis.value.a1.max ? formatProbability(calculationBasis.value.a1.max) : '0.0000');
-const basisA1Min = computed(() => calculationBasis.value.a1.min ? formatProbability(calculationBasis.value.a1.min) : '0.0000');
-const basisA1Ratio = computed(() => calculationBasis.value.a1.ratio ? calculationBasis.value.a1.ratio.toFixed(4) : '0.0000');
+  return true;
+});
 
 watch(selectedAttributeId, value => {
   attributes.value.forEach(attribute => {
@@ -483,7 +542,7 @@ watch(selectedAttributeId, value => {
 
 watch(dialogVisible, visible => {
   if (!visible) {
-    resetFallAlarmResults();
+    resetMatrixState();
   }
 });
 
@@ -502,50 +561,98 @@ function formatProbability(value) {
   return Number(value).toFixed(4);
 }
 
+function formatRatio(value) {
+  if (!Number.isFinite(value)) return 'Infinity';
+  return Number(value).toFixed(4);
+}
+
 function rowSum(row) {
   return matrixHeaders.reduce((sum, header) => sum + (row[header] || 0), 0);
 }
 
-function resetFallAlarmResults() {
-  fallAlarmMatrixData.value = null;
-  alphaValue.value = null;
-  betaValue.value = null;
-  calibratedParams.value = null;
-  dialogPrivacyBudget.value = null;
-  savedPrivacyBudget.value = null;
-  // 重置计算依据数据
-  calculationBasis.value = {
-    a0: {
-      max: null,
-      min: null,
-      ratio: null
-    },
-    a1: {
-      max: null,
-      min: null,
-      ratio: null
-    },
-    selectedColumn: 'a1'
-  };
+function isSelectedColumn(header) {
+  return alphaBetaResult.value?.selectedLabel === header;
 }
 
 function savePrivacyBudget() {
-  if (dialogPrivacyBudget.value === null || dialogPrivacyBudget.value <= 0) {
-    ElMessage.warning('请输入有效的隐私预算');
+  const nextValue = Number(dialogPrivacyBudget.value);
+  if (!Number.isFinite(nextValue) || nextValue <= 0) {
+    ElMessage.warning('请输入大于 0 的隐私预算');
     return;
   }
-  savedPrivacyBudget.value = dialogPrivacyBudget.value;
-  ElMessage.success('隐私预算保存成功');
+
+  savedPrivacyBudget.value = nextValue;
+  basicConfig.value.privacyBudget = nextValue;
+  privacyBudgetSaved.value = true;
+  calibratedParams.value = null;
+  ElMessage.success('隐私预算已保存');
 }
 
-async function loadFallAlarmMatrix() {
+function resetMatrixState() {
+  fallAlarmMatrixData.value = null;
+  alphaBetaResult.value = null;
+  columnStats.value = [];
+  calibratedParams.value = null;
+  hasGeneratedMatrix.value = false;
+  privacyBudgetSaved.value = false;
+  dialogPrivacyBudget.value = basicConfig.value.privacyBudget;
+  savedPrivacyBudget.value = basicConfig.value.privacyBudget;
+}
+
+function buildCurrentConfigPayload() {
+  return {
+    attributeName: currentAttribute.value?.name || '',
+    matrixData: fallAlarmMatrixData.value,
+    columnStats: columnStats.value,
+    alphaBetaResult: alphaBetaResult.value,
+    selectedColumnLabel: alphaBetaResult.value?.selectedLabel || '',
+    epsilon: savedPrivacyBudget.value,
+    epsilonDraft: dialogPrivacyBudget.value,
+    privacyBudgetSaved: privacyBudgetSaved.value,
+    calibratedParams: calibratedParams.value,
+    notes: {
+      dataPath: FALL_ALARM_DATA_PATH,
+      selectedColumnRatio: selectedColumnRatio.value,
+      unselectedColumnRatio: unselectedColumnRatio.value
+    }
+  };
+}
+
+function applySavedConfig(config) {
+  fallAlarmMatrixData.value = config?.matrixData || null;
+  columnStats.value = config?.columnStats || [];
+  alphaBetaResult.value = config?.alphaBetaResult || null;
+  calibratedParams.value = config?.calibratedParams || null;
+  hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
+  privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
+  dialogPrivacyBudget.value = config?.epsilonDraft ?? config?.epsilon ?? basicConfig.value.privacyBudget;
+  savedPrivacyBudget.value = config?.epsilon ?? basicConfig.value.privacyBudget;
+}
+
+function resetDialogForAttribute(attribute) {
+  resetMatrixState();
+
+  const savedConfig = attributeConfigStore.getConfigById(attribute.id);
+  if (savedConfig) {
+    applySavedConfig(savedConfig);
+  }
+}
+
+async function recalculateMatrix() {
   matrixLoading.value = true;
+  calibratedParams.value = null;
+
   try {
     const { matrix } = await loadFallAlarmMatrixFromCSV(FALL_ALARM_DATA_PATH);
     fallAlarmMatrixData.value = matrix;
+    const result = calculateAlphaBeta(matrix);
+    alphaBetaResult.value = result;
+    columnStats.value = result.stats;
+    hasGeneratedMatrix.value = true;
+    ElMessage.success('条件分布矩阵已刷新');
   } catch (error) {
-    console.error('加载跌倒告警条件矩阵失败:', error);
-    ElMessage.error('加载跌倒告警测试矩阵失败');
+    console.error('重算条件分布矩阵失败:', error);
+    ElMessage.error('重算条件分布矩阵失败');
   } finally {
     matrixLoading.value = false;
   }
@@ -553,94 +660,18 @@ async function loadFallAlarmMatrix() {
 
 async function handleAttributeClick(attribute) {
   currentAttribute.value = attribute;
+  resetDialogForAttribute(attribute);
   dialogVisible.value = true;
-  resetFallAlarmResults();
-
-  if (attribute.name === '是否触发异常跌倒告警') {
-    await loadFallAlarmMatrix();
-  }
-}
-
-function calculateUncertainty() {
-  if (!fallAlarmMatrixData.value) {
-    ElMessage.warning('请先等待条件分布矩阵加载完成');
-    return;
-  }
-
-  uncertaintyLoading.value = true;
-
-  try {
-    // 构建条件概率数组格式，用于优化版本的计算
-    const conditionalProbs = [];
-    const rows = buildMatrixRows(fallAlarmMatrixData.value);
-    
-    // 收集A=0和A=1列的数据
-    const a0Values = [];
-    const a1Values = [];
-    
-    rows.forEach(row => {
-      const probs = FALL_ALARM_ORDER.map(label => row[label] || 0);
-      conditionalProbs.push(probs);
-      
-      // 假设FALL_ALARM_ORDER[0]是"未触发"(A=0)，FALL_ALARM_ORDER[1]是"触发"(A=1)
-      a0Values.push(probs[0] || 0);
-      a1Values.push(probs[1] || 0);
-    });
-    
-    // 计算A=0列的max、min、ratio
-    const a0Max = Math.max(...a0Values);
-    const a0Min = Math.min(...a0Values);
-    const a0Ratio = a0Max / a0Min;
-    
-    // 计算A=1列的max、min、ratio
-    const a1Max = Math.max(...a1Values);
-    const a1Min = Math.min(...a1Values);
-    const a1Ratio = a1Max / a1Min;
-    
-    // 确定选择哪一列作为alpha和beta的来源（选择ratio较大的列）
-    let selectedColumn = 'a1'; // 默认选择A=1
-    if (a0Ratio > a1Ratio) {
-      selectedColumn = 'a0';
-    }
-    
-    // 更新计算依据数据
-    calculationBasis.value = {
-      a0: {
-        max: a0Max,
-        min: a0Min,
-        ratio: a0Ratio
-      },
-      a1: {
-        max: a1Max,
-        min: a1Min,
-        ratio: a1Ratio
-      },
-      selectedColumn: selectedColumn
-    };
-    
-    // 内在不确定性计算不依赖隐私预算，使用默认值 1.0
-    const epsilon = 1.0;
-    const { alpha, beta } = calculateAlphaBetaOptimized(conditionalProbs, epsilon);
-    
-    alphaValue.value = alpha;
-    betaValue.value = beta;
-    ElMessage.success('α、β 计算完成（优化版本）');
-  } catch (error) {
-    console.error('计算 α、β 失败:', error);
-    ElMessage.error('计算 α、β 失败');
-  } finally {
-    uncertaintyLoading.value = false;
-  }
 }
 
 function calibrateParams() {
-  if (!fallAlarmMatrixData.value || alphaValue.value === null || betaValue.value === null) {
-    ElMessage.warning('请先计算 α、β 参数');
+  if (!alphaBetaResult.value) {
+    ElMessage.warning('请先计算条件分布矩阵');
     return;
   }
-  
-  if (savedPrivacyBudget.value === null) {
-    ElMessage.warning('请先设置并保存隐私预算');
+
+  if (!privacyBudgetSaved.value) {
+    ElMessage.warning('请先填写并保存隐私预算 ε');
     return;
   }
 
@@ -649,27 +680,63 @@ function calibrateParams() {
   try {
     const epsilon = Number(savedPrivacyBudget.value) || 1.0;
     const k = matrixHeaders.length;
-    
-    // 使用考虑 α、β 的优化版本计算 ARR 参数
-    const { p, q } = calculateARRParameters(alphaValue.value, betaValue.value, epsilon, k);
+    const { p, q } = calculateARRParameters(alphaBetaResult.value.alpha, alphaBetaResult.value.beta, epsilon, k);
 
     calibratedParams.value = {
-      p: p.toFixed(4),
-      q: q.toFixed(4),
+      p: Number(p).toFixed(4),
+      q: Number(q).toFixed(4),
       epsilon,
       k,
       protocol: 'ARR (Adaptive Randomized Response)',
-      description: '基于 α、β 优化的随机响应，保留值概率为 p，翻转值概率为 q。',
+      description: `基于 ${alphaBetaResult.value.selectedLabel} 列自动校准扰动参数。`,
       dataSource: 'temp_fall_alarm_age_200.csv'
     };
 
-    ElMessage.success('扰动参数校准完成（优化版本）');
+    ElMessage.success('扰动参数校准完成');
   } catch (error) {
     console.error('校准扰动参数失败:', error);
     ElMessage.error('校准扰动参数失败');
   } finally {
     calibrationLoading.value = false;
   }
+}
+
+function handleDialogCancel() {
+  dialogVisible.value = false;
+}
+
+function handleSaveAttributeConfig() {
+  if (!currentAttribute.value) {
+    return;
+  }
+
+  if (!canSaveCurrentConfig.value) {
+    ElMessage.warning('请先完成矩阵、α/β、ε 和扰动参数校准后再保存配置');
+    return;
+  }
+
+  attributeConfigStore.saveConfig(currentAttribute.value.id, buildCurrentConfigPayload());
+  dialogVisible.value = false;
+  ElMessage.success('配置已保存');
+}
+
+function handleDeleteConfig(attribute) {
+  ElMessageBox.confirm('确认删除当前配置吗？删除后将恢复为未配置状态。', '删除确认', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+    .then(() => {
+      attributeConfigStore.deleteConfig(attribute.id);
+
+      if (currentAttribute.value?.id === attribute.id) {
+        resetMatrixState();
+        dialogVisible.value = false;
+      }
+
+      ElMessage.success('配置已删除');
+    })
+    .catch(() => {});
 }
 
 function saveConfig() {
@@ -751,6 +818,9 @@ function deleteTask(task) {
 
 onMounted(() => {
   taskStore.loadFromLocalStorage();
+  attributeConfigStore.loadFromLocalStorage();
+  dialogPrivacyBudget.value = basicConfig.value.privacyBudget;
+  savedPrivacyBudget.value = basicConfig.value.privacyBudget;
 });
 </script>
 
@@ -817,6 +887,12 @@ onMounted(() => {
   color: #409eff;
 }
 
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .config-footer {
   margin-top: 30px;
   padding-top: 20px;
@@ -866,26 +942,33 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  margin-top: 10px;
   padding: 15px;
   background-color: #f5f7fa;
   border-radius: 4px;
 }
 
-.boundary-group {
+.boundary-group,
+.module-group {
   border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  padding: 15px;
+  border-radius: 8px;
+  padding: 16px;
   background-color: #fff;
 }
 
-.boundary-title {
+.boundary-title,
+.module-title {
   font-weight: 700;
   font-size: 16px;
   color: #303133;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e4e7ed;
+  margin: 0 0 14px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .group-display {
@@ -915,12 +998,13 @@ onMounted(() => {
 
 .matrix-loading,
 .matrix-placeholder,
-.empty-details {
+.empty-details,
+.empty-state-panel {
   text-align: center;
   padding: 24px;
   color: #909399;
   background-color: #f5f7fa;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .matrix-container {
@@ -930,18 +1014,18 @@ onMounted(() => {
 .matrix-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 520px;
+  min-width: 560px;
 }
 
 .matrix-table th,
 .matrix-table td {
-  border: 1px solid #ddd;
+  border: 1px solid #dfe6ee;
   padding: 10px;
   text-align: center;
 }
 
 .matrix-table th {
-  background-color: #f5f7fa;
+  background-color: #f7f9fc;
   font-weight: 700;
 }
 
@@ -949,57 +1033,185 @@ onMounted(() => {
   font-family: 'Courier New', monospace;
 }
 
-.uncertainty-container,
-.calibration-container {
+.header-cell {
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.matrix-value-column.highlight-column {
+  background-color: #edf5ff;
+}
+
+.row-sum-column {
+  background-color: #fafbfc !important;
+  color: #9aa4b2;
+  font-weight: 500 !important;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compact-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.result-panel {
+  padding: 14px;
+  border: 1px solid #dfe6ee;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.accent-panel {
+  border-color: #bfd7ff;
+  background: #eef5ff;
+}
+
+.result-label {
+  font-size: 13px;
+  color: #5f6b7a;
+  margin-bottom: 8px;
+}
+
+.result-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.result-subtext {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7785;
+}
+
+.basis-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fbff;
+  border: 1px solid #dfe6ee;
+}
+
+.basis-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.basis-table th,
+.basis-table td {
+  border-bottom: 1px solid #e7edf4;
+  padding: 10px 8px;
+  text-align: left;
+  color: #425466;
+}
+
+.basis-table th {
+  color: #1f2d3d;
+  font-weight: 700;
+}
+
+.basis-row {
+  display: flex;
   gap: 16px;
   flex-wrap: wrap;
+  color: #425466;
 }
 
-.uncertainty-item,
-.param-item {
+.basis-name {
+  min-width: 120px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.selected-reason {
+  font-weight: 700;
+  color: #214c9b;
+  border-top: 1px dashed #cfd8e3;
+  padding-top: 10px;
+}
+
+.final-selection-card {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #eef5ff;
+  border: 1px solid #bfd7ff;
+}
+
+.final-selection-title {
+  font-weight: 700;
+  color: #1f2d3d;
+  margin-bottom: 6px;
+}
+
+.final-selection-line {
+  color: #214c9b;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.muted-text {
+  color: #98a2b3;
+}
+
+.epsilon-card {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px solid #dfe6ee;
+  border-radius: 8px;
+  background: #f8fbff;
 }
 
-.calibration-item,
-.param-group.single-group {
+.epsilon-item {
   display: flex;
-  gap: 20px;
+  align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.uncertainty-info {
-  margin-top: 10px;
-  padding: 10px 15px;
-  background-color: #f0f9ff;
-  border-left: 4px solid #409eff;
-  border-radius: 4px;
+.epsilon-label {
+  font-weight: 700;
+  color: #425466;
 }
 
-.uncertainty-info p,
-.calibration-info p {
-  margin: 5px 0;
-  color: #303133;
+.epsilon-hint,
+.calibration-tip {
+  font-size: 13px;
+  color: #7b8794;
+  margin-top: 8px;
 }
 
 .calibration-info {
-  margin-top: 10px;
-  padding: 10px 15px;
+  margin-top: 12px;
+  padding: 12px 14px;
   background-color: #f0fff4;
   border-left: 4px solid #67c23a;
   border-radius: 4px;
+}
+
+.calibration-info p {
+  margin: 5px 0;
+  color: #303133;
 }
 
 .calibration-info .formula {
   font-family: 'Courier New', monospace;
   color: #606266;
   font-style: italic;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed #dcdfe6;
 }
 
 .fixed-value {
@@ -1013,124 +1225,27 @@ onMounted(() => {
   cursor: help;
 }
 
-.privacy-budget-input {
+.dialog-footer {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
-.budget-info {
-  margin-top: 10px;
-  padding: 8px 12px;
-  background-color: #f0f9ff;
-  border-left: 3px solid #409eff;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #409eff;
-}
+@media (max-width: 768px) {
+  .section-header,
+  .epsilon-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-/* 模块组样式 */
-.module-group {
-  margin: 20px 0;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
-}
+  .result-grid,
+  .compact-grid {
+    grid-template-columns: 1fr;
+  }
 
-.matrix-uncertainty-group {
-  background-color: #f9f9f9;
-  border: 1px solid #e4e7ed;
-}
-
-.privacy-calibration-group {
-  background-color: #f0f9ff;
-  border: 1px solid #d9ecff;
-}
-
-.module-title {
-  margin-top: 0;
-  margin-bottom: 16px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-  border-bottom: 1px solid #e4e7ed;
-  padding-bottom: 10px;
-}
-
-/* 调整模块组内的表单项间距 */
-.module-group .form-item {
-  margin-bottom: 16px;
-}
-
-.module-group .form-item:last-child {
-  margin-bottom: 0;
-}
-
-/* 结果卡片样式 */
-.result-card {
-  width: 120px;
-  padding: 8px 12px;
-  background-color: #f0f9ff;
-  border: 1px solid #d9ecff;
-  border-radius: 4px;
-  text-align: center;
-  font-weight: 500;
-  color: #409eff;
-}
-
-/* 高亮列样式 */
-.highlight-column {
-  background-color: #e6f7ff;
-  border-left: 2px solid #1890ff;
-  border-right: 2px solid #1890ff;
-}
-
-/* 行和列样式 */
-.row-sum-column {
-  color: #909399;
-  font-size: 0.9em;
-  font-style: italic;
-}
-
-/* 计算依据区域样式 */
-.calculation-basis {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background-color: #f6ffed;
-  border: 1px solid #b7eb8f;
-  border-radius: 6px;
-}
-
-.basis-title {
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #52c41a;
-}
-
-.basis-content p {
-  margin: 6px 0;
-  font-size: 13px;
-  color: #595959;
-}
-
-.selected-reason {
-  font-weight: 500;
-  color: #52c41a;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed #b7eb8f;
-}
-
-/* 选中标记样式 */
-.selected-mark {
-  display: inline-block;
-  margin-left: 6px;
-  color: #52c41a;
-  font-weight: bold;
-  font-size: 12px;
+  .action-cell,
+  .dialog-footer {
+    justify-content: flex-start;
+  }
 }
 </style>
-
