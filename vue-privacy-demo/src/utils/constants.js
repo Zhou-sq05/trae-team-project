@@ -19,6 +19,8 @@ export const STEP_BUCKET_ORDER = [
 
 export const WEIGHT_STATUS_ORDER = ['偏瘦', '正常', '超重'];
 
+export const MISSING_STATUS_ORDER = ['非缺失（M=0）', '缺失（M=1）'];
+
 export const AGE_GROUP_DISPLAY = [
   { name: '青年', range: '18-44岁' },
   { name: '中年', range: '45-59岁' },

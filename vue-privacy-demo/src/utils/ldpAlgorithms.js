@@ -172,6 +172,25 @@ export function calculateAOUEParameters(alpha, beta, epsilon) {
   return { p, q, rawQ, clamped: q !== rawQ };
 }
 
+export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
+  const epsilonStage1 = epsilon / 2;
+  const epsilonStage2 = epsilon - epsilonStage1;
+  const stage1 = calculateARRParameters(alpha, beta, epsilonStage1, 2);
+  const expStage2 = Math.exp(epsilonStage2);
+  const p2 = expStage2 / (expStage2 + scoreDomainSize - 1);
+  const q2 = 1 / (expStage2 + scoreDomainSize - 1);
+
+  return {
+    epsilonStage1,
+    epsilonStage2,
+    p1: stage1.p,
+    q1: stage1.q,
+    p2,
+    q2,
+    scoreDomainSize
+  };
+}
+
 // 计算条件概率的最大最小值
 export function computeMaxMin(conditionalProbs, targetValue) {
   const column = conditionalProbs.map(row => row[targetValue - 1]);

@@ -87,7 +87,9 @@
                       <el-table-column label="防护模式" width="150">
                         <template #default="scope">
                           <div v-if="scope.row.fixed" class="fixed-value">
-                            <el-tag type="primary">间接隐私风险</el-tag>
+                            <el-tag type="primary">
+                              {{ scope.row.protectionMode === 'hybrid' ? '混合隐私风险' : '间接隐私风险' }}
+                            </el-tag>
                             <el-tooltip :content="scope.row.tooltip">
                               <el-icon><QuestionFilled /></el-icon>
                             </el-tooltip>
@@ -378,36 +380,7 @@
           </div>
         </div>
 
-        <div v-else-if="currentAttribute.name === '睡眠时长'" class="attribute-details">
-          <div class="form-item relation-row">
-            <span class="relation-label">相关敏感属性 S：</span>
-            <span class="relation-value">血压</span>
-          </div>
-          <div class="form-item">
-            <label>分组说明</label>
-            <div class="boundary-settings">
-              <div class="boundary-group">
-                <div class="boundary-title">睡眠时长分组</div>
-                <div class="group-display">
-                  <div class="group-item"><span class="group-name">睡眠不足</span><span class="group-range">0-7 小时</span></div>
-                  <div class="group-item"><span class="group-name">正常睡眠</span><span class="group-range">7-10 小时</span></div>
-                  <div class="group-item"><span class="group-name">睡眠过多</span><span class="group-range">10-24 小时</span></div>
-                </div>
-              </div>
-              <div class="boundary-group">
-                <div class="boundary-title">血压分组</div>
-                <div class="group-display">
-                  <div class="group-item"><span class="group-name">低血压</span><span class="group-range">&lt;90 mmHg</span></div>
-                  <div class="group-item"><span class="group-name">正常血压</span><span class="group-range">90-119 mmHg</span></div>
-                  <div class="group-item"><span class="group-name">高血压</span><span class="group-range">≥120 mmHg</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="matrix-placeholder">
-            <p>该属性保留原有演示场景，本次未改动其矩阵来源。</p>
-          </div>
-        </div>
+
 
         <div v-else-if="currentAttribute.name === '日均站立时长分档'" class="attribute-details">
           <div class="form-item relation-row">
@@ -661,24 +634,54 @@
           </div>
 
           <div class="module-group">
+            <h3 class="module-title">隐私预算 ε</h3>
+            <div class="epsilon-card">
+              <div class="epsilon-item">
+                <span class="epsilon-label">当前隐私预算</span>
+                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
+              </div>
+              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
+            </div>
+            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
+            <div class="epsilon-hint">AOUE 场景下，支持集构造依赖当前隐私预算 ε，因此需先设置 ε，再计算内在不确定性参数。</div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">支持集与内在不确定性参数计算</h3>
+              <el-button type="primary" plain :disabled="!canCalculateStepsSupport" @click="calculateStepsSupportAndAlphaBeta">
+                {{ stepsAlphaBetaResult ? '重新计算支持集与 α/β' : '计算支持集与 α/β' }}
+              </el-button>
+            </div>
+            <div v-if="!privacyBudgetSaved" class="empty-state-panel">
+              <p>请先设置并保存隐私预算 ε，AOUE 才能按当前 ε 构造支持集 C_ij 并计算 α、β。</p>
+            </div>
+            <div v-else-if="!stepsMatrixData" class="empty-state-panel">
+              <p>请先计算条件分布矩阵，再基于当前 ε 构造支持集与内在不确定性参数。</p>
+            </div>
+            <template v-else>
             <h3 class="module-title">计算依据</h3>
             <div v-if="stepsSupportStats.length" class="basis-card">
               <table class="basis-table">
                 <thead>
                   <tr>
-                    <th>候选支持集</th>
+                    <th>敏感状态对</th>
+                    <th>支持集</th>
                     <th>覆盖桶</th>
-                    <th>α</th>
-                    <th>β</th>
+                    <th>α_ij</th>
+                    <th>β_ij</th>
+                    <th>ratio</th>
                     <th>是否选中</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="stat in stepsSupportStats" :key="stat.label">
                     <td>{{ stat.label }}</td>
+                    <td>{{ `C_${stat.sourcePair[0]}${stat.sourcePair[1]}` }}</td>
                     <td>{{ stat.bucketText }}</td>
                     <td>{{ formatProbability(stat.alpha) }}</td>
                     <td>{{ formatProbability(stat.beta) }}</td>
+                    <td>{{ formatRatio(stat.ratio) }}</td>
                     <td>
                       <el-tag v-if="stepsAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">
                         已选
@@ -690,19 +693,54 @@
               </table>
               <div class="final-selection-card">
                 <div class="final-selection-title">最终选择结果</div>
-                <div class="final-selection-line">最终选定支持集：{{ stepsAlphaBetaResult?.selectedLabel }}</div>
-                <div class="final-selection-line">覆盖桶：{{ stepsAlphaBetaResult?.selectedSupportSet?.bucketText }}</div>
-                <div class="final-selection-line">当前实现先基于敏感属性两两差异构造候选支持集，再按不确定性参数选择规则选出最终 α、β。</div>
+                <div class="final-selection-line">最终选中的敏感状态对：{{ stepsAlphaBetaResult?.selectedLabel }}</div>
+                <div class="final-selection-line">最终支持集：{{ stepsAlphaBetaResult?.selectedSupportSet?.bucketText }}</div>
+                <div class="final-selection-line">最终 α = {{ formatProbability(stepsAlphaBetaResult?.alpha) }}，β = {{ formatProbability(stepsAlphaBetaResult?.beta) }}</div>
+                <div class="final-selection-line">系统先按论文中的支持集规则构造各个 C_ij，再计算每个 (α_ij, β_ij)，最后按不确定性参数选择规则选出最终结果；ratio 仅作辅助展示。</div>
+              </div>
+
+              <div class="support-detail-list">
+                <div
+                  v-for="stat in stepsSupportStats"
+                  :key="`${stat.label}-detail`"
+                  :class="['support-detail-card', { 'selected-support-card': stepsAlphaBetaResult?.selectedLabel === stat.label }]"
+                >
+                  <div class="support-detail-header">
+                    <div class="support-detail-title">{{ stat.label }}</div>
+                    <el-tag v-if="stepsAlphaBetaResult?.selectedLabel === stat.label" type="success" effect="light">最终选中</el-tag>
+                  </div>
+                  <div class="support-detail-line">敏感状态对：{{ stat.sourcePair[0] }} vs {{ stat.sourcePair[1] }}</div>
+                  <div class="support-detail-line">支持集：{{ `C_${stat.sourcePair[0]}${stat.sourcePair[1]}` }} = {{ stat.bucketText }}</div>
+                  <div class="support-detail-line">选取依据：{{ stat.supportRule }}</div>
+                  <div class="support-detail-line">当前规则：{{ stat.localRule }}</div>
+
+                  <div class="support-detail-subtitle">支持集选取过程</div>
+                  <div v-for="decision in stat.bucketDecisions" :key="`${stat.label}-${decision.bucket}`" class="support-detail-line mono-line">
+                    {{ decision.bucket }}：Pr(A={{ decision.bucket }}|{{ decision.leftStatus }}) = {{ formatProbability(decision.leftProb) }}，
+                    Pr(A={{ decision.bucket }}|{{ decision.rightStatus }}) = {{ formatProbability(decision.rightProb) }}，
+                    {{ decision.reason }}
+                  </div>
+
+                  <div class="support-detail-subtitle">α、β 计算算式</div>
+                  <div class="support-detail-line mono-line">{{ stat.alphaFormula }}</div>
+                  <div class="support-detail-line mono-line">{{ stat.betaFormula }}</div>
+                  <div class="support-detail-line mono-line">{{ stat.compareFormula }}</div>
+                  <div v-if="stat.isEmptySet" class="support-detail-line">由于支持集为空，页面已按默认初始化展示 α_ij 与 β_ij。</div>
+                </div>
               </div>
             </div>
             <div v-else class="empty-state-panel">
-              <p>矩阵尚未计算，暂时无法展示候选支持集及其 α、β 结果。</p>
+              <p>点击“计算支持集与 α/β”后，将按当前 ε 构造 C_ij，并展示 α_ij、β_ij 及其计算过程。</p>
             </div>
+            </template>
           </div>
 
           <div class="module-group">
             <h3 class="module-title">内在不确定性参数</h3>
-            <div v-if="stepsAlphaBetaResult" class="result-grid">
+            <div v-if="!privacyBudgetSaved" class="empty-state-panel">
+              <p>请先设置并保存隐私预算 ε。</p>
+            </div>
+            <div v-else-if="stepsAlphaBetaResult" class="result-grid">
               <div class="result-panel accent-panel">
                 <div class="result-label">选定支持集</div>
                 <div class="result-value">{{ stepsAlphaBetaResult.selectedLabel }}</div>
@@ -720,7 +758,178 @@
               </div>
             </div>
             <div v-else class="empty-state-panel">
-              <p>条件分布矩阵计算完成后，这里会自动展示支持集对应的 α、β。</p>
+              <p>请先基于当前 ε 计算支持集与 α、β。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">扰动参数重校准</h3>
+              <el-button
+                type="primary"
+                :loading="stepsCalibrationLoading"
+                :disabled="!privacyBudgetSaved || !stepsAlphaBetaResult"
+                @click="calibrateParams"
+              >
+                校准扰动参数
+              </el-button>
+            </div>
+            <div class="result-grid compact-grid">
+              <div class="result-panel">
+                <div class="result-label">p（真实位保留为 1 的概率）</div>
+                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.p : '--' }}</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">q（非真实位翻转为 1 的概率）</div>
+                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.q : '--' }}</div>
+              </div>
+            </div>
+            <div class="calibration-tip">先对 A 做 one-hot 编码，再逐位扰动。</div>
+            <div class="calibration-tip">AOUE 中真实位的 p 固定为 0.5，q 由 ε、α、β 自动校准。</div>
+            <div v-if="!privacyBudgetSaved" class="calibration-tip">请先设置并保存隐私预算 ε。</div>
+            <div v-else-if="!stepsAlphaBetaResult" class="calibration-tip">请先基于当前 ε 计算支持集与内在不确定性参数。</div>
+            <div v-if="stepsCalibratedParams" class="calibration-info">
+              <p>隐私预算 ε = {{ stepsCalibratedParams.epsilon }}</p>
+              <p>域大小 d = {{ stepsCalibratedParams.d }}</p>
+              <p>协议 = {{ stepsCalibratedParams.protocol }}</p>
+              <p class="formula">调用 calculateAOUEParameters(α, β, ε) 计算 q，且 p 固定为 0.5。</p>
+              <p>{{ stepsCalibratedParams.description }}</p>
+              <p>数据源：{{ stepsCalibratedParams.dataSource }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="currentAttribute.name === '睡眠质量评分'" class="attribute-details">
+          <div class="form-item relation-row">
+            <span class="relation-label">防护模式：</span>
+            <span class="relation-value">混合隐私风险</span>
+          </div>
+
+          <div class="form-item relation-row">
+            <span class="relation-label">相关敏感属性 S：</span>
+            <span class="relation-value">年龄段</span>
+          </div>
+
+          <div class="form-item">
+            <label>年龄段分组</label>
+            <div class="boundary-settings">
+              <div class="boundary-group">
+                <div class="boundary-title">年龄段分组</div>
+                <div class="group-display">
+                  <div v-for="group in ageGroupDisplay" :key="group.name" class="group-item">
+                    <span class="group-name">{{ group.name }}</span>
+                    <span class="group-range">{{ group.range }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">缺失状态与敏感属性的条件分布矩阵 Pr(M|S)</h3>
+              <el-button type="primary" plain :loading="sleepMissingMatrixLoading" @click="recalculateMatrix">
+                {{ sleepMissingMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+              </el-button>
+            </div>
+
+            <div v-if="sleepMissingMatrixLoading" class="matrix-loading">
+              <span>正在根据当前 CSV 重新统计 Pr(M|S)...</span>
+            </div>
+            <div v-else-if="sleepMissingMatrixData" class="matrix-container">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>年龄段(S) \ 缺失状态(M)</th>
+                    <th
+                      v-for="header in MISSING_STATUS_ORDER"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isSleepMissingSelectedColumn(header) }]"
+                    >
+                      <div class="header-cell">
+                        <span>{{ header }}</span>
+                        <el-tag v-if="isSleepMissingSelectedColumn(header)" size="small" type="success" effect="light">αβ来源</el-tag>
+                      </div>
+                    </th>
+                    <th class="row-sum-column">行和</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in sleepMissingMatrixRows" :key="row.s">
+                    <th>{{ row.s }}</th>
+                    <td
+                      v-for="header in MISSING_STATUS_ORDER"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isSleepMissingSelectedColumn(header) }]"
+                    >
+                      {{ formatProbability(row[header]) }}
+                    </td>
+                    <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="matrix-placeholder">
+              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(M|S)。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">内在不确定性参数计算依据</h3>
+            <div v-if="sleepMissingColumnStats.length" class="basis-card">
+              <table class="basis-table">
+                <thead>
+                  <tr>
+                    <th>候选列</th>
+                    <th>max</th>
+                    <th>min</th>
+                    <th>ratio</th>
+                    <th>是否选中</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="stat in sleepMissingColumnStats" :key="stat.label">
+                    <td>{{ stat.label }}</td>
+                    <td>{{ formatProbability(stat.max) }}</td>
+                    <td>{{ formatProbability(stat.min) }}</td>
+                    <td>{{ formatRatio(stat.ratio) }}</td>
+                    <td>
+                      <el-tag v-if="sleepMissingAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">已选</el-tag>
+                      <span v-else class="muted-text">未选</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="final-selection-card">
+                <div class="final-selection-title">最终选择结果</div>
+                <div class="final-selection-line">最终选定列：{{ sleepMissingAlphaBetaResult?.selectedLabel }}</div>
+                <div class="final-selection-line">系统根据缺失状态两列的区分度比较结果，选出 α、β 来源列。</div>
+              </div>
+            </div>
+            <div v-else class="empty-state-panel">
+              <p>矩阵尚未计算，暂时无法展示缺失状态列的 max / min / ratio 比较。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">内在不确定性参数</h3>
+            <div v-if="sleepMissingAlphaBetaResult" class="result-grid">
+              <div class="result-panel accent-panel">
+                <div class="result-label">选定列</div>
+                <div class="result-value">{{ sleepMissingAlphaBetaResult.selectedLabel }}</div>
+                <div class="result-subtext">后续两阶段参数校准都基于该列的 α、β。</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">α（最大条件概率）</div>
+                <div class="result-value">{{ formatProbability(sleepMissingAlphaBetaResult.alpha) }}</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">β（最小条件概率）</div>
+                <div class="result-value">{{ formatProbability(sleepMissingAlphaBetaResult.beta) }}</div>
+              </div>
+            </div>
+            <div v-else class="empty-state-panel">
+              <p>缺失状态条件分布矩阵计算完成后，这里会自动展示 α、β。</p>
             </div>
           </div>
 
@@ -739,27 +948,55 @@
           <div class="module-group">
             <div class="section-header">
               <h3 class="module-title">扰动参数重校准</h3>
-              <el-button type="primary" :loading="stepsCalibrationLoading" @click="calibrateParams">校准扰动参数</el-button>
+              <el-button type="primary" :loading="sleepMissingCalibrationLoading" @click="calibrateParams">校准扰动参数</el-button>
             </div>
-            <div class="result-grid compact-grid">
-              <div class="result-panel">
-                <div class="result-label">p（真实位保留为 1 的概率）</div>
-                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.p : '--' }}</div>
+            <div class="stage-panel-group">
+              <div class="stage-panel">
+                <div class="stage-title">第一阶段：缺失状态扰动参数</div>
+                <div class="stage-desc">针对缺失状态 M 的二值扰动</div>
+                <div class="result-grid compact-grid">
+                  <div class="result-panel stage-result-panel">
+                    <div class="result-label">p1</div>
+                    <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.p1 : '--' }}</div>
+                    <div class="result-subtext">保留原始缺失状态的概率</div>
+                  </div>
+                  <div class="result-panel stage-result-panel">
+                    <div class="result-label">q1</div>
+                    <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.q1 : '--' }}</div>
+                    <div class="result-subtext">翻转为另一缺失状态的概率</div>
+                  </div>
+                </div>
+                <div class="stage-check-line">满足 p1 + q1 = 1</div>
               </div>
-              <div class="result-panel">
-                <div class="result-label">q（非真实位翻转为 1 的概率）</div>
-                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.q : '--' }}</div>
+
+              <div class="stage-panel">
+                <div class="stage-title">第二阶段：睡眠评分扰动参数</div>
+                <div class="stage-desc">针对非缺失睡眠评分（1-5）的多值扰动</div>
+                <div class="result-grid compact-grid">
+                  <div class="result-panel stage-result-panel">
+                    <div class="result-label">p2</div>
+                    <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.p2 : '--' }}</div>
+                    <div class="result-subtext">保留真实评分值的概率</div>
+                  </div>
+                  <div class="result-panel stage-result-panel">
+                    <div class="result-label">q2</div>
+                    <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.q2 : '--' }}</div>
+                    <div class="result-subtext">扰动到其他评分值的概率</div>
+                  </div>
+                </div>
+                <div class="stage-check-line">满足 p2 + 4q2 = 1</div>
               </div>
             </div>
-            <div class="calibration-tip">先对 A 做 one-hot 编码，再逐位扰动。</div>
-            <div class="calibration-tip">AOUE 中真实位的 p 固定为 0.5，q 由 ε、α、β 自动校准。</div>
-            <div v-if="stepsCalibratedParams" class="calibration-info">
-              <p>隐私预算 ε = {{ stepsCalibratedParams.epsilon }}</p>
-              <p>域大小 d = {{ stepsCalibratedParams.d }}</p>
-              <p>协议 = {{ stepsCalibratedParams.protocol }}</p>
-              <p class="formula">调用 calculateAOUEParameters(α, β, ε) 计算 q，且 p 固定为 0.5。</p>
-              <p>{{ stepsCalibratedParams.description }}</p>
-              <p>数据源：{{ stepsCalibratedParams.dataSource }}</p>
+            <div v-if="sleepMissingCalibratedParams" class="calibration-summary-bar">
+              已完成两阶段扰动参数校准
+            </div>
+            <div v-if="sleepMissingCalibratedParams" class="light-summary-card">
+              <div class="light-summary-item">隐私预算 ε：{{ sleepMissingCalibratedParams.epsilon }}</div>
+              <div class="light-summary-item">第一阶段预算 ε1：{{ sleepMissingCalibratedParams.epsilonStage1 }}</div>
+              <div class="light-summary-item">第二阶段预算 ε2：{{ sleepMissingCalibratedParams.epsilonStage2 }}</div>
+              <div class="light-summary-item">协议：{{ sleepMissingCalibratedParams.protocol }}</div>
+              <div class="light-summary-item">数据源：{{ sleepMissingCalibratedParams.dataSource }}</div>
+              <div class="light-summary-item">机制说明：{{ sleepMissingCalibratedParams.description }}</div>
             </div>
           </div>
         </div>
@@ -808,7 +1045,14 @@ import {
   calculateStepsAlphaBeta,
   loadStepsMatrixFromCSV
 } from '../../utils/stepsWeightMatrix.js';
-import { calculateARRParameters, calculateAGRParameters, calculateAOUEParameters } from '../../utils/ldpAlgorithms.js';
+import {
+  SLEEP_QUALITY_MISSING_DATA_PATH,
+  MISSING_STATUS_ORDER,
+  buildSleepMissingMatrixRows,
+  calculateSleepMissingAlphaBeta,
+  loadSleepMissingMatrixFromCSV
+} from '../../utils/sleepQualityMissingMatrix.js';
+import { calculateARRParameters, calculateAGRParameters, calculateAOUEParameters, calculateTSPParameters } from '../../utils/ldpAlgorithms.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -839,16 +1083,6 @@ const savedPrivacyBudget = ref(1.0);
 const attributes = ref([
   {
     id: 1,
-    name: '睡眠时长',
-    isProtected: false,
-    protectionMode: 'indirect',
-    algorithm: 'aoue',
-    status: '未配置',
-    fixed: true,
-    tooltip: '睡眠时长与血压存在关联关系，保留原有间接隐私风险配置。'
-  },
-  {
-    id: 2,
     name: '是否触发异常跌倒告警',
     isProtected: false,
     protectionMode: 'indirect',
@@ -858,7 +1092,7 @@ const attributes = ref([
     tooltip: '是否触发异常跌倒告警与年龄段分组存在关联关系，固定采用间接隐私风险配置。'
   },
   {
-    id: 3,
+    id: 2,
     name: '日均站立时长分档',
     isProtected: false,
     protectionMode: 'indirect',
@@ -868,7 +1102,7 @@ const attributes = ref([
     tooltip: '日均站立时长分档与体重状态存在关联关系，使用间接隐私风险 + AGRR协议。'
   },
   {
-    id: 4,
+    id: 3,
     name: '每日步数分桶',
     isProtected: false,
     protectionMode: 'indirect',
@@ -877,7 +1111,16 @@ const attributes = ref([
     fixed: true,
     tooltip: '每日步数分桶与体重状态存在关联关系，使用间接隐私风险 + AOUE协议。'
   },
-  { id: 5, name: '睡眠质量评分', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false, tooltip: '' }
+  {
+    id: 4,
+    name: '睡眠质量评分',
+    isProtected: false,
+    protectionMode: 'hybrid',
+    algorithm: 'tsp',
+    status: '未配置',
+    fixed: true,
+    tooltip: '睡眠质量评分存在缺失状态与年龄段关联，使用混合隐私风险 + TSP协议。'
+  }
 ]);
 
 const ageGroupDisplay = AGE_GROUP_DISPLAY;
@@ -912,6 +1155,13 @@ const stepsSupportStats = ref([]);
 const stepsCalibrationLoading = ref(false);
 const stepsCalibratedParams = ref(null);
 
+const sleepMissingMatrixLoading = ref(false);
+const sleepMissingMatrixData = ref(null);
+const sleepMissingAlphaBetaResult = ref(null);
+const sleepMissingColumnStats = ref([]);
+const sleepMissingCalibrationLoading = ref(false);
+const sleepMissingCalibratedParams = ref(null);
+
 
 
 const matrixRows = computed(() => buildMatrixRows(fallAlarmMatrixData.value));
@@ -925,6 +1175,8 @@ const unselectedColumnRatio = computed(() => {
 // 站立时长矩阵数据
 const standMatrixRows = computed(() => buildStandMatrixRows(standMatrixData.value));
 const stepsMatrixRows = computed(() => buildStepsMatrixRows(stepsMatrixData.value));
+const sleepMissingMatrixRows = computed(() => buildSleepMissingMatrixRows(sleepMissingMatrixData.value));
+const canCalculateStepsSupport = computed(() => Boolean(stepsMatrixData.value && privacyBudgetSaved.value));
 const canSaveCurrentConfig = computed(() => {
   if (!currentAttribute.value) return false;
 
@@ -952,6 +1204,15 @@ const canSaveCurrentConfig = computed(() => {
       stepsAlphaBetaResult.value &&
       privacyBudgetSaved.value &&
       stepsCalibratedParams.value
+    );
+  }
+
+  if (currentAttribute.value.name === '睡眠质量评分') {
+    return Boolean(
+      hasGeneratedMatrix.value &&
+      sleepMissingAlphaBetaResult.value &&
+      privacyBudgetSaved.value &&
+      sleepMissingCalibratedParams.value
     );
   }
 
@@ -998,6 +1259,9 @@ function rowSum(row) {
   if (STAND_BUCKET_ORDER.some(header => row[header] !== undefined)) {
     return STAND_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
   }
+  if (MISSING_STATUS_ORDER.some(header => row[header] !== undefined)) {
+    return MISSING_STATUS_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
+  }
   return STEP_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
 }
 
@@ -1013,6 +1277,10 @@ function isStepsSelectedBucket(header) {
   return stepsAlphaBetaResult.value?.selectedSupportSet?.buckets?.includes(header);
 }
 
+function isSleepMissingSelectedColumn(header) {
+  return sleepMissingAlphaBetaResult.value?.selectedLabel === header;
+}
+
 function savePrivacyBudget() {
   const nextValue = Number(dialogPrivacyBudget.value);
   if (!Number.isFinite(nextValue) || nextValue <= 0) {
@@ -1026,6 +1294,11 @@ function savePrivacyBudget() {
   calibratedParams.value = null;
   standCalibratedParams.value = null;
   stepsCalibratedParams.value = null;
+  sleepMissingCalibratedParams.value = null;
+  if (currentAttribute.value?.name === '每日步数分桶') {
+    stepsAlphaBetaResult.value = null;
+    stepsSupportStats.value = [];
+  }
   ElMessage.success('隐私预算已保存');
 }
 
@@ -1042,6 +1315,10 @@ function resetMatrixState() {
   stepsAlphaBetaResult.value = null;
   stepsSupportStats.value = [];
   stepsCalibratedParams.value = null;
+  sleepMissingMatrixData.value = null;
+  sleepMissingAlphaBetaResult.value = null;
+  sleepMissingColumnStats.value = [];
+  sleepMissingCalibratedParams.value = null;
   hasGeneratedMatrix.value = false;
   privacyBudgetSaved.value = false;
   dialogPrivacyBudget.value = basicConfig.value.privacyBudget;
@@ -1083,6 +1360,23 @@ function buildCurrentConfigPayload() {
     };
   }
 
+  if (currentAttribute.value?.name === '睡眠质量评分') {
+    return {
+      attributeName: currentAttribute.value.name,
+      sceneType: 'sleepQualityTsp',
+      matrixData: sleepMissingMatrixData.value,
+      columnStats: sleepMissingColumnStats.value,
+      alphaBetaResult: sleepMissingAlphaBetaResult.value,
+      epsilon: savedPrivacyBudget.value,
+      epsilonDraft: dialogPrivacyBudget.value,
+      privacyBudgetSaved: privacyBudgetSaved.value,
+      calibratedParams: sleepMissingCalibratedParams.value,
+      notes: {
+        dataPath: SLEEP_QUALITY_MISSING_DATA_PATH
+      }
+    };
+  }
+
   return {
     attributeName: currentAttribute.value?.name || '',
     sceneType: 'fallAlarm',
@@ -1120,6 +1414,18 @@ function applySavedConfig(config) {
     stepsAlphaBetaResult.value = config?.alphaBetaResult || null;
     stepsSupportStats.value = config?.supportStats || config?.alphaBetaResult?.supportStats || [];
     stepsCalibratedParams.value = config?.calibratedParams || null;
+    hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
+    privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
+    dialogPrivacyBudget.value = config?.epsilonDraft ?? config?.epsilon ?? basicConfig.value.privacyBudget;
+    savedPrivacyBudget.value = config?.epsilon ?? basicConfig.value.privacyBudget;
+    return;
+  }
+
+  if (config?.sceneType === 'sleepQualityTsp') {
+    sleepMissingMatrixData.value = config?.matrixData || null;
+    sleepMissingAlphaBetaResult.value = config?.alphaBetaResult || null;
+    sleepMissingColumnStats.value = config?.columnStats || config?.alphaBetaResult?.stats || [];
+    sleepMissingCalibratedParams.value = config?.calibratedParams || null;
     hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
     privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
     dialogPrivacyBudget.value = config?.epsilonDraft ?? config?.epsilon ?? basicConfig.value.privacyBudget;
@@ -1187,23 +1493,61 @@ async function recalculateMatrix() {
     }
   } else if (currentAttribute.value.name === '每日步数分桶') {
     stepsMatrixLoading.value = true;
+    stepsAlphaBetaResult.value = null;
+    stepsSupportStats.value = [];
     stepsCalibratedParams.value = null;
 
     try {
       const result = await loadStepsMatrixFromCSV();
       stepsMatrixData.value = result.matrix;
-      const alphaBetaResultData = calculateStepsAlphaBeta(result.matrix, Number(savedPrivacyBudget.value) || 1.0);
-      stepsAlphaBetaResult.value = alphaBetaResultData;
-      stepsSupportStats.value = alphaBetaResultData.supportStats;
       hasGeneratedMatrix.value = true;
-      ElMessage.success('条件分布矩阵已刷新');
+      ElMessage.success('条件分布矩阵已刷新，请先保存隐私预算 ε 再计算支持集与内在不确定性参数');
     } catch (error) {
       console.error('重算条件分布矩阵失败:', error);
       ElMessage.error('重算条件分布矩阵失败');
     } finally {
       stepsMatrixLoading.value = false;
     }
+  } else if (currentAttribute.value.name === '睡眠质量评分') {
+    sleepMissingMatrixLoading.value = true;
+    sleepMissingCalibratedParams.value = null;
+
+    try {
+      const result = await loadSleepMissingMatrixFromCSV();
+      sleepMissingMatrixData.value = result.matrix;
+      const alphaBetaResultData = calculateSleepMissingAlphaBeta(result.matrix);
+      sleepMissingAlphaBetaResult.value = alphaBetaResultData;
+      sleepMissingColumnStats.value = alphaBetaResultData.stats;
+      hasGeneratedMatrix.value = true;
+      ElMessage.success('缺失状态条件分布矩阵已刷新');
+    } catch (error) {
+      console.error('重算条件分布矩阵失败:', error);
+      ElMessage.error('重算条件分布矩阵失败');
+    } finally {
+      sleepMissingMatrixLoading.value = false;
+    }
   }
+}
+
+function calculateStepsSupportAndAlphaBeta() {
+  if (!stepsMatrixData.value) {
+    ElMessage.warning('请先计算条件分布矩阵');
+    return;
+  }
+
+  if (!privacyBudgetSaved.value) {
+    ElMessage.warning('请先设置并保存隐私预算 ε');
+    return;
+  }
+
+  const alphaBetaResultData = calculateStepsAlphaBeta(
+    stepsMatrixData.value,
+    Number(savedPrivacyBudget.value) || 1.0
+  );
+  stepsAlphaBetaResult.value = alphaBetaResultData;
+  stepsSupportStats.value = alphaBetaResultData.supportStats;
+  stepsCalibratedParams.value = null;
+  ElMessage.success('支持集与内在不确定性参数已更新');
 }
 
 async function handleAttributeClick(attribute) {
@@ -1231,6 +1575,14 @@ async function handleAttributeClick(attribute) {
     attribute.name === '每日步数分桶' &&
     stepsAlphaBetaResult.value &&
     !stepsMatrixData.value
+  ) {
+    await recalculateMatrix();
+  }
+
+  if (
+    attribute.name === '睡眠质量评分' &&
+    sleepMissingAlphaBetaResult.value &&
+    !sleepMissingMatrixData.value
   ) {
     await recalculateMatrix();
   }
@@ -1355,6 +1707,49 @@ function calibrateParams() {
       ElMessage.error('校准扰动参数失败');
     } finally {
       stepsCalibrationLoading.value = false;
+    }
+  } else if (currentAttribute.value.name === '睡眠质量评分') {
+    if (!sleepMissingAlphaBetaResult.value) {
+      ElMessage.warning('请先计算缺失状态条件分布矩阵');
+      return;
+    }
+
+    if (!privacyBudgetSaved.value) {
+      ElMessage.warning('请先填写并保存隐私预算 ε');
+      return;
+    }
+
+    sleepMissingCalibrationLoading.value = true;
+
+    try {
+      const epsilon = Number(savedPrivacyBudget.value) || 1.0;
+      const { epsilonStage1, epsilonStage2, p1, q1, p2, q2, scoreDomainSize } = calculateTSPParameters(
+        sleepMissingAlphaBetaResult.value.alpha,
+        sleepMissingAlphaBetaResult.value.beta,
+        epsilon,
+        5
+      );
+
+      sleepMissingCalibratedParams.value = {
+        p1: Number(p1).toFixed(4),
+        q1: Number(q1).toFixed(4),
+        p2: Number(p2).toFixed(4),
+        q2: Number(q2).toFixed(4),
+        epsilon,
+        epsilonStage1: Number(epsilonStage1).toFixed(4),
+        epsilonStage2: Number(epsilonStage2).toFixed(4),
+        d: scoreDomainSize,
+        protocol: 'TSP (Two-Stage Perturbation)',
+        description: `第一阶段针对缺失状态 M 进行二值扰动，第二阶段针对非缺失的睡眠评分（1-5）进行评分扰动。`,
+        dataSource: 'temp_sleep_quality_missing_age_200.csv'
+      };
+
+      ElMessage.success('两阶段扰动参数校准完成');
+    } catch (error) {
+      console.error('校准扰动参数失败:', error);
+      ElMessage.error('校准扰动参数失败');
+    } finally {
+      sleepMissingCalibrationLoading.value = false;
     }
   }
 }
@@ -1815,6 +2210,116 @@ onMounted(() => {
 .final-selection-line {
   color: #214c9b;
   font-weight: 600;
+  line-height: 1.6;
+}
+
+.support-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.support-detail-card {
+  padding: 14px;
+  border: 1px solid #dfe6ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.selected-support-card {
+  border-color: #bfd7ff;
+  background: #eef5ff;
+}
+
+.support-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.support-detail-title,
+.support-detail-subtitle {
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.support-detail-subtitle {
+  margin-top: 10px;
+}
+
+.support-detail-line {
+  color: #425466;
+  line-height: 1.7;
+}
+
+.mono-line {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.stage-panel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stage-panel {
+  padding: 16px;
+  border: 1px solid #dfe6ee;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.stage-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.stage-desc {
+  margin-top: 6px;
+  margin-bottom: 12px;
+  color: #6b7785;
+  font-size: 13px;
+}
+
+.stage-result-panel {
+  background: #ffffff;
+  min-height: 132px;
+}
+
+.stage-check-line {
+  margin-top: 10px;
+  color: #6b7785;
+  font-size: 13px;
+}
+
+.calibration-summary-bar {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #eef5ff;
+  border: 1px solid #bfd7ff;
+  color: #214c9b;
+  font-weight: 700;
+}
+
+.light-summary-card {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.light-summary-item {
+  color: #425466;
   line-height: 1.6;
 }
 

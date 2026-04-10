@@ -109,32 +109,82 @@ export function buildStepsMatrixRows(matrixData) {
   });
 }
 
-function getPairwiseSupportCandidates(matrixData) {
+function formatSupportFormula(status, terms, sum) {
+  return `${status}行求和 = ${terms.map(value => value.toFixed(4)).join(' + ')} = ${sum.toFixed(4)}`;
+}
+
+function getPairwiseSupportCandidates(matrixData, epsilon = 1) {
   const pairs = [
     ['偏瘦', '正常'],
     ['偏瘦', '超重'],
     ['正常', '超重']
   ];
+  const expEpsilon = Math.exp(epsilon);
+  const defaultAlpha = expEpsilon / (1 + expEpsilon);
+  const defaultBeta = 1 / (1 + expEpsilon);
 
   return pairs.map(([left, right]) => {
-    const diffEntries = STEP_BUCKET_ORDER.map(bucket => ({
-      bucket,
-      diff: Math.abs((matrixData.conditionalProbs[left]?.[bucket] ?? 0) - (matrixData.conditionalProbs[right]?.[bucket] ?? 0))
-    }));
+    const diffEntries = STEP_BUCKET_ORDER.map(bucket => {
+      const leftProb = matrixData.conditionalProbs[left]?.[bucket] ?? 0;
+      const rightProb = matrixData.conditionalProbs[right]?.[bucket] ?? 0;
+      const ratio = rightProb === 0 ? (leftProb === 0 ? 1 : Number.POSITIVE_INFINITY) : leftProb / rightProb;
+      const included = ratio >= expEpsilon;
 
-    const avgDiff = diffEntries.reduce((sum, item) => sum + item.diff, 0) / diffEntries.length;
-    let supportBuckets = diffEntries.filter(item => item.diff >= avgDiff).map(item => item.bucket);
+      return {
+        bucket,
+        leftProb,
+        rightProb,
+        ratio,
+        included
+      };
+    });
 
-    if (!supportBuckets.length) {
-      supportBuckets = [diffEntries.slice().sort((a, b) => b.diff - a.diff)[0].bucket];
-    }
+    const supportBuckets = diffEntries.filter(item => item.included).map(item => item.bucket);
+    const pairValues = calculateSupportProbabilities(matrixData, supportBuckets, [left, right]);
+    const leftValue = pairValues.find(item => item.status === left) ?? { status: left, terms: [], sum: 0 };
+    const rightValue = pairValues.find(item => item.status === right) ?? { status: right, terms: [], sum: 0 };
+    const isEmptySet = supportBuckets.length === 0;
+    const alpha = isEmptySet ? defaultAlpha : leftValue.sum;
+    const beta = isEmptySet ? defaultBeta : rightValue.sum;
 
     return {
       label: `${left} vs ${right}`,
       sourcePair: [left, right],
+      supportRule: '按论文规则构造 C_ij = { a | Pr(A=a|s_i) / Pr(A=a|s_j) >= e^ε }。',
       buckets: supportBuckets,
-      diffScore: diffEntries.reduce((sum, item) => sum + item.diff, 0),
-      bucketText: supportBuckets.join('、')
+      bucketText: supportBuckets.length ? supportBuckets.join('、') : '∅',
+      pairValues,
+      alpha,
+      beta,
+      alphaSource: left,
+      betaSource: right,
+      alphaTerms: leftValue.terms,
+      betaTerms: rightValue.terms,
+      alphaFormula: isEmptySet
+        ? `α_${left}${right} = e^ε / (1 + e^ε) = ${defaultAlpha.toFixed(4)}`
+        : `α_${left}${right} = ${leftValue.terms.map(value => value.toFixed(4)).join(' + ')} = ${leftValue.sum.toFixed(4)}`,
+      betaFormula: isEmptySet
+        ? `β_${left}${right} = 1 / (1 + e^ε) = ${defaultBeta.toFixed(4)}`
+        : `β_${left}${right} = ${rightValue.terms.map(value => value.toFixed(4)).join(' + ')} = ${rightValue.sum.toFixed(4)}`,
+      compareFormula: isEmptySet
+        ? `由于 C_${left}${right} = ∅，按默认初始化取 α = ${defaultAlpha.toFixed(4)}，β = ${defaultBeta.toFixed(4)}`
+        : `α = ${leftValue.sum.toFixed(4)}，β = ${rightValue.sum.toFixed(4)}`,
+      ratio: beta === 0 ? Number.POSITIVE_INFINITY : alpha / beta,
+      bucketDecisions: diffEntries.map(item => ({
+        bucket: item.bucket,
+        leftStatus: left,
+        rightStatus: right,
+        leftProb: item.leftProb,
+        rightProb: item.rightProb,
+        ratio: item.ratio,
+        included: item.included,
+        reason: item.included
+          ? `因 Pr(${item.bucket}|${left}) / Pr(${item.bucket}|${right}) = ${Number.isFinite(item.ratio) ? item.ratio.toFixed(4) : 'Infinity'} >= e^ε = ${expEpsilon.toFixed(4)}，纳入 C_ij`
+          : `因 Pr(${item.bucket}|${left}) / Pr(${item.bucket}|${right}) = ${Number.isFinite(item.ratio) ? item.ratio.toFixed(4) : 'Infinity'} < e^ε = ${expEpsilon.toFixed(4)}，不纳入 C_ij`
+      })),
+      localRule: `对 ${left} vs ${right}，仅保留满足 Pr(A=a|S=${left}) / Pr(A=a|S=${right}) >= e^ε 的桶。`,
+      expEpsilon,
+      isEmptySet
     };
   });
 }
@@ -165,26 +215,10 @@ export function calculateStepsAlphaBeta(matrixData, epsilon = 1) {
   }
 
   const expEpsilon = Math.exp(epsilon);
-  const supportStats = getPairwiseSupportCandidates(matrixData).map((candidate, index) => {
-    const pairValues = calculateSupportProbabilities(matrixData, candidate.buckets, candidate.sourcePair);
-    const alphaItem = pairValues.reduce((best, current) => (current.sum > best.sum ? current : best));
-    const betaItem = pairValues.reduce((best, current) => (current.sum < best.sum ? current : best));
-    const alpha = alphaItem.sum;
-    const beta = betaItem.sum;
-
-    return {
-      ...candidate,
-      alpha,
-      beta,
-      ratio: beta === 0 ? Number.POSITIVE_INFINITY : alpha / beta,
-      supportIndex: index,
-      pairValues,
-      alphaSource: alphaItem.status,
-      betaSource: betaItem.status,
-      alphaTerms: alphaItem.terms,
-      betaTerms: betaItem.terms
-    };
-  });
+  const supportStats = getPairwiseSupportCandidates(matrixData, epsilon).map((candidate, index) => ({
+    ...candidate,
+    supportIndex: index
+  }));
 
   let selectedPair = null;
   let selectedSupportSet = null;
@@ -209,7 +243,7 @@ export function calculateStepsAlphaBeta(matrixData, epsilon = 1) {
     selectedLabel: selectedSupportSet?.label ?? null,
     selectedSupportSet,
     supportStats,
-    selectionRule: '系统依据不确定性参数选择规则，从候选支持集的 (α, β) 中选出最终结果。',
+    selectionRule: '系统先按论文中的支持集规则构造各个 C_ij，再计算每个 (α_ij, β_ij)，最后使用 choose() 依据不确定性参数选择规则选出最终结果。',
     expEpsilon
   };
 }
