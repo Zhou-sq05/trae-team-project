@@ -1,4 +1,6 @@
-﻿export const YOUNG_MIN = 18;
+﻿import { FALL_ALARM_ORDER, AGE_GROUP_DISPLAY } from './constants.js';
+
+export const YOUNG_MIN = 18;
 export const YOUNG_MAX = 44;
 export const MIDDLE_MIN = 45;
 export const MIDDLE_MAX = 59;
@@ -7,13 +9,6 @@ export const OLD_MIN = 60;
 export const FALL_ALARM_DATA_PATH = '/data/temp_fall_alarm_age_200.csv';
 
 export const AGE_GROUP_ORDER = ['青年', '中年', '老年'];
-export const FALL_ALARM_ORDER = ['未触发（A=0）', '触发（A=1）'];
-
-export const AGE_GROUP_DISPLAY = [
-  { name: '青年', range: `${YOUNG_MIN}-${YOUNG_MAX}岁` },
-  { name: '中年', range: `${MIDDLE_MIN}-${MIDDLE_MAX}岁` },
-  { name: '老年', range: `${OLD_MIN}岁及以上` }
-];
 
 export function getAgeGroup(age) {
   const numericAge = Number(age);
@@ -169,3 +164,5 @@ export async function loadFallAlarmMatrixFromCSV(filePath = FALL_ALARM_DATA_PATH
     matrix
   };
 }
+
+export { AGE_GROUP_DISPLAY };

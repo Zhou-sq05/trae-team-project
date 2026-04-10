@@ -369,9 +369,9 @@
             <div class="calibration-tip">满足 p + q = 1</div>
             <div v-if="calibratedParams" class="calibration-info">
               <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
-              <p>域大小 k = {{ calibratedParams.k }}</p>
+              <p>域大小 d = {{ calibratedParams.d || calibratedParams.k }}</p>
               <p>协议 = {{ calibratedParams.protocol }}</p>
-              <p class="formula">p = e^ε / (e^ε + k - 1), q = 1 / (e^ε + k - 1)</p>
+              <p class="formula">p = e^ε / (e^ε + d - 1), q = 1 / (e^ε + d - 1)</p>
               <p>{{ calibratedParams.description }}</p>
               <p>数据源：{{ calibratedParams.dataSource }}</p>
             </div>
@@ -409,6 +409,361 @@
           </div>
         </div>
 
+        <div v-else-if="currentAttribute.name === '日均站立时长分档'" class="attribute-details">
+          <div class="form-item relation-row">
+            <span class="relation-label">相关敏感属性 S：</span>
+            <span class="relation-value">体重状态</span>
+          </div>
+
+          <div class="form-item">
+            <label>体重状态分组</label>
+            <div class="boundary-settings">
+              <div class="boundary-group">
+                <div class="boundary-title">体重状态分组</div>
+                <div class="group-display">
+                  <div class="group-item"><span class="group-name">偏瘦</span></div>
+                  <div class="group-item"><span class="group-name">正常</span></div>
+                  <div class="group-item"><span class="group-name">超重</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">S 与 A 的条件分布矩阵 Pr(A|S)</h3>
+              <el-button type="primary" plain :loading="standMatrixLoading" @click="recalculateMatrix">
+                {{ standMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+              </el-button>
+            </div>
+
+            <div v-if="standMatrixLoading" class="matrix-loading">
+              <span>正在根据当前 CSV 重新统计条件分布矩阵...</span>
+            </div>
+            <div v-else-if="standMatrixData" class="matrix-container">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>体重状态(S) \ 日均站立时长分档(A)</th>
+                    <th
+                      v-for="header in STAND_BUCKET_ORDER"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isStandSelectedColumn(header) }]"
+                    >
+                      <div class="header-cell">
+                        <span>{{ header }}</span>
+                        <el-tag v-if="isStandSelectedColumn(header)" size="small" type="success" effect="light">αβ来源</el-tag>
+                      </div>
+                    </th>
+                    <th class="row-sum-column">行和</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in standMatrixRows" :key="row.s">
+                    <th>{{ row.s }}</th>
+                    <td
+                      v-for="header in STAND_BUCKET_ORDER"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isStandSelectedColumn(header) }]"
+                    >
+                      {{ formatProbability(row[header]) }}
+                    </td>
+                    <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="matrix-placeholder">
+              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(A|S)。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">计算依据</h3>
+            <div v-if="standColumnStats.length" class="basis-card">
+              <table class="basis-table">
+                <thead>
+                  <tr>
+                    <th>候选列</th>
+                    <th>αk</th>
+                    <th>βk</th>
+                    <th>ratio</th>
+                    <th>是否选中</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="stat in standColumnStats" :key="stat.label">
+                    <td>{{ stat.label }}</td>
+                    <td>{{ formatProbability(stat.alpha) }}</td>
+                    <td>{{ formatProbability(stat.beta) }}</td>
+                    <td>{{ formatRatio(stat.ratio) }}</td>
+                    <td>
+                      <el-tag v-if="standAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">
+                        已选
+                      </el-tag>
+                      <span v-else class="muted-text">未选</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="final-selection-card">
+                <div class="final-selection-title">最终选择结果</div>
+                <div class="final-selection-line">最终选定列：{{ standAlphaBetaResult?.selectedLabel }}</div>
+                <div class="final-selection-line">
+                  选择原因：系统依据不确定性参数选择规则，从各候选列的 (αk, βk) 中选出最终 α、β；ratio 仅作为辅助展示指标。
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state-panel">
+              <p>矩阵尚未计算，暂时无法展示各候选列的 αk / βk / ratio 比较结果。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">内在不确定性参数</h3>
+            <div v-if="standAlphaBetaResult" class="result-grid">
+              <div class="result-panel accent-panel">
+                <div class="result-label">选定列</div>
+                <div class="result-value">{{ standAlphaBetaResult.selectedLabel }}</div>
+                <div class="result-subtext">系统按不确定性参数选择规则选中该列，ratio 仅用于辅助展示。</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">α（最大条件概率）</div>
+                <div class="result-value">{{ formatProbability(standAlphaBetaResult.alpha) }}</div>
+                <div class="result-subtext">在选定列中，对所有体重状态取最大的 Pr(A=a*|S=s)。</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">β（最小条件概率）</div>
+                <div class="result-value">{{ formatProbability(standAlphaBetaResult.beta) }}</div>
+                <div class="result-subtext">在选定列中，对所有体重状态取最小的 Pr(A=a*|S=s)。</div>
+              </div>
+            </div>
+            <div v-else class="empty-state-panel">
+              <p>条件分布矩阵计算完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">隐私预算 ε</h3>
+            <div class="epsilon-card">
+              <div class="epsilon-item">
+                <span class="epsilon-label">当前隐私预算</span>
+                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
+              </div>
+              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
+            </div>
+            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">扰动参数重校准</h3>
+              <el-button type="primary" :loading="standCalibrationLoading" @click="calibrateParams">校准扰动参数</el-button>
+            </div>
+            <div class="result-grid compact-grid">
+              <div class="result-panel">
+                <div class="result-label">p（保持概率）</div>
+                <div class="result-value">{{ standCalibratedParams ? standCalibratedParams.p : '--' }}</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">q（翻转概率）</div>
+                <div class="result-value">{{ standCalibratedParams ? standCalibratedParams.q : '--' }}</div>
+              </div>
+            </div>
+            <div class="calibration-tip">由 ε、α、β 自动校准</div>
+            <div class="calibration-tip">d = 4 表示 A 的域大小</div>
+            <div class="calibration-tip">满足 p + (d-1)q = 1</div>
+            <div v-if="standCalibratedParams" class="calibration-info">
+              <p>隐私预算 ε = {{ standCalibratedParams.epsilon }}</p>
+              <p>域大小 d = {{ standCalibratedParams.d || standCalibratedParams.k }}</p>
+              <p>协议 = {{ standCalibratedParams.protocol }}</p>
+              <p class="formula">当 α / β ≤ e^ε 时，直接取 p = 1, q = 0；否则 p = ((1 - α) - (1 - β)e^ε) / ((1 - dα) - (1 - dβ)e^ε)，q = (1 - p)/(d - 1)</p>
+              <p>{{ standCalibratedParams.description }}</p>
+              <p>数据源：{{ standCalibratedParams.dataSource }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="currentAttribute.name === '每日步数分桶'" class="attribute-details">
+          <div class="form-item relation-row">
+            <span class="relation-label">相关敏感属性 S：</span>
+            <span class="relation-value">体重状态</span>
+          </div>
+
+          <div class="form-item">
+            <label>体重状态分组</label>
+            <div class="boundary-settings">
+              <div class="boundary-group">
+                <div class="boundary-title">体重状态分组</div>
+                <div class="group-display">
+                  <div v-for="status in WEIGHT_STATUS_ORDER" :key="status" class="group-item">
+                    <span class="group-name">{{ status }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">S 与 A 的条件分布矩阵 Pr(A|S)</h3>
+              <el-button type="primary" plain :loading="stepsMatrixLoading" @click="recalculateMatrix">
+                {{ stepsMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+              </el-button>
+            </div>
+
+            <div v-if="stepsMatrixLoading" class="matrix-loading">
+              <span>正在根据当前 CSV 重新统计条件分布矩阵...</span>
+            </div>
+            <div v-else-if="stepsMatrixData" class="matrix-container">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>体重状态(S) \ 每日步数分桶(A)</th>
+                    <th
+                      v-for="header in STEP_BUCKET_ORDER"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isStepsSelectedBucket(header) }]"
+                    >
+                      <div class="header-cell">
+                        <span>{{ header }}</span>
+                        <el-tag
+                          v-if="isStepsSelectedBucket(header)"
+                          size="small"
+                          type="success"
+                          effect="light"
+                        >
+                          支持集
+                        </el-tag>
+                      </div>
+                    </th>
+                    <th class="row-sum-column">行和</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in stepsMatrixRows" :key="row.s">
+                    <th>{{ row.s }}</th>
+                    <td
+                      v-for="header in STEP_BUCKET_ORDER"
+                      :key="header"
+                      :class="['matrix-value-column', { 'highlight-column': isStepsSelectedBucket(header) }]"
+                    >
+                      {{ formatProbability(row[header]) }}
+                    </td>
+                    <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="matrix-placeholder">
+              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(A|S)。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">计算依据</h3>
+            <div v-if="stepsSupportStats.length" class="basis-card">
+              <table class="basis-table">
+                <thead>
+                  <tr>
+                    <th>候选支持集</th>
+                    <th>覆盖桶</th>
+                    <th>α</th>
+                    <th>β</th>
+                    <th>是否选中</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="stat in stepsSupportStats" :key="stat.label">
+                    <td>{{ stat.label }}</td>
+                    <td>{{ stat.bucketText }}</td>
+                    <td>{{ formatProbability(stat.alpha) }}</td>
+                    <td>{{ formatProbability(stat.beta) }}</td>
+                    <td>
+                      <el-tag v-if="stepsAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">
+                        已选
+                      </el-tag>
+                      <span v-else class="muted-text">未选</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="final-selection-card">
+                <div class="final-selection-title">最终选择结果</div>
+                <div class="final-selection-line">最终选定支持集：{{ stepsAlphaBetaResult?.selectedLabel }}</div>
+                <div class="final-selection-line">覆盖桶：{{ stepsAlphaBetaResult?.selectedSupportSet?.bucketText }}</div>
+                <div class="final-selection-line">当前实现先基于敏感属性两两差异构造候选支持集，再按不确定性参数选择规则选出最终 α、β。</div>
+              </div>
+            </div>
+            <div v-else class="empty-state-panel">
+              <p>矩阵尚未计算，暂时无法展示候选支持集及其 α、β 结果。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">内在不确定性参数</h3>
+            <div v-if="stepsAlphaBetaResult" class="result-grid">
+              <div class="result-panel accent-panel">
+                <div class="result-label">选定支持集</div>
+                <div class="result-value">{{ stepsAlphaBetaResult.selectedLabel }}</div>
+                <div class="result-subtext">{{ stepsAlphaBetaResult.selectedSupportSet?.bucketText }}</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">α（最大条件概率）</div>
+                <div class="result-value">{{ formatProbability(stepsAlphaBetaResult.alpha) }}</div>
+                <div class="result-subtext">在当前候选支持集对应的 sourcePair 内，对覆盖桶逐项求和后取较大值。</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">β（最小条件概率）</div>
+                <div class="result-value">{{ formatProbability(stepsAlphaBetaResult.beta) }}</div>
+                <div class="result-subtext">在当前候选支持集对应的 sourcePair 内，对覆盖桶逐项求和后取较小值。</div>
+              </div>
+            </div>
+            <div v-else class="empty-state-panel">
+              <p>条件分布矩阵计算完成后，这里会自动展示支持集对应的 α、β。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">隐私预算 ε</h3>
+            <div class="epsilon-card">
+              <div class="epsilon-item">
+                <span class="epsilon-label">当前隐私预算</span>
+                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
+              </div>
+              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
+            </div>
+            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
+          </div>
+
+          <div class="module-group">
+            <div class="section-header">
+              <h3 class="module-title">扰动参数重校准</h3>
+              <el-button type="primary" :loading="stepsCalibrationLoading" @click="calibrateParams">校准扰动参数</el-button>
+            </div>
+            <div class="result-grid compact-grid">
+              <div class="result-panel">
+                <div class="result-label">p（真实位保留为 1 的概率）</div>
+                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.p : '--' }}</div>
+              </div>
+              <div class="result-panel">
+                <div class="result-label">q（非真实位翻转为 1 的概率）</div>
+                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.q : '--' }}</div>
+              </div>
+            </div>
+            <div class="calibration-tip">先对 A 做 one-hot 编码，再逐位扰动。</div>
+            <div class="calibration-tip">AOUE 中真实位的 p 固定为 0.5，q 由 ε、α、β 自动校准。</div>
+            <div v-if="stepsCalibratedParams" class="calibration-info">
+              <p>隐私预算 ε = {{ stepsCalibratedParams.epsilon }}</p>
+              <p>域大小 d = {{ stepsCalibratedParams.d }}</p>
+              <p>协议 = {{ stepsCalibratedParams.protocol }}</p>
+              <p class="formula">调用 calculateAOUEParameters(α, β, ε) 计算 q，且 p 固定为 0.5。</p>
+              <p>{{ stepsCalibratedParams.description }}</p>
+              <p>数据源：{{ stepsCalibratedParams.dataSource }}</p>
+            </div>
+          </div>
+        </div>
+
         <div v-else class="empty-details">
           <p>该属性的详细信息正在整理中。</p>
         </div>
@@ -434,14 +789,26 @@ import { useAttributeConfigStore } from '../../store/attributeConfig';
 import { useTaskStore } from '../../store/task';
 import { useUserStore } from '../../store/user';
 import {
-  AGE_GROUP_DISPLAY,
   FALL_ALARM_DATA_PATH,
-  FALL_ALARM_ORDER,
   buildMatrixRows,
   calculateAlphaBeta,
   loadFallAlarmMatrixFromCSV
 } from '../../utils/fallAlarmMatrix.js';
-import { calculateARRParameters } from '../../utils/ldpAlgorithms.js';
+import { AGE_GROUP_DISPLAY, FALL_ALARM_ORDER, STEP_BUCKET_ORDER, WEIGHT_STATUS_ORDER } from '../../utils/constants.js';
+import {
+  STAND_DURATION_DATA_PATH,
+  STAND_BUCKET_ORDER,
+  buildStandMatrixRows,
+  calculateStandAlphaBeta,
+  loadStandMatrixFromCSV
+} from '../../utils/standDurationMatrix.js';
+import {
+  STEPS_WEIGHT_DATA_PATH,
+  buildStepsMatrixRows,
+  calculateStepsAlphaBeta,
+  loadStepsMatrixFromCSV
+} from '../../utils/stepsWeightMatrix.js';
+import { calculateARRParameters, calculateAGRParameters, calculateAOUEParameters } from '../../utils/ldpAlgorithms.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -490,8 +857,26 @@ const attributes = ref([
     fixed: true,
     tooltip: '是否触发异常跌倒告警与年龄段分组存在关联关系，固定采用间接隐私风险配置。'
   },
-  { id: 3, name: '日均站立时长分档', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false, tooltip: '' },
-  { id: 4, name: '每日步数分档', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false, tooltip: '' },
+  {
+    id: 3,
+    name: '日均站立时长分档',
+    isProtected: false,
+    protectionMode: 'indirect',
+    algorithm: 'agrr',
+    status: '已配置',
+    fixed: true,
+    tooltip: '日均站立时长分档与体重状态存在关联关系，使用间接隐私风险 + AGRR协议。'
+  },
+  {
+    id: 4,
+    name: '每日步数分桶',
+    isProtected: false,
+    protectionMode: 'indirect',
+    algorithm: 'aoue',
+    status: '未配置',
+    fixed: true,
+    tooltip: '每日步数分桶与体重状态存在关联关系，使用间接隐私风险 + AOUE协议。'
+  },
   { id: 5, name: '睡眠质量评分', isProtected: false, protectionMode: '', algorithm: 'default', status: '未配置', fixed: false, tooltip: '' }
 ]);
 
@@ -512,6 +897,23 @@ const columnStats = ref([]);
 const calibrationLoading = ref(false);
 const calibratedParams = ref(null);
 
+// 站立时长相关状态
+const standMatrixLoading = ref(false);
+const standMatrixData = ref(null);
+const standAlphaBetaResult = ref(null);
+const standColumnStats = ref([]);
+const standCalibrationLoading = ref(false);
+const standCalibratedParams = ref(null);
+
+const stepsMatrixLoading = ref(false);
+const stepsMatrixData = ref(null);
+const stepsAlphaBetaResult = ref(null);
+const stepsSupportStats = ref([]);
+const stepsCalibrationLoading = ref(false);
+const stepsCalibratedParams = ref(null);
+
+
+
 const matrixRows = computed(() => buildMatrixRows(fallAlarmMatrixData.value));
 const selectedColumnRatio = computed(() => alphaBetaResult.value?.selectedStat?.ratio ?? null);
 const unselectedColumnRatio = computed(() => {
@@ -519,6 +921,10 @@ const unselectedColumnRatio = computed(() => {
   const other = columnStats.value.find(stat => stat.label !== alphaBetaResult.value.selectedLabel);
   return other?.ratio ?? null;
 });
+
+// 站立时长矩阵数据
+const standMatrixRows = computed(() => buildStandMatrixRows(standMatrixData.value));
+const stepsMatrixRows = computed(() => buildStepsMatrixRows(stepsMatrixData.value));
 const canSaveCurrentConfig = computed(() => {
   if (!currentAttribute.value) return false;
 
@@ -528,6 +934,24 @@ const canSaveCurrentConfig = computed(() => {
       alphaBetaResult.value &&
       privacyBudgetSaved.value &&
       calibratedParams.value
+    );
+  }
+
+  if (currentAttribute.value.name === '日均站立时长分档') {
+    return Boolean(
+      hasGeneratedMatrix.value &&
+      standAlphaBetaResult.value &&
+      privacyBudgetSaved.value &&
+      standCalibratedParams.value
+    );
+  }
+
+  if (currentAttribute.value.name === '每日步数分桶') {
+    return Boolean(
+      hasGeneratedMatrix.value &&
+      stepsAlphaBetaResult.value &&
+      privacyBudgetSaved.value &&
+      stepsCalibratedParams.value
     );
   }
 
@@ -567,11 +991,26 @@ function formatRatio(value) {
 }
 
 function rowSum(row) {
-  return matrixHeaders.reduce((sum, header) => sum + (row[header] || 0), 0);
+  if (!row) return 0;
+  if (matrixHeaders.some(header => row[header] !== undefined)) {
+    return matrixHeaders.reduce((sum, header) => sum + (row[header] || 0), 0);
+  }
+  if (STAND_BUCKET_ORDER.some(header => row[header] !== undefined)) {
+    return STAND_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
+  }
+  return STEP_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
 }
 
 function isSelectedColumn(header) {
   return alphaBetaResult.value?.selectedLabel === header;
+}
+
+function isStandSelectedColumn(header) {
+  return standAlphaBetaResult.value?.selectedLabel === header;
+}
+
+function isStepsSelectedBucket(header) {
+  return stepsAlphaBetaResult.value?.selectedSupportSet?.buckets?.includes(header);
 }
 
 function savePrivacyBudget() {
@@ -585,6 +1024,8 @@ function savePrivacyBudget() {
   basicConfig.value.privacyBudget = nextValue;
   privacyBudgetSaved.value = true;
   calibratedParams.value = null;
+  standCalibratedParams.value = null;
+  stepsCalibratedParams.value = null;
   ElMessage.success('隐私预算已保存');
 }
 
@@ -593,6 +1034,14 @@ function resetMatrixState() {
   alphaBetaResult.value = null;
   columnStats.value = [];
   calibratedParams.value = null;
+  standMatrixData.value = null;
+  standAlphaBetaResult.value = null;
+  standColumnStats.value = [];
+  standCalibratedParams.value = null;
+  stepsMatrixData.value = null;
+  stepsAlphaBetaResult.value = null;
+  stepsSupportStats.value = [];
+  stepsCalibratedParams.value = null;
   hasGeneratedMatrix.value = false;
   privacyBudgetSaved.value = false;
   dialogPrivacyBudget.value = basicConfig.value.privacyBudget;
@@ -600,8 +1049,43 @@ function resetMatrixState() {
 }
 
 function buildCurrentConfigPayload() {
+  if (currentAttribute.value?.name === '日均站立时长分档') {
+    return {
+      attributeName: currentAttribute.value.name,
+      sceneType: 'standDuration',
+      matrixData: standMatrixData.value,
+      supportStats: standColumnStats.value,
+      alphaBetaResult: standAlphaBetaResult.value,
+      epsilon: savedPrivacyBudget.value,
+      epsilonDraft: dialogPrivacyBudget.value,
+      privacyBudgetSaved: privacyBudgetSaved.value,
+      calibratedParams: standCalibratedParams.value,
+      notes: {
+        dataPath: STAND_DURATION_DATA_PATH
+      }
+    };
+  }
+
+  if (currentAttribute.value?.name === '每日步数分桶') {
+    return {
+      attributeName: currentAttribute.value.name,
+      sceneType: 'stepsBucket',
+      matrixData: stepsMatrixData.value,
+      supportStats: stepsSupportStats.value,
+      alphaBetaResult: stepsAlphaBetaResult.value,
+      epsilon: savedPrivacyBudget.value,
+      epsilonDraft: dialogPrivacyBudget.value,
+      privacyBudgetSaved: privacyBudgetSaved.value,
+      calibratedParams: stepsCalibratedParams.value,
+      notes: {
+        dataPath: STEPS_WEIGHT_DATA_PATH
+      }
+    };
+  }
+
   return {
     attributeName: currentAttribute.value?.name || '',
+    sceneType: 'fallAlarm',
     matrixData: fallAlarmMatrixData.value,
     columnStats: columnStats.value,
     alphaBetaResult: alphaBetaResult.value,
@@ -619,9 +1103,33 @@ function buildCurrentConfigPayload() {
 }
 
 function applySavedConfig(config) {
+  if (config?.sceneType === 'standDuration') {
+    standMatrixData.value = config?.matrixData || null;
+    standAlphaBetaResult.value = config?.alphaBetaResult || null;
+    standColumnStats.value = config?.supportStats || config?.alphaBetaResult?.columnStats || [];
+    standCalibratedParams.value = config?.calibratedParams || null;
+    hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
+    privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
+    dialogPrivacyBudget.value = config?.epsilonDraft ?? config?.epsilon ?? basicConfig.value.privacyBudget;
+    savedPrivacyBudget.value = config?.epsilon ?? basicConfig.value.privacyBudget;
+    return;
+  }
+
+  if (config?.sceneType === 'stepsBucket') {
+    stepsMatrixData.value = config?.matrixData || null;
+    stepsAlphaBetaResult.value = config?.alphaBetaResult || null;
+    stepsSupportStats.value = config?.supportStats || config?.alphaBetaResult?.supportStats || [];
+    stepsCalibratedParams.value = config?.calibratedParams || null;
+    hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
+    privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
+    dialogPrivacyBudget.value = config?.epsilonDraft ?? config?.epsilon ?? basicConfig.value.privacyBudget;
+    savedPrivacyBudget.value = config?.epsilon ?? basicConfig.value.privacyBudget;
+    return;
+  }
+
   fallAlarmMatrixData.value = config?.matrixData || null;
-  columnStats.value = config?.columnStats || [];
   alphaBetaResult.value = config?.alphaBetaResult || null;
+  columnStats.value = config?.columnStats || config?.alphaBetaResult?.stats || [];
   calibratedParams.value = config?.calibratedParams || null;
   hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
   privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
@@ -639,22 +1147,62 @@ function resetDialogForAttribute(attribute) {
 }
 
 async function recalculateMatrix() {
-  matrixLoading.value = true;
-  calibratedParams.value = null;
+  if (!currentAttribute.value) return;
 
-  try {
-    const { matrix } = await loadFallAlarmMatrixFromCSV(FALL_ALARM_DATA_PATH);
-    fallAlarmMatrixData.value = matrix;
-    const result = calculateAlphaBeta(matrix);
-    alphaBetaResult.value = result;
-    columnStats.value = result.stats;
-    hasGeneratedMatrix.value = true;
-    ElMessage.success('条件分布矩阵已刷新');
-  } catch (error) {
-    console.error('重算条件分布矩阵失败:', error);
-    ElMessage.error('重算条件分布矩阵失败');
-  } finally {
-    matrixLoading.value = false;
+  if (currentAttribute.value.name === '是否触发异常跌倒告警') {
+    matrixLoading.value = true;
+    calibratedParams.value = null;
+
+    try {
+      const result = await loadFallAlarmMatrixFromCSV();
+      fallAlarmMatrixData.value = result.matrix;
+      const alphaBetaResultData = calculateAlphaBeta(result.matrix);
+      alphaBetaResult.value = alphaBetaResultData;
+      columnStats.value = alphaBetaResultData.stats;
+      hasGeneratedMatrix.value = true;
+      ElMessage.success('条件分布矩阵已刷新');
+    } catch (error) {
+      console.error('重算条件分布矩阵失败:', error);
+      ElMessage.error('重算条件分布矩阵失败');
+    } finally {
+      matrixLoading.value = false;
+    }
+  } else if (currentAttribute.value.name === '日均站立时长分档') {
+    standMatrixLoading.value = true;
+    standCalibratedParams.value = null;
+
+    try {
+      const matrix = await loadStandMatrixFromCSV();
+      standMatrixData.value = matrix;
+      const result = calculateStandAlphaBeta(matrix, Number(savedPrivacyBudget.value) || 1.0);
+      standAlphaBetaResult.value = result;
+      standColumnStats.value = result.columnStats;
+      hasGeneratedMatrix.value = true;
+      ElMessage.success('条件分布矩阵已刷新');
+    } catch (error) {
+      console.error('重算条件分布矩阵失败:', error);
+      ElMessage.error('重算条件分布矩阵失败');
+    } finally {
+      standMatrixLoading.value = false;
+    }
+  } else if (currentAttribute.value.name === '每日步数分桶') {
+    stepsMatrixLoading.value = true;
+    stepsCalibratedParams.value = null;
+
+    try {
+      const result = await loadStepsMatrixFromCSV();
+      stepsMatrixData.value = result.matrix;
+      const alphaBetaResultData = calculateStepsAlphaBeta(result.matrix, Number(savedPrivacyBudget.value) || 1.0);
+      stepsAlphaBetaResult.value = alphaBetaResultData;
+      stepsSupportStats.value = alphaBetaResultData.supportStats;
+      hasGeneratedMatrix.value = true;
+      ElMessage.success('条件分布矩阵已刷新');
+    } catch (error) {
+      console.error('重算条件分布矩阵失败:', error);
+      ElMessage.error('重算条件分布矩阵失败');
+    } finally {
+      stepsMatrixLoading.value = false;
+    }
   }
 }
 
@@ -662,42 +1210,152 @@ async function handleAttributeClick(attribute) {
   currentAttribute.value = attribute;
   resetDialogForAttribute(attribute);
   dialogVisible.value = true;
+
+  if (
+    attribute.name === '是否触发异常跌倒告警' &&
+    alphaBetaResult.value &&
+    !fallAlarmMatrixData.value
+  ) {
+    await recalculateMatrix();
+  }
+
+  if (
+    attribute.name === '日均站立时长分档' &&
+    standAlphaBetaResult.value &&
+    !standMatrixData.value
+  ) {
+    await recalculateMatrix();
+  }
+
+  if (
+    attribute.name === '每日步数分桶' &&
+    stepsAlphaBetaResult.value &&
+    !stepsMatrixData.value
+  ) {
+    await recalculateMatrix();
+  }
 }
 
 function calibrateParams() {
-  if (!alphaBetaResult.value) {
-    ElMessage.warning('请先计算条件分布矩阵');
-    return;
-  }
+  if (!currentAttribute.value) return;
 
-  if (!privacyBudgetSaved.value) {
-    ElMessage.warning('请先填写并保存隐私预算 ε');
-    return;
-  }
+  if (currentAttribute.value.name === '是否触发异常跌倒告警') {
+    if (!alphaBetaResult.value) {
+      ElMessage.warning('请先计算条件分布矩阵');
+      return;
+    }
 
-  calibrationLoading.value = true;
+    if (!privacyBudgetSaved.value) {
+      ElMessage.warning('请先填写并保存隐私预算 ε');
+      return;
+    }
 
-  try {
-    const epsilon = Number(savedPrivacyBudget.value) || 1.0;
-    const k = matrixHeaders.length;
-    const { p, q } = calculateARRParameters(alphaBetaResult.value.alpha, alphaBetaResult.value.beta, epsilon, k);
+    calibrationLoading.value = true;
 
-    calibratedParams.value = {
-      p: Number(p).toFixed(4),
-      q: Number(q).toFixed(4),
-      epsilon,
-      k,
-      protocol: 'ARR (Adaptive Randomized Response)',
-      description: `基于 ${alphaBetaResult.value.selectedLabel} 列自动校准扰动参数。`,
-      dataSource: 'temp_fall_alarm_age_200.csv'
-    };
+    try {
+      const epsilon = Number(savedPrivacyBudget.value) || 1.0;
+      const d = matrixHeaders.length;
+      const { p, q } = calculateARRParameters(alphaBetaResult.value.alpha, alphaBetaResult.value.beta, epsilon, d);
 
-    ElMessage.success('扰动参数校准完成');
-  } catch (error) {
-    console.error('校准扰动参数失败:', error);
-    ElMessage.error('校准扰动参数失败');
-  } finally {
-    calibrationLoading.value = false;
+      calibratedParams.value = {
+        p: Number(p).toFixed(4),
+        q: Number(q).toFixed(4),
+        epsilon,
+        d,
+        protocol: 'ARR (Adaptive Randomized Response)',
+        description: `基于 ${alphaBetaResult.value.selectedLabel} 列自动校准扰动参数。`,
+        dataSource: 'temp_fall_alarm_age_200.csv'
+      };
+
+      ElMessage.success('扰动参数校准完成');
+    } catch (error) {
+      console.error('校准扰动参数失败:', error);
+      ElMessage.error('校准扰动参数失败');
+    } finally {
+      calibrationLoading.value = false;
+    }
+  } else if (currentAttribute.value.name === '日均站立时长分档') {
+    if (!standAlphaBetaResult.value) {
+      ElMessage.warning('请先计算条件分布矩阵');
+      return;
+    }
+
+    if (!privacyBudgetSaved.value) {
+      ElMessage.warning('请先填写并保存隐私预算 ε');
+      return;
+    }
+
+    standCalibrationLoading.value = true;
+
+    try {
+      const epsilon = Number(savedPrivacyBudget.value) || 1.0;
+      const d = STAND_BUCKET_ORDER.length;
+      const { p, q, triggeredByThreshold } = calculateAGRParameters(
+        standAlphaBetaResult.value.alpha,
+        standAlphaBetaResult.value.beta,
+        epsilon,
+        d
+      );
+
+      standCalibratedParams.value = {
+        p: Number(p).toFixed(4),
+        q: Number(q).toFixed(4),
+        epsilon,
+        d,
+        protocol: 'AGRR (Adaptive Generalized Randomized Response)',
+        description: triggeredByThreshold
+          ? `由于 α / β <= e^ε，系统直接取 p = 1、q = 0。当前 α = ${standAlphaBetaResult.value.alpha.toFixed(4)}，β = ${standAlphaBetaResult.value.beta.toFixed(4)}，ε = ${epsilon}。`
+          : `系统依据不确定性参数选择规则选中 ${standAlphaBetaResult.value.selectedLabel} 列，并基于该列的 α、β 自动校准扰动参数。`,
+        dataSource: 'temp_stand_duration_weight_200.csv'
+      };
+
+      ElMessage.success('扰动参数校准完成');
+    } catch (error) {
+      console.error('校准扰动参数失败:', error);
+      ElMessage.error('校准扰动参数失败');
+    } finally {
+      standCalibrationLoading.value = false;
+    }
+  } else if (currentAttribute.value.name === '每日步数分桶') {
+    if (!stepsAlphaBetaResult.value) {
+      ElMessage.warning('请先计算条件分布矩阵');
+      return;
+    }
+
+    if (!privacyBudgetSaved.value) {
+      ElMessage.warning('请先填写并保存隐私预算 ε');
+      return;
+    }
+
+    stepsCalibrationLoading.value = true;
+
+    try {
+      const epsilon = Number(savedPrivacyBudget.value) || 1.0;
+      const { p, q, rawQ, clamped } = calculateAOUEParameters(
+        stepsAlphaBetaResult.value.alpha,
+        stepsAlphaBetaResult.value.beta,
+        epsilon
+      );
+
+      stepsCalibratedParams.value = {
+        p: Number(p).toFixed(4),
+        q: Number(q).toFixed(4),
+        epsilon,
+        d: STEP_BUCKET_ORDER.length,
+        protocol: 'AOUE (Adaptive Optimized Unary Encoding)',
+        description: clamped
+          ? `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}。AOUE 先对每日步数分桶做 one-hot 编码，再逐位扰动；本次原始 q = ${rawQ.toFixed(4)}，已按有效区间裁剪为 ${q.toFixed(4)}。`
+          : `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}，先对每日步数分桶做 one-hot 编码，再按 AOUE 逐位扰动。`,
+        dataSource: 'temp_steps_weight_200.csv'
+      };
+
+      ElMessage.success('扰动参数校准完成');
+    } catch (error) {
+      console.error('校准扰动参数失败:', error);
+      ElMessage.error('校准扰动参数失败');
+    } finally {
+      stepsCalibrationLoading.value = false;
+    }
   }
 }
 
