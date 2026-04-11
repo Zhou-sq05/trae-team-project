@@ -47,151 +47,71 @@
             <el-card shadow="hover">
               <template #header>
                 <div class="card-header">
-                  <span>配置面板</span>
+                  <span>采集属性配置</span>
                 </div>
               </template>
 
-              <el-tabs v-model="activeTab">
-                <el-tab-pane label="基础配置" name="basic">
-                  <div class="basic-config">
-                    <div class="config-section">
-                      <h3>数据采集选择</h3>
-                      <el-radio-group v-model="basicConfig.dataSource">
-                        <el-radio label="模拟数据">模拟数据</el-radio>
-                        <el-radio label="手环采集">手环采集</el-radio>
-                        <el-radio label="导入">导入</el-radio>
-                      </el-radio-group>
-                    </div>
-                    <div class="config-section">
-                      <h3>隐私预算 ε</h3>
-                      <el-input v-model.number="basicConfig.privacyBudget" placeholder="请输入隐私预算" />
-                    </div>
-                  </div>
-                </el-tab-pane>
-
-                <el-tab-pane label="属性配置" name="attributes">
-                  <div class="attr-config">
-                    <el-table :data="tableAttributes" style="width: 100%">
-                      <el-table-column prop="name" label="采集属性">
-                        <template #default="scope">
-                          <span class="attribute-link" @click="handleAttributeClick(scope.row)">
-                            {{ scope.row.name }}
-                          </span>
-                        </template>
-                      </el-table-column>
-                      <el-table-column label="参与保护" width="120">
-                        <template #default="scope">
-                          <el-radio v-model="selectedAttributeId" :label="scope.row.id" />
-                        </template>
-                      </el-table-column>
-                      <el-table-column label="防护模式" width="150">
-                        <template #default="scope">
-                          <div v-if="scope.row.fixed" class="fixed-value">
-                            <el-tag type="primary">
-                              {{ scope.row.protectionMode === 'hybrid' ? '混合隐私风险' : '间接隐私风险' }}
-                            </el-tag>
-                            <el-tooltip :content="scope.row.tooltip">
-                              <el-icon><QuestionFilled /></el-icon>
-                            </el-tooltip>
-                          </div>
-                          <el-select
-                            v-else
-                            v-model="scope.row.protectionMode"
-                            placeholder="待选择"
-                            :disabled="selectedAttributeId !== scope.row.id"
-                            @change="handleProtectionModeChange(scope.row)"
-                          >
-                            <el-option label="间接隐私风险防护" value="indirect" />
-                            <el-option label="混合隐私风险防护" value="hybrid" />
-                          </el-select>
-                        </template>
-                      </el-table-column>
-                      <el-table-column label="算法协议" width="140">
-                        <template #default="scope">
-                          <div v-if="scope.row.fixed" class="fixed-value">
-                            <el-tag type="success">{{ scope.row.algorithm.toUpperCase() }}</el-tag>
-                          </div>
-                          <el-select
-                            v-else
-                            v-model="scope.row.algorithm"
-                            placeholder="默认"
-                            :disabled="selectedAttributeId !== scope.row.id"
-                          >
-                            <el-option label="ARR" value="arr" />
-                            <el-option label="AGRR" value="agrr" />
-                            <el-option label="AOUE" value="aoue" />
-                          </el-select>
-                        </template>
-                      </el-table-column>
-                      <el-table-column label="状态" width="100">
-                        <template #default="scope">
-                          <el-tag :type="scope.row.configStatus === '已配置' ? 'success' : 'info'">
-                            {{ scope.row.configStatus }}
-                          </el-tag>
-                        </template>
-                      </el-table-column>
-                      <el-table-column label="操作" width="180">
+              <div class="attr-config">
+                <el-table :data="tableAttributes" style="width: 100%">
+                  <el-table-column prop="name" label="采集属性" min-width="220">
+                    <template #default="scope">
+                      <span class="attribute-link" @click="handleAttributeClick(scope.row)">
+                        {{ scope.row.name }}
+                      </span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="防护模式" width="170">
+                    <template #default="scope">
+                      <div class="fixed-value">
+                        <el-tag type="primary">
+                          {{ scope.row.protectionMode === 'hybrid' ? '混合隐私风险' : '间接隐私风险' }}
+                        </el-tag>
+                        <el-tooltip :content="scope.row.tooltip">
+                          <el-icon><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="算法协议" width="140">
+                    <template #default="scope">
+                      <div class="fixed-value">
+                        <el-tag type="success">{{ scope.row.algorithm.toUpperCase() }}</el-tag>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="状态" width="100">
+                    <template #default="scope">
+                      <el-tag :type="scope.row.configStatus === '已配置' ? 'success' : 'info'">
+                        {{ scope.row.configStatus }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                      <el-table-column label="操作" width="240">
                         <template #default="scope">
                           <div class="action-cell">
                             <el-button type="primary" link @click="handleAttributeClick(scope.row)">
-                              {{ scope.row.configStatus === '已配置' ? '编辑配置' : '配置' }}
+                              编辑配置
                             </el-button>
                             <el-button
-                              v-if="scope.row.configStatus === '已配置'"
                               type="danger"
                               link
+                              :disabled="scope.row.configStatus !== '已配置'"
                               @click="handleDeleteConfig(scope.row)"
                             >
                               删除
                             </el-button>
-                          </div>
-                        </template>
-                      </el-table-column>
-                    </el-table>
-                  </div>
-                </el-tab-pane>
-
-                <el-tab-pane label="任务管理" name="tasks">
-                  <div class="task-management">
-                    <el-table :data="taskStore.taskList" style="width: 100%">
-                      <el-table-column prop="id" label="任务 ID" />
-                      <el-table-column label="创建时间" width="200">
-                        <template #default="scope">
-                          {{ new Date(scope.row.createdAt).toLocaleString() }}
-                        </template>
-                      </el-table-column>
-                      <el-table-column prop="dataSource" label="数据来源" width="120" />
-                      <el-table-column prop="privacyBudget" label="隐私预算" width="100" />
-                      <el-table-column label="操作" width="100">
-                        <template #default="scope">
-                          <el-button type="danger" size="small" @click="deleteTask(scope.row)">
-                            <el-icon><Delete /></el-icon>
-                          </el-button>
-                        </template>
-                      </el-table-column>
-                    </el-table>
-                  </div>
-                </el-tab-pane>
-              </el-tabs>
-
-              <div v-if="activeTab === 'attributes'" class="config-footer">
-                <div class="task-id-input">
-                  <span>任务 ID：</span>
-                  <el-input
-                    v-model="customTaskId"
-                    placeholder="请输入任务 ID，留空则自动生成"
-                    style="width: 300px; margin-right: 10px"
-                  />
-                </div>
-                <el-button type="primary" @click="saveConfig">保存</el-button>
-                <el-button @click="distributePolicy">下发隐私策略</el-button>
-                <el-alert
-                  v-if="taskId"
-                  :title="`任务 ID: ${taskId}`"
-                  type="success"
-                  show-icon
-                  style="margin-top: 20px"
-                />
+                        <el-button
+                          type="success"
+                          link
+                          :disabled="scope.row.configStatus !== '已配置'"
+                          @click="openDistributeDialog(scope.row)"
+                        >
+                          下发
+                        </el-button>
+                      </div>
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
             </el-card>
           </div>
@@ -1014,6 +934,78 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="distributeDialogVisible"
+      title="下发确认"
+      width="680px"
+    >
+      <div v-if="distributeAttribute" class="distribute-dialog-body">
+        <div class="distribute-task-row">
+          <div class="task-id-block">
+            <span class="task-id-label">任务 ID</span>
+            <el-input v-model="distributeTaskIdDraft" placeholder="请输入任务 ID，留空可自动生成" />
+          </div>
+          <el-button @click="generateDistributeTaskId">自动生成</el-button>
+        </div>
+
+        <div class="distribute-overview-card">
+          <div class="overview-title">当前属性下发概览</div>
+          <div class="overview-grid">
+            <div class="overview-item">
+              <span class="overview-label">任务ID</span>
+              <span class="overview-value">{{ distributePreviewTaskId || '待生成' }}</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">采集属性名称</span>
+              <span class="overview-value">{{ distributeAttribute.name }}</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">防护模式</span>
+              <span class="overview-value">{{ distributeSummary.mode }}</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">协议类型</span>
+              <span class="overview-value">{{ distributeSummary.protocol }}</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">相关敏感属性</span>
+              <span class="overview-value">{{ distributeSummary.sensitiveAttribute }}</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">隐私预算 ε</span>
+              <span class="overview-value">{{ distributeSummary.epsilon }}</span>
+            </div>
+            <div class="overview-item overview-item-full">
+              <span class="overview-label">关键参数摘要</span>
+              <div class="param-chip-list">
+                <el-tag
+                  v-for="item in distributeSummary.parameterSummary"
+                  :key="item"
+                  size="small"
+                  effect="light"
+                >
+                  {{ item }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="overview-item overview-item-full">
+              <span class="overview-label">用户端处理方式摘要</span>
+              <span class="overview-value">{{ distributeSummary.userProcessSummary }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="distributeDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmDistributeAttribute">
+            确认下发
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1063,12 +1055,11 @@ const attributeConfigStore = useAttributeConfigStore();
 const activeMenu = computed(() => route.path);
 const user = computed(() => userStore.user);
 
-const activeTab = ref('basic');
-const selectedAttributeId = ref(null);
 const dialogVisible = ref(false);
 const currentAttribute = ref(null);
-const taskId = ref('');
-const customTaskId = ref('');
+const distributeDialogVisible = ref(false);
+const distributeAttribute = ref(null);
+const distributeTaskIdDraft = ref('');
 const hasGeneratedMatrix = ref(false);
 const privacyBudgetSaved = ref(false);
 
@@ -1218,11 +1209,85 @@ const canSaveCurrentConfig = computed(() => {
 
   return true;
 });
+const distributePreviewTaskId = computed(() => distributeTaskIdDraft.value.trim());
+const distributeSummary = computed(() => {
+  if (!distributeAttribute.value) {
+    return {
+      mode: '--',
+      protocol: '--',
+      sensitiveAttribute: '--',
+      epsilon: '--',
+      parameterSummary: ['待读取配置'],
+      userProcessSummary: '--'
+    };
+  }
 
-watch(selectedAttributeId, value => {
-  attributes.value.forEach(attribute => {
-    attribute.isProtected = attribute.id === value;
-  });
+  const config = attributeConfigStore.getConfigById(distributeAttribute.value.id);
+  const calibratedParams = config?.calibratedParams || {};
+  const protocolMap = {
+    arr: 'ARR',
+    agrr: 'AGRR',
+    aoue: 'AOUE',
+    tsp: 'TSP'
+  };
+  const summaryMap = {
+    '是否触发异常跌倒告警': {
+      sensitiveAttribute: '年龄段',
+      userProcessSummary: 'ARR：二值随机响应',
+      parameterSummary: [
+        `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
+        `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
+        `p=${calibratedParams.p ?? '--'}`,
+        `q=${calibratedParams.q ?? '--'}`
+      ]
+    },
+    '日均站立时长分档': {
+      sensitiveAttribute: '体重状态',
+      userProcessSummary: 'AGRR：分档后多值扰动',
+      parameterSummary: [
+        `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
+        `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
+        `p=${calibratedParams.p ?? '--'}`,
+        `q=${calibratedParams.q ?? '--'}`
+      ]
+    },
+    '每日步数分桶': {
+      sensitiveAttribute: '体重状态',
+      userProcessSummary: 'AOUE：分桶 + one-hot 编码 + 逐位扰动',
+      parameterSummary: [
+        `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
+        `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
+        `p=${calibratedParams.p ?? '--'}`,
+        `q=${calibratedParams.q ?? '--'}`
+      ]
+    },
+    '睡眠质量评分': {
+      sensitiveAttribute: '年龄段',
+      userProcessSummary: 'TSP：两阶段扰动',
+      parameterSummary: [
+        `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
+        `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
+        `p1=${calibratedParams.p1 ?? '--'}`,
+        `q1=${calibratedParams.q1 ?? '--'}`,
+        `p2=${calibratedParams.p2 ?? '--'}`,
+        `q2=${calibratedParams.q2 ?? '--'}`
+      ]
+    }
+  };
+  const details = summaryMap[distributeAttribute.value.name] || {
+    sensitiveAttribute: '--',
+    userProcessSummary: '--',
+    parameterSummary: ['--']
+  };
+
+  return {
+    mode: distributeAttribute.value.protectionMode === 'hybrid' ? '混合隐私风险' : '间接隐私风险',
+    protocol: protocolMap[distributeAttribute.value.algorithm] || distributeAttribute.value.algorithm?.toUpperCase() || '--',
+    sensitiveAttribute: details.sensitiveAttribute,
+    epsilon: config?.epsilon ?? '--',
+    parameterSummary: details.parameterSummary,
+    userProcessSummary: details.userProcessSummary
+  };
 });
 
 watch(dialogVisible, visible => {
@@ -1234,12 +1299,6 @@ watch(dialogVisible, visible => {
 function handleLogout() {
   userStore.logout();
   router.push('/login');
-}
-
-function handleProtectionModeChange(row) {
-  if (row.protectionMode === 'indirect' || row.protectionMode === 'hybrid') {
-    row.algorithm = 'agrr';
-  }
 }
 
 function formatProbability(value) {
@@ -1792,81 +1851,89 @@ function handleDeleteConfig(attribute) {
     .catch(() => {});
 }
 
-function saveConfig() {
-  if (!selectedAttributeId.value) {
-    ElMessage.warning('请选择一个属性参与保护');
+function createGeneratedTaskId(attribute) {
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+  const nameSlug = String(attribute?.algorithm || 'task').toUpperCase();
+  return `Task_${nameSlug}_${dateStr}_${Date.now()}`;
+}
+
+function validateTaskId(taskIdValue) {
+  if (!taskIdValue) {
+    ElMessage.warning('请填写或自动生成任务 ID');
+    return false;
+  }
+
+  if (taskIdValue.length > 50) {
+    ElMessage.warning('任务 ID 长度不能超过 50 个字符');
+    return false;
+  }
+
+  if (!/^[a-zA-Z0-9_-]+$/.test(taskIdValue)) {
+    ElMessage.warning('任务 ID 只允许字母、数字、下划线和中划线');
+    return false;
+  }
+
+  if (taskStore.taskList.some(task => task.id === taskIdValue)) {
+    ElMessage.warning('任务 ID 已存在，请更换');
+    return false;
+  }
+
+  return true;
+}
+
+function generateDistributeTaskId() {
+  if (!distributeAttribute.value) return;
+  distributeTaskIdDraft.value = createGeneratedTaskId(distributeAttribute.value);
+}
+
+function openDistributeDialog(attribute) {
+  if (!attributeConfigStore.hasConfigById(attribute.id)) {
+    ElMessage.warning('请先完成当前属性配置保存，再执行下发');
     return;
   }
 
-  let newTaskId = '';
-  const trimmedTaskId = customTaskId.value.trim();
+  distributeAttribute.value = attribute;
+  distributeTaskIdDraft.value = createGeneratedTaskId(attribute);
+  distributeDialogVisible.value = true;
+}
 
-  if (trimmedTaskId) {
-    if (trimmedTaskId.length > 50) {
-      ElMessage.warning('任务 ID 长度不能超过 50 个字符');
-      return;
-    }
+function confirmDistributeAttribute() {
+  if (!distributeAttribute.value) return;
 
-    if (!/^[a-zA-Z0-9_-]+$/.test(trimmedTaskId)) {
-      ElMessage.warning('任务 ID 只允许字母、数字、下划线和中划线');
-      return;
-    }
-
-    if (taskStore.taskList.some(task => task.id === trimmedTaskId)) {
-      ElMessage.warning('任务 ID 已存在，请更换');
-      return;
-    }
-
-    newTaskId = trimmedTaskId;
-  } else {
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-    newTaskId = `Task_${dateStr}_${Date.now()}`;
+  const nextTaskId = distributeTaskIdDraft.value.trim();
+  if (!validateTaskId(nextTaskId)) {
+    return;
   }
 
-  taskId.value = newTaskId;
+  const savedConfig = attributeConfigStore.getConfigById(distributeAttribute.value.id);
+  if (!savedConfig) {
+    ElMessage.warning('当前属性尚无可下发的已保存配置');
+    return;
+  }
 
-  attributes.value.forEach(attribute => {
-    attribute.status = attribute.id === selectedAttributeId.value && attribute.protectionMode ? '已配置' : '未配置';
-  });
+  const taskAttribute = {
+    ...JSON.parse(JSON.stringify(distributeAttribute.value)),
+    isProtected: true,
+    status: '已配置',
+    configStatus: '已配置'
+  };
 
   taskStore.addTask({
-    id: newTaskId,
+    id: nextTaskId,
     createdAt: new Date().toISOString(),
-    dataSource: basicConfig.value.dataSource,
-    privacyBudget: basicConfig.value.privacyBudget,
-    attributes: JSON.parse(JSON.stringify(attributes.value))
+    dataSource: savedConfig?.notes?.dataPath || basicConfig.value.dataSource,
+    privacyBudget: savedConfig?.epsilon ?? savedPrivacyBudget.value,
+    attributes: [taskAttribute],
+    distributedAttributeId: distributeAttribute.value.id,
+    distributedAttributeName: distributeAttribute.value.name,
+    protectionMode: distributeAttribute.value.protectionMode,
+    algorithm: distributeAttribute.value.algorithm,
+    configSnapshot: JSON.parse(JSON.stringify(savedConfig))
   });
 
-  customTaskId.value = '';
-  ElMessage.success('配置保存成功，任务已生成');
-}
-
-function distributePolicy() {
-  if (!taskId.value) {
-    ElMessage.warning('请先保存配置生成任务 ID');
-    return;
-  }
-
-  if (!selectedAttributeId.value) {
-    ElMessage.warning('请选择一个属性参与保护');
-    return;
-  }
-
-  ElMessage.success('隐私策略下发成功');
-}
-
-function deleteTask(task) {
-  ElMessageBox.confirm(`确定要删除任务 ${task.id} 吗？`, '警告', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  })
-    .then(() => {
-      taskStore.deleteTask(task.id);
-      ElMessage.success('任务删除成功');
-    })
-    .catch(() => {});
+  distributeDialogVisible.value = false;
+  ElMessage.success(`属性 ${distributeAttribute.value.name} 已成功下发，任务 ID：${nextTaskId}`);
 }
 
 onMounted(() => {
@@ -1944,23 +2011,83 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.config-footer {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
-}
-
-.task-id-input {
+.distribute-dialog-body {
   display: flex;
-  align-items: center;
-  margin-bottom: 15px;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.task-id-input span {
-  width: 80px;
-  font-weight: 500;
+.distribute-task-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.task-id-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-id-label {
+  font-weight: 700;
+  color: #303133;
+}
+
+.distribute-overview-card {
+  border: 1px solid #dfe6ee;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 16px;
+}
+
+.overview-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2d3d;
+  margin-bottom: 14px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e4ebf3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.overview-item-full {
+  grid-column: 1 / -1;
+}
+
+.overview-label {
+  font-size: 13px;
+  color: #6b7785;
+}
+
+.overview-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2d3d;
+  line-height: 1.6;
+}
+
+.param-chip-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .attribute-details {
@@ -2396,13 +2523,15 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .section-header,
-  .epsilon-card {
+  .epsilon-card,
+  .distribute-task-row {
     flex-direction: column;
     align-items: stretch;
   }
 
   .result-grid,
-  .compact-grid {
+  .compact-grid,
+  .overview-grid {
     grid-template-columns: 1fr;
   }
 
