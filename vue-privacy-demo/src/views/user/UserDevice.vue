@@ -1151,9 +1151,32 @@ onMounted(() => {
 
 .demo-top-card {
   padding: 16px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.demo-top-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-top-item:first-child {
+  flex: 0 1 40%;
+  min-width: 0;
+}
+
+.demo-top-item:not(:first-child) {
+  flex: 0 0 auto;
+}
+
+.demo-top-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2d3d;
+  word-break: break-all;
 }
 
 .preview-card {
@@ -1172,9 +1195,18 @@ onMounted(() => {
   }
 
   .task-meta-grid,
-  .card-grid,
-  .demo-top-card {
+  .card-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .demo-top-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .demo-top-item {
+    width: 100%;
   }
 }
 </style>
