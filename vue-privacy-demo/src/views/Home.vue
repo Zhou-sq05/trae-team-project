@@ -17,13 +17,6 @@
       <div class="jump-box">
         <h2>管理端</h2>
         <div class="button-group">
-          <el-button type="primary" @click="goToRegister('admin')">注册</el-button>
-          <el-button @click="goToLogin('admin')">登录</el-button>
-        </div>
-      </div>
-      <div class="jump-box">
-        <h2>设置端</h2>
-        <div class="button-group">
           <el-button type="primary" @click="goToRegister('setting')">注册</el-button>
           <el-button @click="goToLogin('setting')">登录</el-button>
         </div>
@@ -116,4 +109,24 @@ const goToRegister = (type) => {
   padding: 12px;
   font-size: 16px;
 }
+
+.jump-box .button-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
+  width: 100%;
+}
+
+.jump-box .button-group .el-button {
+  width: 100% !important;
+  min-width: 120px !important;
+  margin: 0 auto !important;
+  display: flex !important;         
+  align-items: center !important;  
+  justify-content: center !important; 
+  text-align: center !important;
+  line-height: 1 !important;          
+  height: 40px !important;            
+}
+
 </style>
