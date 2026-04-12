@@ -68,11 +68,14 @@ export function aggregateAGRR(perturbedData, epsilon, domainSize, p, q) {
 // 计算 AGRR 的扰动参数
 export function calculateAGRParameters(alpha, beta, epsilon, domainSize) {
   const exp_eps = Math.exp(epsilon);
+  if (beta > 0 && alpha / beta <= exp_eps) {
+    return { p: 1, q: 0, triggeredByThreshold: true, expEpsilon: exp_eps };
+  }
   const numerator = (1 - alpha) - (1 - beta) * exp_eps;
   const denominator = (1 - domainSize * alpha) - (1 - domainSize * beta) * exp_eps;
   const p = Math.min(numerator / denominator, 1);
   const q = (1 - p) / (domainSize - 1);
-  return { p, q };
+  return { p, q, triggeredByThreshold: false, expEpsilon: exp_eps };
 }
 
 // ARR 算法 - 客户端扰动
@@ -164,8 +167,28 @@ export function aggregateAOUE(perturbedData, epsilon, domainSize, p, q) {
 export function calculateAOUEParameters(alpha, beta, epsilon) {
   const exp_eps = Math.exp(epsilon);
   const p = 0.5;
-  const q = (alpha - beta * exp_eps) / ((exp_eps - 1) + 2 * (alpha - beta * exp_eps));
-  return { p, q };
+  const rawQ = (alpha - beta * exp_eps) / ((exp_eps - 1) + 2 * (alpha - beta * exp_eps));
+  const q = Math.min(Math.max(rawQ, 0), 0.5);
+  return { p, q, rawQ, clamped: q !== rawQ };
+}
+
+export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
+  const epsilonStage1 = epsilon / 2;
+  const epsilonStage2 = epsilon - epsilonStage1;
+  const stage1 = calculateARRParameters(alpha, beta, epsilonStage1, 2);
+  const expStage2 = Math.exp(epsilonStage2);
+  const p2 = expStage2 / (expStage2 + scoreDomainSize - 1);
+  const q2 = 1 / (expStage2 + scoreDomainSize - 1);
+
+  return {
+    epsilonStage1,
+    epsilonStage2,
+    p1: stage1.p,
+    q1: stage1.q,
+    p2,
+    q2,
+    scoreDomainSize
+  };
 }
 
 // 计算条件概率的最大最小值

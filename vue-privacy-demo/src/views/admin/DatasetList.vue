@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="admin-container">
     <el-container>
       <el-header>
@@ -8,7 +8,7 @@
         <div class="header-right">
           <el-dropdown>
             <span class="user-info">
-              {{ user?.username || '管理员' }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              {{ user?.username || '管理员' }} <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -22,22 +22,21 @@
         <el-aside width="200px">
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/dashboard">
-              <el-icon><house /></el-icon>
+              <el-icon><House /></el-icon>
               <span>首页</span>
             </el-menu-item>
             <el-menu-item index="/admin/attr-config">
-              <el-icon><setting /></el-icon>
+              <el-icon><Setting /></el-icon>
               <span>属性配置</span>
             </el-menu-item>
             <el-menu-item index="/admin/dataset">
-              <el-icon><document /></el-icon>
+              <el-icon><Document /></el-icon>
               <span>数据集列表</span>
             </el-menu-item>
             <el-menu-item index="/admin/aggregate">
-              <el-icon><data-analysis /></el-icon>
+              <el-icon><DataAnalysis /></el-icon>
               <span>聚合结果</span>
             </el-menu-item>
-
           </el-menu>
         </el-aside>
         <el-main>
@@ -48,18 +47,14 @@
                   <span>数据集</span>
                 </div>
               </template>
+
               <div class="dataset-header">
                 <div class="total-data">
                   总数据数: <span class="total-count">{{ totalDataCount }}</span>
                   <span style="margin-left: 20px;">任务ID筛选:</span>
                   <el-select v-model="filterTaskId" placeholder="选择任务ID" style="width: 200px; margin: 0 10px">
                     <el-option label="全部数据" value="" />
-                    <el-option 
-                      v-for="task in tasks" 
-                      :key="task.id" 
-                      :label="task.id" 
-                      :value="task.id"
-                    />
+                    <el-option v-for="task in tasks" :key="task.id" :label="task.id" :value="task.id" />
                   </el-select>
                   <el-button type="primary" @click="selectAllData" :disabled="filteredDatasets.length === 0" style="margin-left: 20px;">
                     选择全部数据
@@ -72,10 +67,10 @@
                   <el-button type="primary" @click="refreshData" :loading="loading">刷新</el-button>
                 </div>
               </div>
-              
-              <el-table 
-                :data="paginatedDatasets" 
-                style="width: 100%" 
+
+              <el-table
+                :data="paginatedDatasets"
+                style="width: 100%"
                 v-loading="loading"
                 ref="tableRef"
                 @selection-change="handleSelectionChange"
@@ -87,7 +82,12 @@
                 <el-table-column prop="uploadTime" label="上传时间" />
                 <el-table-column prop="status" label="数据状态" width="100">
                   <template #default="scope">
-                    <el-tag type="success">{{ scope.row.status }}</el-tag>
+                    <el-tag :type="scope.row.status === '已上报' ? 'success' : 'warning'">{{ scope.row.status }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="协议" width="120">
+                  <template #default="scope">
+                    <span>{{ scope.row.algorithm }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="数据详情" width="100">
@@ -96,8 +96,7 @@
                   </template>
                 </el-table-column>
               </el-table>
-              
-              <!-- 分页控件 -->
+
               <div class="pagination-container">
                 <el-pagination
                   v-model:current-page="currentPage"
@@ -109,7 +108,7 @@
                   @current-change="handleCurrentChange"
                 />
               </div>
-              
+
               <div class="batch-generate">
                 <div class="generate-controls">
                   <span>批量生成</span>
@@ -121,14 +120,9 @@
                   </el-select>
                   <span>任务ID</span>
                   <el-select v-model="selectedTaskId" placeholder="选择任务ID" style="width: 200px; margin: 0 10px">
-                    <el-option 
-                      v-for="task in tasks" 
-                      :key="task.id" 
-                      :label="task.id" 
-                      :value="task.id"
-                    />
+                    <el-option v-for="task in tasks" :key="task.id" :label="task.id" :value="task.id" />
                   </el-select>
-                  <span class="hint">(预先生成真实分布作为基准)</span>
+                  <span class="hint">(预先生成演示用扰动数据)</span>
                 </div>
                 <div class="generate-buttons">
                   <el-button type="primary" @click="generateData">生成数据</el-button>
@@ -136,8 +130,7 @@
                 </div>
               </div>
             </el-card>
-            
-            <!-- 数据详情表格 -->
+
             <el-card shadow="hover" style="margin-top: 20px" v-if="selectedDataset">
               <template #header>
                 <div class="card-header">
@@ -148,11 +141,12 @@
                 <el-table-column label="序号" type="index" width="80" />
                 <el-table-column prop="userId" label="用户ID" />
                 <el-table-column prop="taskId" label="任务ID" />
-                <el-table-column prop="attribute" label="属性名" />
-                <el-table-column prop="perturbedValue" label="扰动后值" />
-                <el-table-column prop="mode" label="模式" width="100" />
-                <el-table-column prop="algorithm" label="算法" width="100" />
-                <el-table-column prop="uploadTime" label="上传时间" />
+                <el-table-column prop="attribute" label="属性名" min-width="180" />
+                <el-table-column prop="rawValue" label="原始值" min-width="160" />
+                <el-table-column prop="reportedValue" label="上报值" min-width="180" />
+                <el-table-column prop="mode" label="模式" width="120" />
+                <el-table-column prop="algorithm" label="算法" width="140" />
+                <el-table-column prop="uploadTime" label="上传时间" min-width="180" />
               </el-table>
             </el-card>
           </div>
@@ -163,436 +157,391 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { useUserStore } from '../../store/user'
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { House, Setting, Document, DataAnalysis, ArrowDown } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { useUserStore } from '../../store/user';
 
-const route = useRoute()
-const router = useRouter()
-const userStore = useUserStore()
-const activeMenu = computed(() => route.path)
-const user = computed(() => userStore.user)
+const route = useRoute();
+const router = useRouter();
+const userStore = useUserStore();
+const activeMenu = computed(() => route.path);
+const user = computed(() => userStore.user);
 
-const handleLogout = () => {
-  userStore.logout()
-  router.push('/login')
-}
+const datasets = ref([]);
+const tableRef = ref(null);
+const selectedRows = ref([]);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const generateCount = ref('10');
+const tasks = ref([]);
+const selectedTaskId = ref('');
+const filterTaskId = ref('');
+const selectedDataset = ref(null);
+const dataDetails = ref([]);
+const loading = ref(false);
+const rawSubmissions = ref([]);
 
-// 数据集数据
-const datasets = ref([])
+const totalDataCount = computed(() => filteredDatasets.value.length);
 
-// 总数据数
-const totalDataCount = computed(() => filteredDatasets.value.length)
-
-// 表格引用和选中行
-const tableRef = ref(null)
-const selectedRows = ref([])
-
-// 分页相关
-const currentPage = ref(1)
-const pageSize = ref(10)
-
-// 过滤后的数据
 const filteredDatasets = computed(() => {
   if (!filterTaskId.value) {
-    return datasets.value
+    return datasets.value;
   }
-  return datasets.value.filter(item => item.taskId === filterTaskId.value)
-})
+  return datasets.value.filter(item => String(item.taskId) === String(filterTaskId.value));
+});
 
-// 分页后的数据
 const paginatedDatasets = computed(() => {
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  const endIndex = startIndex + pageSize.value
-  return filteredDatasets.value.slice(startIndex, endIndex)
-})
+  const startIndex = (currentPage.value - 1) * pageSize.value;
+  const endIndex = startIndex + pageSize.value;
+  return filteredDatasets.value.slice(startIndex, endIndex);
+});
 
-// 批量生成人数
-const generateCount = ref('10')
+const handleLogout = () => {
+  userStore.logout();
+  router.push('/login');
+};
 
-// 任务列表
-const tasks = ref([])
-
-// 选中的任务ID
-const selectedTaskId = ref('')
-
-// 过滤任务ID
-const filterTaskId = ref('')
-
-// 选中的数据集
-const selectedDataset = ref(null)
-
-// 数据详情
-const dataDetails = ref([])
-
-// 加载状态
-const loading = ref(false)
-
-// 从本地存储加载数据
-const loadDataFromStorage = () => {
-  loading.value = true
+function safeParse(key, fallback) {
   try {
-    // 从本地存储获取数据
-    const storedData = localStorage.getItem('submittedData')
-    if (storedData) {
-      const parsedData = JSON.parse(storedData)
-      // 处理数据，确保只显示扰动后的数据
-      datasets.value = parsedData.map((item, index) => ({
-        id: index + 1,
-        userId: item.userId || `用户${String(index + 1).padStart(3, '0')}`,
-        taskId: item.taskId,
-        uploadTime: new Date(item.uploadTime || Date.now()).toLocaleString(),
-        status: '已扰动'
-      }))
-    } else {
-      // 如果没有数据，使用默认模拟数据
-      datasets.value = [
-        { id: 1, userId: '用户001', taskId: 'Task_20260330', uploadTime: '2026/3/30 21:52', status: '已扰动' },
-        { id: 2, userId: '用户002', taskId: 'Task_20260330', uploadTime: '2026/3/30 22:15', status: '已扰动' },
-        { id: 3, userId: '用户003', taskId: 'Task_20260330', uploadTime: '2026/3/30 23:01', status: '已扰动' }
-      ]
-    }
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
   } catch (error) {
-    console.error('加载数据失败:', error)
-    ElMessage.error('加载数据失败')
-    // 使用默认模拟数据
-    datasets.value = [
-      { id: 1, userId: '用户001', taskId: 'Task_20260330', uploadTime: '2026/3/30 21:52', status: '已扰动' },
-      { id: 2, userId: '用户002', taskId: 'Task_20260330', uploadTime: '2026/3/30 22:15', status: '已扰动' },
-      { id: 3, userId: '用户003', taskId: 'Task_20260330', uploadTime: '2026/3/30 23:01', status: '已扰动' }
-    ]
+    console.error(`解析 ${key} 失败:`, error);
+    return fallback;
+  }
+}
+
+function getTaskListFromStorage() {
+  const directTasks = safeParse('tasks', []);
+  const taskStore = safeParse('taskStore', {});
+  const fromStore = Array.isArray(taskStore?.taskList) ? taskStore.taskList : [];
+  const merged = [...directTasks, ...fromStore];
+  const seen = new Set();
+  return merged.filter(task => {
+    if (!task?.id || seen.has(String(task.id))) return false;
+    seen.add(String(task.id));
+    return true;
+  });
+}
+
+function getTaskById(taskId) {
+  return tasks.value.find(task => String(task.id) === String(taskId)) || null;
+}
+
+function getProtectedAttribute(task) {
+  if (!task?.attributes?.length) return null;
+  const supportedNames = ['是否触发异常跌倒告警', '日均站立时长分档', '每日步数分桶', '睡眠质量评分'];
+  return (
+    task.attributes.find(attribute => supportedNames.includes(attribute.name) && attribute.isProtected) ||
+    task.attributes.find(attribute => supportedNames.includes(attribute.name) && attribute.status === '已配置') ||
+    task.attributes.find(attribute => supportedNames.includes(attribute.name)) ||
+    null
+  );
+}
+
+function getTaskMeta(taskId) {
+  const task = getTaskById(taskId);
+  const attribute = getProtectedAttribute(task);
+  const map = {
+    '是否触发异常跌倒告警': {
+      attributeName: '是否触发异常跌倒告警',
+      algorithm: 'ARR',
+      mode: '间接隐私风险'
+    },
+    '日均站立时长分档': {
+      attributeName: '日均站立时长分档',
+      algorithm: 'AGRR',
+      mode: '间接隐私风险'
+    },
+    '每日步数分桶': {
+      attributeName: '每日步数分桶',
+      algorithm: 'AOUE',
+      mode: '间接隐私风险'
+    },
+    '睡眠质量评分': {
+      attributeName: '睡眠质量评分',
+      algorithm: 'TSP',
+      mode: '混合隐私风险'
+    }
+  };
+  return map[attribute?.name] || {
+    attributeName: attribute?.name || '未知属性',
+    algorithm: task?.protocol || '未知协议',
+    mode: task?.protectionMode || '未知模式'
+  };
+}
+
+function formatDateTime(value) {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleString();
+}
+
+function formatArrLabel(value) {
+  return Number(value) === 1 ? '触发' : '未触发';
+}
+
+function buildDatasetRows(submissions) {
+  return submissions.map((item, index) => {
+    const meta = getTaskMeta(item.taskId);
+    const hasReport = Boolean(item.reportData);
+    return {
+      id: index + 1,
+      sourceIndex: index,
+      userId: item.userId || `用户${String(index + 1).padStart(3, '0')}`,
+      taskId: item.taskId,
+      uploadTime: formatDateTime(item.uploadTime || Date.now()),
+      status: hasReport ? '已上报' : '已扰动',
+      algorithm: item.reportData?.protocol || meta.algorithm
+    };
+  });
+}
+
+function buildDetailRows(submission, dataset) {
+  if (!submission) return [];
+
+  const meta = getTaskMeta(dataset.taskId);
+  const scenario = submission.rawData?.scenario;
+
+  if (submission.reportData && scenario === 'arr') {
+    const rawValue = Number(submission.rawData?.fallAlarm ?? 0);
+    const reportValue = submission.reportData?.perturbedValue;
+    return [{
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      attribute: meta.attributeName,
+      rawValue: `${formatArrLabel(rawValue)}（${rawValue}）`,
+      reportedValue: `${submission.reportData?.perturbedLabel || formatArrLabel(reportValue)}（${reportValue}）`,
+      mode: meta.mode,
+      algorithm: submission.reportData?.protocol || meta.algorithm,
+      uploadTime: dataset.uploadTime
+    }];
+  }
+
+  if (submission.reportData && scenario === 'agrr') {
+    return [{
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      attribute: meta.attributeName,
+      rawValue: `${submission.rawData?.standMinutes ?? '--'} 分钟 -> ${submission.rawData?.standBucket || '--'}`,
+      reportedValue: submission.reportData?.perturbedLabel || submission.reportData?.perturbedValue || '--',
+      mode: meta.mode,
+      algorithm: submission.reportData?.protocol || meta.algorithm,
+      uploadTime: dataset.uploadTime
+    }];
+  }
+
+  if (submission.reportData && scenario === 'aoue') {
+    return [{
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      attribute: meta.attributeName,
+      rawValue: `${submission.rawData?.dailySteps ?? '--'} 步 -> ${submission.rawData?.stepsBucket || '--'}`,
+      reportedValue: submission.reportData?.perturbedLabel || submission.reportData?.perturbedValue || '--',
+      mode: meta.mode,
+      algorithm: submission.reportData?.protocol || meta.algorithm,
+      uploadTime: dataset.uploadTime
+    }];
+  }
+
+  if (submission.reportData && scenario === 'tsp') {
+    const missingText = Number(submission.rawData?.sleepMissing) === 1 ? '缺失' : '非缺失';
+    const scoreText = Number(submission.rawData?.sleepMissing) === 1 ? '--' : submission.rawData?.sleepScore ?? '--';
+    return [{
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      attribute: meta.attributeName,
+      rawValue: `缺失状态: ${missingText}，评分: ${scoreText}`,
+      reportedValue: submission.reportData?.perturbedLabel || submission.reportData?.perturbedValue || '--',
+      mode: meta.mode,
+      algorithm: submission.reportData?.protocol || meta.algorithm,
+      uploadTime: dataset.uploadTime
+    }];
+  }
+
+  if (submission.perturbedData) {
+    const attributeMap = {
+      sleepHours: '睡眠时长',
+      dailySteps: '日均步数',
+      exerciseFrequency: '近7天运动频次',
+      heartRate: '平均静息心率',
+      mood: '今日感觉'
+    };
+
+    return Object.entries(submission.perturbedData).map(([key, value]) => ({
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      attribute: attributeMap[key] || key,
+      rawValue: submission.rawData?.[key] != null ? String(submission.rawData[key]) : '--',
+      reportedValue: value != null ? String(value) : '--',
+      mode: '差分隐私',
+      algorithm: 'Laplace',
+      uploadTime: dataset.uploadTime
+    }));
+  }
+
+  return [{
+    userId: dataset.userId,
+    taskId: dataset.taskId,
+    attribute: meta.attributeName,
+    rawValue: '--',
+    reportedValue: '--',
+    mode: meta.mode,
+    algorithm: meta.algorithm,
+    uploadTime: dataset.uploadTime
+  }];
+}
+
+function loadDataFromStorage() {
+  loading.value = true;
+  try {
+    const parsedData = safeParse('submittedData', []);
+    rawSubmissions.value = Array.isArray(parsedData) ? parsedData : [];
+    datasets.value = buildDatasetRows(rawSubmissions.value);
+  } catch (error) {
+    console.error('加载数据失败:', error);
+    ElMessage.error('加载数据失败');
+    rawSubmissions.value = [];
+    datasets.value = [];
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
-// 加载任务列表
-const loadTasks = () => {
-  try {
-    // 从本地存储加载任务数据
-    const taskStore = JSON.parse(localStorage.getItem('taskStore') || '{}')
-    const taskList = taskStore.taskList || []
-    
-    // 同时检查另一种存储方式
-    const tasksFromLocal = JSON.parse(localStorage.getItem('tasks') || '[]')
-    
-    // 合并两种来源的任务
-    const allTasks = [...taskList, ...tasksFromLocal]
-    
-    // 去重
-    const uniqueTasks = []
-    const taskIds = new Set()
-    
-    allTasks.forEach(task => {
-      if (task.id && !taskIds.has(task.id)) {
-        uniqueTasks.push(task)
-        taskIds.add(task.id)
-      }
-    })
-    
-    // 按创建时间排序，最新的在前
-    uniqueTasks.sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0)
-      const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0)
-      return dateB - dateA
-    })
-    
-    tasks.value = uniqueTasks
-    
-    // 默认选择最新的任务
-    if (uniqueTasks.length > 0) {
-      selectedTaskId.value = uniqueTasks[0].id
-    }
-  } catch (error) {
-    console.error('加载任务列表失败:', error)
+function loadTasks() {
+  tasks.value = getTaskListFromStorage();
+  if (!selectedTaskId.value && tasks.value.length > 0) {
+    selectedTaskId.value = tasks.value[0].id;
   }
 }
 
-// 刷新数据
-const refreshData = () => {
-  loading.value = true
-  // 模拟网络请求延迟
+function refreshData() {
+  loading.value = true;
   setTimeout(() => {
-    loadDataFromStorage()
-    loadTasks() // 同时刷新任务列表
-    ElMessage.success('数据刷新成功')
-  }, 500)
+    loadTasks();
+    loadDataFromStorage();
+    ElMessage.success('数据刷新成功');
+  }, 300);
 }
 
-// 查看数据详情
-const viewDataDetail = (dataset) => {
-  selectedDataset.value = dataset
-  
-  // 从本地存储获取详细数据
-  try {
-    const storedData = localStorage.getItem('submittedData')
-    if (storedData) {
-      const parsedData = JSON.parse(storedData)
-      const userData = parsedData.find(item => item.userId === dataset.userId && item.taskId === dataset.taskId)
-      
-      if (userData && userData.perturbedData) {
-        // 使用实际的扰动后数据
-        dataDetails.value = Object.entries(userData.perturbedData).map(([key, value], index) => ({
-          userId: dataset.userId,
-          taskId: dataset.taskId,
-          attribute: getAttributeName(key),
-          perturbedValue: value.toString(),
-          mode: '差分隐私',
-          algorithm: 'Laplace',
-          uploadTime: dataset.uploadTime
-        }))
-      } else {
-        // 使用模拟数据详情
-        generateMockDataDetails(dataset)
-      }
-    } else {
-      // 使用模拟数据详情
-      generateMockDataDetails(dataset)
-    }
-  } catch (error) {
-    console.error('加载数据详情失败:', error)
-    ElMessage.error('加载数据详情失败')
-    // 使用模拟数据详情
-    generateMockDataDetails(dataset)
-  }
+function viewDataDetail(dataset) {
+  selectedDataset.value = dataset;
+  const submission = rawSubmissions.value[dataset.sourceIndex] || null;
+  dataDetails.value = buildDetailRows(submission, dataset);
 }
 
-// 生成模拟数据详情
-const generateMockDataDetails = (dataset) => {
-  dataDetails.value = [
-    {
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: '睡眠时长',
-      perturbedValue: (7 + Math.random() * 2).toFixed(1),
-      mode: '差分隐私',
-      algorithm: 'Laplace',
-      uploadTime: dataset.uploadTime
-    },
-    {
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: '日均步数',
-      perturbedValue: (10000 + Math.random() * 5000).toFixed(0),
-      mode: '差分隐私',
-      algorithm: 'Laplace',
-      uploadTime: dataset.uploadTime
-    },
-    {
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: '近7天运动频次',
-      perturbedValue: (3 + Math.floor(Math.random() * 4)).toString(),
-      mode: '差分隐私',
-      algorithm: 'Laplace',
-      uploadTime: dataset.uploadTime
-    },
-    {
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: '平均静息心率',
-      perturbedValue: (60 + Math.floor(Math.random() * 30)).toString(),
-      mode: '差分隐私',
-      algorithm: 'Laplace',
-      uploadTime: dataset.uploadTime
-    },
-    {
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: '今日感觉',
-      perturbedValue: ['good', 'normal', 'tired'][Math.floor(Math.random() * 3)],
-      mode: '差分隐私',
-      algorithm: 'Laplace',
-      uploadTime: dataset.uploadTime
-    }
-  ]
-}
-
-// 获取属性名
-const getAttributeName = (key) => {
-  const attributeMap = {
-    sleepHours: '睡眠时长',
-    dailySteps: '日均步数',
-    exerciseFrequency: '近7天运动频次',
-    heartRate: '平均静息心率',
-    mood: '今日感觉'
-  }
-  return attributeMap[key] || key
-}
-
-// 生成数据
-const generateData = () => {
+function generateData() {
   if (!selectedTaskId.value) {
-    ElMessage.warning('请选择任务ID')
-    return
+    ElMessage.warning('请选择任务ID');
+    return;
   }
-  
-  loading.value = true
-  // 模拟生成数据
+
+  loading.value = true;
   setTimeout(() => {
-    const count = parseInt(generateCount.value)
-    const generatedData = []
-    
-    for (let i = 0; i < count; i++) {
-      const userId = `模拟用户${String(datasets.value.length + i + 1).padStart(3, '0')}`
-      const taskId = selectedTaskId.value
-      const uploadTime = new Date().toLocaleString()
-      
-      generatedData.push({
-        id: datasets.value.length + i + 1,
-        userId,
-        taskId,
-        uploadTime,
-        status: '已扰动'
-      })
-    }
-    
-    // 添加到数据集
-    datasets.value = [...datasets.value, ...generatedData]
-    
-    // 保存到本地存储
-    try {
-      const storedData = localStorage.getItem('submittedData') || '[]'
-      const existingData = JSON.parse(storedData)
-      const newData = generatedData.map(item => {
-        // 生成原始数据
-        const rawSleepHours = (7 + Math.random() * 2).toFixed(1)
-        const rawDailySteps = (10000 + Math.random() * 5000).toFixed(0)
-        const rawExerciseFrequency = (3 + Math.floor(Math.random() * 4)).toString()
-        const rawHeartRate = (60 + Math.floor(Math.random() * 30)).toString()
-        const rawMood = ['good', 'normal', 'tired'][Math.floor(Math.random() * 3)]
-        
-        return {
-          userId: item.userId,
-          taskId: item.taskId,
-          uploadTime: item.uploadTime,
-          rawData: {
-            sleepHours: rawSleepHours,
-            dailySteps: rawDailySteps,
-            exerciseFrequency: rawExerciseFrequency,
-            heartRate: rawHeartRate,
-            mood: rawMood
-          },
-          perturbedData: {
-            sleepHours: rawSleepHours,
-            dailySteps: rawDailySteps,
-            exerciseFrequency: rawExerciseFrequency,
-            heartRate: rawHeartRate,
-            mood: rawMood
-          },
-          epsilon: 1.0 // 添加隐私预算
+    const count = Number(generateCount.value);
+    const meta = getTaskMeta(selectedTaskId.value);
+    const existing = safeParse('submittedData', []);
+    const generated = [];
+
+    for (let i = 0; i < count; i += 1) {
+      const rawValue = Math.random() < 0.25 ? 1 : 0;
+      const reportValue = Math.random() < 0.5 ? rawValue : 1 - rawValue;
+      generated.push({
+        userId: `模拟用户${String(existing.length + i + 1).padStart(3, '0')}`,
+        taskId: selectedTaskId.value,
+        uploadTime: new Date().toISOString(),
+        rawData: {
+          scenario: meta.algorithm === 'ARR' ? 'arr' : 'legacy',
+          fallAlarm: rawValue
+        },
+        reportData: {
+          protocol: meta.algorithm,
+          perturbedValue: reportValue,
+          perturbedLabel: formatArrLabel(reportValue),
+          params: {
+            p: '0.8500',
+            q: '0.1500'
+          }
         }
-      })
-      localStorage.setItem('submittedData', JSON.stringify([...existingData, ...newData]))
-    } catch (error) {
-      console.error('保存数据失败:', error)
+      });
     }
-    
-    ElMessage.success(`已为任务 ${selectedTaskId.value} 生成 ${count} 人的模拟数据`)
-    loading.value = false
-  }, 1000)
+
+    localStorage.setItem('submittedData', JSON.stringify([...existing, ...generated]));
+    loadDataFromStorage();
+    ElMessage.success(`已为任务 ${selectedTaskId.value} 生成 ${count} 条演示数据`);
+    loading.value = false;
+  }, 600);
 }
 
-// 开始聚合估计
-const startAggregation = () => {
-  ElMessage.success('开始聚合估计')
-  // 跳转到聚合结果页面
-  router.push('/admin/aggregate')
+function startAggregation() {
+  ElMessage.success('开始聚合估计');
+  router.push('/admin/aggregate');
 }
 
-// 分页处理函数
-const handleSizeChange = (size) => {
-  pageSize.value = size
-  currentPage.value = 1 // 重置为第一页
+function handleSizeChange(size) {
+  pageSize.value = size;
+  currentPage.value = 1;
 }
 
-const handleCurrentChange = (current) => {
-  currentPage.value = current
+function handleCurrentChange(current) {
+  currentPage.value = current;
 }
 
-// 处理选择变更
-const handleSelectionChange = (val) => {
-  selectedRows.value = val
+function handleSelectionChange(val) {
+  selectedRows.value = val;
 }
 
-// 选择全部数据
-const selectAllData = () => {
-  if (tableRef.value) {
-    // 先清空现有选择
-    tableRef.value.clearSelection()
-    // 然后选择过滤后的数据
-    filteredDatasets.value.forEach(row => {
-      tableRef.value.toggleRowSelection(row, true)
-    })
-  }
+function selectAllData() {
+  if (!tableRef.value) return;
+  tableRef.value.clearSelection();
+  filteredDatasets.value.forEach(row => {
+    tableRef.value.toggleRowSelection(row, true);
+  });
 }
 
-// 批量删除
-const batchDelete = () => {
+function batchDelete() {
   if (selectedRows.value.length === 0) {
-    ElMessage.warning('请选择要删除的数据')
-    return
+    ElMessage.warning('请选择要删除的数据');
+    return;
   }
-  
-  ElMessageBox.confirm('确定要删除选中的数据吗？', '警告', {
+
+  ElMessageBox.confirm('确定要删除选中的数据吗？', '删除确认', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
   }).then(() => {
-    // 从本地存储中获取数据
-    const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]')
-    console.log('删除前本地存储数据:', storedData)
-    
-    // 筛选出不包含选中行的数据
-    const updatedData = storedData.filter(item => {
-      const isSelected = selectedRows.value.some(selected => 
-        selected.userId === item.userId && selected.taskId === item.taskId
-      )
-      return !isSelected
-    })
-    
-    console.log('删除后本地存储数据:', updatedData)
-    
-    // 更新本地存储
-    localStorage.setItem('submittedData', JSON.stringify(updatedData))
-    console.log('本地存储已更新')
-    
-    // 重新加载数据
-    loadDataFromStorage()
-    console.log('数据已重新加载')
-    
-    // 清空选择
-    selectedRows.value = []
-    tableRef.value.clearSelection()
-    console.log('选择已清空')
-    
-    // 显示删除成功消息
-    ElMessage.success('批量删除成功')
-  }).catch(() => {
-    // 取消删除
-  })
+    const selectedIndexes = new Set(selectedRows.value.map(row => row.sourceIndex));
+    const updatedData = rawSubmissions.value.filter((_, index) => !selectedIndexes.has(index));
+    localStorage.setItem('submittedData', JSON.stringify(updatedData));
+    selectedRows.value = [];
+    selectedDataset.value = null;
+    dataDetails.value = [];
+    if (tableRef.value) {
+      tableRef.value.clearSelection();
+    }
+    loadDataFromStorage();
+    ElMessage.success('批量删除成功');
+  }).catch(() => {});
 }
 
-// 监听筛选任务ID变化，同步更新批量生成任务ID
-watch(filterTaskId, (newValue) => {
+watch(filterTaskId, newValue => {
+  currentPage.value = 1;
   if (newValue) {
-    // 如果选择了特定任务ID，同步到批量生成任务ID
-    selectedTaskId.value = newValue
-  } else {
-    // 如果选择了"全部数据"，设置为最新的任务ID
-    if (tasks.value.length > 0) {
-      selectedTaskId.value = tasks.value[0].id
-    }
+    selectedTaskId.value = newValue;
+  } else if (tasks.value.length > 0) {
+    selectedTaskId.value = tasks.value[0].id;
   }
-})
+});
 
-// 初始化
 onMounted(() => {
-  loadDataFromStorage()
-  loadTasks() // 加载任务列表
-})
+  loadTasks();
+  loadDataFromStorage();
+});
 </script>
 
 <style scoped>
@@ -642,15 +591,12 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  gap: 16px;
 }
 
 .header-buttons {
   display: flex;
   gap: 10px;
-}
-
-.batch-operations {
-  margin: 20px 0;
 }
 
 .total-data {
@@ -663,6 +609,12 @@ onMounted(() => {
   margin-left: 10px;
 }
 
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
 .batch-generate {
   margin-top: 30px;
   padding-top: 20px;
@@ -670,33 +622,30 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
 }
 
 .generate-controls {
   display: flex;
   align-items: center;
-}
-
-.hint {
-  font-size: 12px;
-  color: #909399;
-  margin-left: 10px;
+  flex-wrap: wrap;
 }
 
 .generate-buttons {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
-.pagination-container {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
+.hint {
+  color: #909399;
+  margin-left: 8px;
 }
 
-.dataset-content {
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  padding: 20px;
+@media (max-width: 1200px) {
+  .dataset-header,
+  .batch-generate {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>
