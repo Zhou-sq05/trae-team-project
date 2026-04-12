@@ -17,13 +17,6 @@
       <div class="jump-box">
         <h2>管理端</h2>
         <div class="button-group">
-          <el-button type="primary" @click="goToRegister('admin')">注册</el-button>
-          <el-button @click="goToLogin('admin')">登录</el-button>
-        </div>
-      </div>
-      <div class="jump-box">
-        <h2>设置端</h2>
-        <div class="button-group">
           <el-button type="primary" @click="goToRegister('setting')">注册</el-button>
           <el-button @click="goToLogin('setting')">登录</el-button>
         </div>
