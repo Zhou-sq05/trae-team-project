@@ -126,17 +126,38 @@
 
         <div class="dynamic-form-panel">
           <div class="summary-heading">
-            <h3>手环端批量采集模拟</h3>
-            <span class="section-tip">在当前页面连续执行本地扰动，模拟健康手环持续采集</span>
+            <h3>单次扰动演示</h3>
+            <span class="section-tip">基于当前输入执行一次本地扰动，查看单条样本的处理过程</span>
           </div>
 
           <div v-if="!currentTaskDetail" class="empty-box">
-            <p>请先选择任务，再配置单次演示或批量采集模拟。</p>
+            <p>请先选择任务，再执行单次扰动演示。</p>
+          </div>
+
+          <div v-else class="dynamic-form batch-simulator">
+            <div class="derived-hint">点击后将基于当前采集输入执行一次本地扰动，并自动切换到右侧“单次扰动演示”页签。</div>
+            <div class="action-row">
+              <el-button type="primary" @click="refreshData" :disabled="!currentTaskDetail">加载示例数据</el-button>
+              <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
+                执行单次扰动演示
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dynamic-form-panel separated-panel">
+          <div class="summary-heading">
+            <h3>手环端连续采集</h3>
+            <span class="section-tip">在当前页面连续执行本地扰动，健康手环持续采集</span>
+          </div>
+
+          <div v-if="!currentTaskDetail" class="empty-box">
+            <p>请先选择任务，再配置连续采集模拟。</p>
           </div>
 
           <div v-else class="dynamic-form batch-simulator">
             <div class="form-item">
-              <span>模拟次数</span>
+              <span>连续采集次数</span>
               <el-select v-model="batchSimulationCount" style="width: 180px">
                 <el-option label="10 次" :value="10" />
                 <el-option label="50 次" :value="50" />
@@ -145,28 +166,16 @@
               </el-select>
             </div>
 
-            <div class="form-item">
-              <span>数据生成方式</span>
-              <el-radio-group v-model="batchGenerationMode">
-                <el-radio label="current">基于当前输入重复模拟</el-radio>
-                <el-radio label="auto">自动生成样本（后续可扩展）</el-radio>
-              </el-radio-group>
-              <div class="derived-hint">当前优先支持“基于当前输入重复模拟”，自动生成样本先预留接口。</div>
-            </div>
-
+            <div class="derived-hint">点击后将由手环端自动连续采集 {{ batchSimulationCount }} 次，并自动切换到右侧“连续采集结果”页签。</div>
             <div class="action-row">
-              <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                单次扰动演示
-              </el-button>
               <el-button type="success" @click="runBatchSimulation" :disabled="!canRunBatchSimulation">
-                模拟手环连续采集
+                手环连续采集
               </el-button>
             </div>
           </div>
         </div>
 
         <div class="control-buttons">
-          <el-button type="primary" @click="refreshData" :disabled="!currentTaskDetail">加载示例数据</el-button>
           <el-button @click="goToDashboard">返回首页</el-button>
         </div>
       </div>
@@ -174,134 +183,224 @@
       <div class="right-section">
         <h3>演示调试区域</h3>
         <template v-if="currentTaskDetail?.scenario === 'arr'">
-          <div class="summary-block">
-            <h4>任务摘要</h4>
-            <div class="demo-top-card">
-              <div class="demo-top-item">
-                <span class="demo-top-label">任务 ID：  </span>
-                <span class="demo-top-value">{{ currentTaskDetail?.taskId || '--' }}</span>
-              </div>
-              <div class="demo-top-item">
-                <span class="demo-top-label">协议：  </span>
-                <span class="demo-top-value">{{ currentTaskDetail?.protocol || '--' }}</span>
-              </div>
-              <div class="demo-top-item">
-                <span class="demo-top-label">隐私预算 ε：  </span>
-                <span class="demo-top-value">{{ displayEpsilon }}</span>
-              </div>
-            </div>
+          <div class="demo-tab-bar">
+            <button
+              type="button"
+              class="demo-tab-button"
+              :class="{ active: activeDemoTab === 'single' }"
+              @click="activeDemoTab = 'single'"
+            >
+              单次扰动演示
+            </button>
+            <button
+              type="button"
+              class="demo-tab-button"
+              :class="{ active: activeDemoTab === 'batch' }"
+              @click="activeDemoTab = 'batch'"
+            >
+              连续采集结果
+            </button>
           </div>
 
-          <div class="summary-block">
-            <h4>原始输入</h4>
-            <div class="card-grid">
-              <div v-for="item in arrRawCards" :key="item.label" class="summary-card">
-                <div class="card-label">{{ item.label }}</div>
-                <div class="card-value">{{ item.value }}</div>
+          <template v-if="activeDemoTab === 'single'">
+            <div class="summary-block">
+              <h4>任务摘要</h4>
+              <div class="demo-top-card">
+                <div class="demo-top-item">
+                  <span class="demo-top-label">任务 ID：  </span>
+                  <span class="demo-top-value">{{ currentTaskDetail?.taskId || '--' }}</span>
+                </div>
+                <div class="demo-top-item">
+                  <span class="demo-top-label">协议：  </span>
+                  <span class="demo-top-value">{{ currentTaskDetail?.protocol || '--' }}</span>
+                </div>
+                <div class="demo-top-item">
+                  <span class="demo-top-label">隐私预算 ε：  </span>
+                  <span class="demo-top-value">{{ displayEpsilon }}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="summary-block">
-            <div class="summary-heading">
-              <h4>扰动参数</h4>
-              <span class="section-tip">从管理端当前任务的已保存配置中读取</span>
-            </div>
-            <div class="card-grid">
-              <div v-for="item in arrParameterCards" :key="item.label" class="summary-card">
-                <div class="card-label">{{ item.label }}</div>
-                <div class="card-value">{{ item.value }}</div>
-              </div>
-            </div>
-            <div v-if="!arrParametersReady" class="preview-tip">
-              当前任务尚未在管理端完成 ARR 参数保存，暂时无法执行本地扰动模拟。
-            </div>
-          </div>
-
-          <div class="summary-block">
-            <div class="summary-heading">
-              <h4>扰动结果</h4>
-              <span class="section-tip">同一原始值下可重复随机模拟</span>
-            </div>
-            <div class="card-grid">
-              <div v-for="item in arrResultCards" :key="item.label" class="summary-card preview-card">
-                <div class="card-label">{{ item.label }}</div>
-                <div class="card-value">{{ item.value }}</div>
-              </div>
-            </div>
-            <div class="preview-tip">
-              ARR 会按当前原始编码值与参数 p、q 进行一次本地随机扰动，再生成本次上报值。
-            </div>
-          </div>
-
-          <div class="summary-block">
-            <div class="summary-heading">
-              <h4>操作区</h4>
-              <span class="section-tip">先模拟，再提交上报</span>
-            </div>
-            <div class="action-row">
-              <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                {{ arrSimulationResult ? '重新模拟一次扰动' : '模拟一次扰动' }}
-              </el-button>
-              <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
-                提交上报
-              </el-button>
-            </div>
-          </div>
-
-          <div class="summary-block">
-            <div class="summary-heading">
-              <h4>批量运行结果</h4>
-              <span class="section-tip">展示健康手环连续采集并重复执行 ARR 的汇总结果</span>
-            </div>
-            <div v-if="!arrBatchResult" class="empty-box">
-              <p>点击左侧“模拟手环连续采集”后，这里会展示本次批量运行的统计结果和前 10 条样本明细。</p>
-            </div>
-            <template v-else>
+            <div class="summary-block">
+              <h4>原始输入</h4>
               <div class="card-grid">
-                <div class="summary-card">
-                  <div class="card-label">本次模拟次数</div>
-                  <div class="card-value">{{ arrBatchSummaryCards[0].value }}</div>
-                </div>
-                <div class="summary-card">
-                  <div class="card-label">原始值</div>
-                  <div class="card-value">{{ arrBatchSummaryCards[1].value }}</div>
-                </div>
-                <div class="summary-card preview-card">
-                  <div class="card-label">上报为“是”的次数</div>
-                  <div class="card-value">{{ arrBatchSummaryCards[2].value }}</div>
-                </div>
-                <div class="summary-card preview-card">
-                  <div class="card-label">上报为“否”的次数</div>
-                  <div class="card-value">{{ arrBatchSummaryCards[3].value }}</div>
+                <div v-for="item in arrRawCards" :key="item.label" class="summary-card">
+                  <div class="card-label">{{ item.label }}</div>
+                  <div class="card-value">{{ item.value }}</div>
                 </div>
               </div>
+            </div>
 
-              <div class="batch-detail-table">
-                <div class="batch-table-title">前 {{ arrBatchPreviewRows.length }} 条样本明细</div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>原始值</th>
-                      <th>原始编码</th>
-                      <th>扰动结果</th>
-                      <th>上报值</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="row in arrBatchPreviewRows" :key="row.index">
-                      <td>{{ row.index }}</td>
-                      <td>{{ row.rawLabel }}</td>
-                      <td>{{ row.rawValue }}</td>
-                      <td>{{ row.perturbedLabel }}</td>
-                      <td>{{ row.reportValue }}</td>
-                    </tr>
-                  </tbody>
-                </table>
+            <div class="summary-block">
+              <div class="summary-heading">
+                <h4>扰动参数</h4>
+                <span class="section-tip">从管理端当前任务的已保存配置中读取</span>
               </div>
-            </template>
-          </div>
+              <div class="card-grid">
+                <div v-for="item in arrParameterCards" :key="item.label" class="summary-card">
+                  <div class="card-label">{{ item.label }}</div>
+                  <div class="card-value">{{ item.value }}</div>
+                </div>
+              </div>
+              <div v-if="!arrParametersReady" class="preview-tip">
+                当前任务尚未在管理端完成 ARR 参数保存，暂时无法执行本地扰动。
+              </div>
+            </div>
+            <div class="summary-block">
+              <div class="summary-heading">
+                <h4>扰动结果</h4>
+                <span class="section-tip">同一原始值下可重复随机模拟</span>
+              </div>
+              <div class="card-grid">
+                <div v-for="item in arrResultCards" :key="item.label" class="summary-card preview-card">
+                  <div class="card-label">{{ item.label }}</div>
+                  <div class="card-value">{{ item.value }}</div>
+                </div>
+              </div>
+              <div class="preview-tip">
+                ARR 会按当前原始编码值与参数 p、q 进行一次本地随机扰动，再生成本次上报值。
+              </div>
+            </div>
+
+            <div class="summary-block">
+              <div class="summary-heading">
+                <h4>操作区</h4>
+                <span class="section-tip">先执行一次扰动，再提交上报</span>
+              </div>
+              <div class="action-row">
+                <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
+                  {{ arrSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
+                </el-button>
+                <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
+                  提交上报
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="summary-block">
+              <div class="summary-heading">
+                <h4>连续采集结果</h4>
+                <span class="section-tip">展示健康手环连续采集并重复执行 ARR 的汇总结果</span>
+              </div>
+              <div v-if="!arrBatchResult" class="empty-box">
+                <p>点击左侧“手环连续采集”后，这里会展示本次连续采集的统计结果和前 10 条样本明细。</p>
+              </div>
+              <template v-else>
+                <div class="batch-summary-strip">
+                  <div class="batch-summary-item">
+                    <div class="card-label">本次连续采集次数</div>
+                    <div class="batch-summary-value">{{ arrBatchSummaryCards[0].value }}</div>
+                  </div>
+                  <div class="batch-summary-item">
+                    <div class="card-label">当前任务名称</div>
+                    <div class="batch-summary-value">{{ arrBatchSummaryCards[1].value }}</div>
+                  </div>
+                  <div class="batch-summary-item">
+                    <div class="card-label">当前协议</div>
+                    <div class="batch-summary-value">{{ arrBatchSummaryCards[2].value }}</div>
+                  </div>
+                </div>
+
+                <div class="compare-panel">
+                  <div class="compare-title">扰动前后分布对比</div>
+                  <table class="compare-table">
+                    <thead>
+                      <tr>
+                        <th>状态</th>
+                        <th>原始值</th>
+                        <th>上报值</th>
+                        <th>变化</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in arrDistributionComparisonRows" :key="row.status">
+                        <td>{{ row.status }}</td>
+                        <td>{{ row.rawCount }}</td>
+                        <td>{{ row.reportCount }}</td>
+                        <td :class="['delta-text', row.delta > 0 ? 'increase' : row.delta < 0 ? 'decrease' : 'neutral']">
+                          {{ row.deltaDisplay }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div class="compare-bars">
+                    <div v-for="row in arrDistributionComparisonRows" :key="`${row.status}-bars`" class="compare-bar-row">
+                      <div class="compare-bar-label">{{ row.status }}</div>
+                      <div class="compare-bar-track">
+                        <div class="compare-bar-group">
+                          <span class="compare-bar-caption">原始</span>
+                          <div class="compare-bar">
+                            <div class="compare-bar-fill raw-fill" :style="{ width: `${row.rawPercent}%` }"></div>
+                          </div>
+                          <span class="compare-bar-number">{{ row.rawCount }}</span>
+                        </div>
+                        <div class="compare-bar-group">
+                          <span class="compare-bar-caption">上报</span>
+                          <div class="compare-bar">
+                            <div class="compare-bar-fill report-fill" :style="{ width: `${row.reportPercent}%` }"></div>
+                          </div>
+                          <span class="compare-bar-number">{{ row.reportCount }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="preview-tip">
+                  当前结果为手环端连续执行本地扰动后的统计结果，用于演示设备持续采集并立即本地上报的过程。
+                </div>
+
+                <div class="summary-block batch-upload-block">
+                  <div class="summary-heading">
+                    <h4>批量上报</h4>
+                    <span class="section-tip">将本次连续采集产生的扰动后样本记录批量写入管理端数据源</span>
+                  </div>
+                  <div class="action-row">
+                    <el-button
+                      type="primary"
+                      @click="uploadCurrentBatchResult"
+                      :disabled="!arrBatchResult || batchUploadState?.batchId === arrBatchResult.batchId"
+                    >
+                      上报本次连续采集结果
+                    </el-button>
+                  </div>
+                  <div v-if="batchUploadState && batchUploadState.batchId === arrBatchResult.batchId" class="preview-tip">
+                    本次上报状态：{{ batchUploadState.status }}，本次上报记录数：{{ batchUploadState.count }} 条
+                  </div>
+                  <div v-else class="preview-tip">
+                    请先完成连续采集模拟，再将本次连续采集产生的扰动后样本记录批量上报到管理端。
+                  </div>
+                </div>
+
+                <div class="batch-detail-table">
+                  <div class="batch-table-title">前 {{ arrBatchPreviewRows.length }} 条样本明细</div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>原始值</th>
+                        <th>原始编码</th>
+                        <th>扰动结果</th>
+                        <th>上报值</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in arrBatchPreviewRows" :key="row.index">
+                        <td>{{ row.index }}</td>
+                        <td>{{ row.rawLabel }}</td>
+                        <td>{{ row.rawValue }}</td>
+                        <td>{{ row.perturbedLabel }}</td>
+                        <td>{{ row.reportValue }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+          </template>
         </template>
 
         <template v-else>
@@ -382,7 +481,8 @@ const formTouched = ref(false);
 const arrSimulationResult = ref(null);
 const arrBatchResult = ref(null);
 const batchSimulationCount = ref(100);
-const batchGenerationMode = ref('current');
+const activeDemoTab = ref('single');
+const batchUploadState = ref(null);
 
 const dynamicForm = reactive({
   fallAlarm: 0,
@@ -481,7 +581,7 @@ const canRunSingleSimulation = computed(() => {
 const canRunBatchSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
   if (currentTaskDetail.value.scenario !== 'arr') return false;
-  return canSimulateArr.value && batchGenerationMode.value === 'current' && Number(batchSimulationCount.value) > 0;
+  return arrParametersReady.value && Number(batchSimulationCount.value) > 0;
 });
 const displayEpsilon = computed(() => {
   if (currentTaskDetail.value?.scenario === 'arr' && arrConfigParams.value) {
@@ -594,11 +694,42 @@ const arrResultCards = computed(() => [
 const arrBatchSummaryCards = computed(() => {
   if (!arrBatchResult.value) return [];
   return [
-    { label: '本次模拟次数', value: String(arrBatchResult.value.totalRuns) },
-    { label: '原始值', value: `${arrBatchResult.value.rawLabel}（${arrBatchResult.value.rawValue}）` },
-    { label: '上报为“是”的次数', value: String(arrBatchResult.value.countOne) },
-    { label: '上报为“否”的次数', value: String(arrBatchResult.value.countZero) }
+    { label: '本次连续采集次数', value: String(arrBatchResult.value.totalRuns) },
+    { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
+    { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' },
+    { label: '原始“触发”数量', value: String(arrBatchResult.value.rawCountOne) },
+    { label: '原始“未触发”数量', value: String(arrBatchResult.value.rawCountZero) },
+    { label: '上报“触发”数量', value: String(arrBatchResult.value.countOne) },
+    { label: '上报“未触发”数量', value: String(arrBatchResult.value.countZero) }
   ];
+});
+
+const arrDistributionComparisonRows = computed(() => {
+  if (!arrBatchResult.value) return [];
+  const total = arrBatchResult.value.totalRuns || 1;
+  const rows = [
+    {
+      status: '触发',
+      rawCount: arrBatchResult.value.rawCountOne,
+      reportCount: arrBatchResult.value.countOne
+    },
+    {
+      status: '未触发',
+      rawCount: arrBatchResult.value.rawCountZero,
+      reportCount: arrBatchResult.value.countZero
+    }
+  ];
+
+  return rows.map(row => {
+    const delta = row.reportCount - row.rawCount;
+    return {
+      ...row,
+      delta,
+      deltaDisplay: delta > 0 ? `+${delta}` : `${delta}`,
+      rawPercent: Number(((row.rawCount / total) * 100).toFixed(1)),
+      reportPercent: Number(((row.reportCount / total) * 100).toFixed(1))
+    };
+  });
 });
 
 const arrBatchPreviewRows = computed(() => arrBatchResult.value?.samples?.slice(0, 10) || []);
@@ -636,9 +767,11 @@ watch(currentTaskDetail, detail => {
   resetDynamicForm();
   arrSimulationResult.value = null;
   arrBatchResult.value = null;
+  batchUploadState.value = null;
   if (detail) {
     systemStatus.value = 0;
     formTouched.value = false;
+    activeDemoTab.value = 'single';
   }
 });
 
@@ -652,6 +785,7 @@ watch(
     if (currentTaskDetail.value.scenario === 'arr') {
       arrSimulationResult.value = null;
       arrBatchResult.value = null;
+      batchUploadState.value = null;
       systemStatus.value = 0;
       return;
     }
@@ -690,7 +824,10 @@ function refreshData() {
 
   formTouched.value = true;
   systemStatus.value = 0;
+  // 加载示例数据后自动切换到单次扰动演示标签页
+  activeDemoTab.value = 'single';
   arrBatchResult.value = null;
+  batchUploadState.value = null;
   if (currentTaskDetail.value.scenario === 'arr' && arrParametersReady.value) {
     simulateArrPerturbation(false);
   }
@@ -709,6 +846,7 @@ function handleArrOptionClick(value) {
   markFormTouched();
   arrSimulationResult.value = null;
   arrBatchResult.value = null;
+  batchUploadState.value = null;
   systemStatus.value = 0;
   if (arrParametersReady.value) {
     simulateArrPerturbation(false);
@@ -745,7 +883,7 @@ function simulateArrPerturbation(showMessage = true) {
   systemStatus.value = 1;
 
   if (showMessage) {
-    ElMessage.success('已完成一次 ARR 本地扰动模拟');
+    ElMessage.success('已完成一次 ARR 本地扰动');
   }
 }
 
@@ -756,11 +894,16 @@ function simulateCurrentTaskOnce() {
   }
 
   if (currentTaskDetail.value.scenario === 'arr') {
+    activeDemoTab.value = 'single';
     simulateArrPerturbation(true);
     return;
   }
 
   ElMessage.info('当前优先完成 ARR 场景，其他协议的单次扰动演示将在下一步接入');
+}
+
+function generateArrRawSample() {
+  return Math.random() < 0.15 ? 1 : 0;
 }
 
 function runBatchSimulation() {
@@ -770,27 +913,34 @@ function runBatchSimulation() {
   }
 
   if (currentTaskDetail.value.scenario !== 'arr') {
-    ElMessage.info('批量采集模拟当前优先支持 ARR 场景，其他协议预留扩展接口');
-    return;
-  }
-
-  if (batchGenerationMode.value !== 'current') {
-    ElMessage.info('“自动生成样本”模式暂未启用，请先使用“基于当前输入重复模拟”');
+    ElMessage.info('批量采集当前优先支持 ARR 场景，其他协议预留扩展接口');
     return;
   }
 
   if (!canRunBatchSimulation.value) {
-    ElMessage.warning('请先完成当前输入，并确保 ARR 参数已就绪');
+    ElMessage.warning('请确保当前 ARR 参数已就绪');
     return;
   }
+
+  activeDemoTab.value = 'batch';
 
   const totalRuns = Number(batchSimulationCount.value);
   const samples = [];
   let countOne = 0;
   let countZero = 0;
+  let rawCountOne = 0;
+  let rawCountZero = 0;
 
   for (let i = 0; i < totalRuns; i += 1) {
-    const reportValue = ARR(dynamicForm.fallAlarm, arrConfigParams.value.epsilon, 2, arrConfigParams.value.p, arrConfigParams.value.q);
+    const rawValue = generateArrRawSample();
+    const rawLabel = rawValue === 1 ? '触发' : '未触发';
+    if (rawValue === 1) {
+      rawCountOne += 1;
+    } else {
+      rawCountZero += 1;
+    }
+
+    const reportValue = ARR(rawValue, arrConfigParams.value.epsilon, 2, arrConfigParams.value.p, arrConfigParams.value.q);
     if (reportValue === 1) {
       countOne += 1;
     } else {
@@ -799,17 +949,20 @@ function runBatchSimulation() {
 
     samples.push({
       index: i + 1,
-      rawValue: dynamicForm.fallAlarm,
-      rawLabel: dynamicForm.fallAlarm === 1 ? '触发' : '未触发',
+      rawValue,
+      rawLabel,
       reportValue,
       perturbedLabel: reportValue === 1 ? '触发' : '未触发'
     });
   }
 
   arrBatchResult.value = {
+    batchId: `${currentTaskDetail.value.taskId}-${Date.now()}`,
     totalRuns,
-    rawValue: dynamicForm.fallAlarm,
-    rawLabel: dynamicForm.fallAlarm === 1 ? '触发' : '未触发',
+    rawValue: null,
+    rawLabel: '连续采集样本',
+    rawCountOne,
+    rawCountZero,
     countOne,
     countZero,
     samples
@@ -825,7 +978,70 @@ function runBatchSimulation() {
   }
 
   systemStatus.value = 1;
-  ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集模拟`);
+  ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
+}
+
+function uploadCurrentBatchResult() {
+  if (!currentTaskDetail.value) {
+    ElMessage.warning('请先选择任务');
+    return;
+  }
+
+  if (!arrBatchResult.value?.samples?.length) {
+    ElMessage.warning('请先模拟连续采集');
+    return;
+  }
+
+  if (batchUploadState.value?.batchId === arrBatchResult.value.batchId) {
+    ElMessage.info('本次连续采集结果已上报');
+    return;
+  }
+
+  try {
+    const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
+    const uploadTime = new Date().toISOString();
+    const records = arrBatchResult.value.samples.map(sample => ({
+      userId: user.value?.username || '用户001',
+      user_id: user.value?.username || '用户001',
+      taskId: currentTaskDetail.value.taskId,
+      task_id: currentTaskDetail.value.taskId,
+      batch_id: arrBatchResult.value.batchId,
+      protocol: currentTaskDetail.value.protocol,
+      uploadTime,
+      upload_time: uploadTime,
+      report_value: sample.reportValue,
+      reportData: {
+        protocol: currentTaskDetail.value.protocol,
+        perturbedValue: sample.reportValue,
+        perturbedLabel: sample.perturbedLabel,
+        reportValue: sample.reportValue
+      },
+      batchSummary: {
+        sampleCount: arrBatchResult.value.samples.length,
+        rawTriggerCount: arrBatchResult.value.rawCountOne,
+        rawNonTriggerCount: arrBatchResult.value.rawCountZero,
+        reportTriggerCount: arrBatchResult.value.countOne,
+        reportNonTriggerCount: arrBatchResult.value.countZero
+      },
+      sampleMeta: {
+        source: 'continuous-collection',
+        batchId: arrBatchResult.value.batchId,
+        sampleIndex: sample.index
+      }
+    }));
+
+    localStorage.setItem('submittedData', JSON.stringify([...storedData, ...records]));
+    batchUploadState.value = {
+      batchId: arrBatchResult.value.batchId,
+      status: '已上报',
+      count: arrBatchResult.value.samples.length
+    };
+    systemStatus.value = 2;
+    ElMessage.success(`已成功上报 ${arrBatchResult.value.samples.length} 条连续采集扰动记录到管理端`);
+  } catch (error) {
+    console.error('批量上报连续采集结果失败:', error);
+    ElMessage.error('上报失败，请稍后重试');
+  }
 }
 
 function submitData() {
@@ -840,7 +1056,7 @@ function submitData() {
   }
 
   if (currentTaskDetail.value.scenario === 'arr' && !arrSimulationResult.value) {
-    ElMessage.warning('请先完成一次 ARR 本地扰动模拟');
+    ElMessage.warning('请先完成一次 ARR 本地扰动');
     return;
   }
 
@@ -1066,6 +1282,11 @@ onMounted(() => {
   padding: 4px 0 0;
 }
 
+.separated-panel {
+  border-top: 1px solid #e8edf3;
+  padding-top: 22px;
+}
+
 .form-item {
   display: flex;
   flex-direction: column;
@@ -1108,12 +1329,181 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.demo-tab-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #f3f7fc;
+  border: 1px solid #dbe6f1;
+}
+
+.demo-tab-button {
+  border: none;
+  background: transparent;
+  color: #5f6b7a;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.demo-tab-button.active {
+  background: #ffffff;
+  color: #409eff;
+  box-shadow: 0 4px 14px rgba(64, 158, 255, 0.12);
+}
+
 .batch-detail-table {
   margin-top: 16px;
   border: 1px solid #dfe6ee;
   border-radius: 10px;
   overflow: hidden;
   background: #fff;
+}
+
+.batch-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.batch-summary-item {
+  padding: 12px 14px;
+  border: 1px solid #e5ecf4;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.batch-summary-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #425466;
+  line-height: 1.5;
+}
+
+.compare-panel {
+  border: 1px solid #dfe6ee;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.compare-title {
+  padding: 12px 14px;
+  background: #f7fbff;
+  border-bottom: 1px solid #e7eef6;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef2f6;
+  text-align: left;
+  font-size: 13px;
+  color: #425466;
+}
+
+.compare-table th {
+  background: #fafcff;
+  color: #6b7785;
+  font-weight: 600;
+}
+
+.delta-text {
+  font-weight: 700;
+}
+
+.delta-text.increase {
+  color: #e67e22;
+}
+
+.delta-text.decrease {
+  color: #409eff;
+}
+
+.delta-text.neutral {
+  color: #6b7785;
+}
+
+.compare-bars {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #fcfdff;
+}
+
+.compare-bar-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.compare-bar-label {
+  min-width: 54px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #425466;
+  padding-top: 4px;
+}
+
+.compare-bar-track {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compare-bar-group {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  gap: 10px;
+  align-items: center;
+}
+
+.compare-bar-caption,
+.compare-bar-number {
+  font-size: 12px;
+  color: #6b7785;
+}
+
+.compare-bar-number {
+  text-align: right;
+  font-weight: 600;
+}
+
+.compare-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #edf2f7;
+  overflow: hidden;
+}
+
+.compare-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.raw-fill {
+  background: linear-gradient(90deg, #9ec5ff 0%, #409eff 100%);
+}
+
+.report-fill {
+  background: linear-gradient(90deg, #8fd3a8 0%, #67c23a 100%);
 }
 
 .batch-table-title {
@@ -1195,7 +1585,8 @@ onMounted(() => {
   }
 
   .task-meta-grid,
-  .card-grid {
+  .card-grid,
+  .batch-summary-strip {
     grid-template-columns: 1fr;
   }
   
@@ -1207,6 +1598,15 @@ onMounted(() => {
   
   .demo-top-item {
     width: 100%;
+  }
+
+  .compare-bar-row {
+    flex-direction: column;
+  }
+
+  .compare-bar-label {
+    min-width: auto;
+    padding-top: 0;
   }
 }
 </style>

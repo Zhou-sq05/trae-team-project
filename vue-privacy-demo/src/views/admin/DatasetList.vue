@@ -61,9 +61,8 @@
                   </el-button>
                 </div>
                 <div class="header-buttons">
-                  <el-button type="danger" @click="batchDelete" :disabled="selectedRows.length === 0">
-                    批量删除
-                  </el-button>
+                  <el-button type="danger" @click="batchDelete" :disabled="selectedRows.length === 0">批量删除</el-button>
+                  <el-button type="success" @click="startAggregation">开始聚合估计</el-button>
                   <el-button type="primary" @click="refreshData" :loading="loading">刷新</el-button>
                 </div>
               </div>
@@ -79,15 +78,12 @@
                 <el-table-column label="序号" type="index" width="80" />
                 <el-table-column prop="userId" label="用户ID" />
                 <el-table-column prop="taskId" label="任务ID" />
-                <el-table-column prop="uploadTime" label="上传时间" />
+                <el-table-column prop="batchId" label="批次号" min-width="180" />
+                <el-table-column prop="algorithm" label="协议" width="120" />
+                <el-table-column prop="uploadTime" label="上传时间" min-width="180" />
                 <el-table-column prop="status" label="数据状态" width="100">
                   <template #default="scope">
                     <el-tag :type="scope.row.status === '已上报' ? 'success' : 'warning'">{{ scope.row.status }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="协议" width="120">
-                  <template #default="scope">
-                    <span>{{ scope.row.algorithm }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="数据详情" width="100">
@@ -108,51 +104,53 @@
                   @current-change="handleCurrentChange"
                 />
               </div>
-
-              <div class="batch-generate">
-                <div class="generate-controls">
-                  <span>批量生成</span>
-                  <el-select v-model="generateCount" placeholder="人数" style="width: 100px; margin: 0 10px">
-                    <el-option label="10人" value="10" />
-                    <el-option label="50人" value="50" />
-                    <el-option label="100人" value="100" />
-                    <el-option label="500人" value="500" />
-                  </el-select>
-                  <span>任务ID</span>
-                  <el-select v-model="selectedTaskId" placeholder="选择任务ID" style="width: 200px; margin: 0 10px">
-                    <el-option v-for="task in tasks" :key="task.id" :label="task.id" :value="task.id" />
-                  </el-select>
-                  <span class="hint">(预先生成演示用扰动数据)</span>
-                </div>
-                <div class="generate-buttons">
-                  <el-button type="primary" @click="generateData">生成数据</el-button>
-                  <el-button type="success" @click="startAggregation">开始聚合估计</el-button>
-                </div>
-              </div>
             </el-card>
 
-            <el-card shadow="hover" style="margin-top: 20px" v-if="selectedDataset">
-              <template #header>
-                <div class="card-header">
-                  <span>数据详情 - 用户ID: {{ selectedDataset.userId }} | 任务ID: {{ selectedDataset.taskId }}</span>
-                </div>
-              </template>
-              <el-table :data="dataDetails" style="width: 100%">
-                <el-table-column label="序号" type="index" width="80" />
-                <el-table-column prop="userId" label="用户ID" />
-                <el-table-column prop="taskId" label="任务ID" />
-                <el-table-column prop="attribute" label="属性名" min-width="180" />
-                <el-table-column prop="rawValue" label="原始值" min-width="160" />
-                <el-table-column prop="reportedValue" label="上报值" min-width="180" />
-                <el-table-column prop="mode" label="模式" width="120" />
-                <el-table-column prop="algorithm" label="算法" width="140" />
-                <el-table-column prop="uploadTime" label="上传时间" min-width="180" />
-              </el-table>
-            </el-card>
           </div>
         </el-main>
       </el-container>
     </el-container>
+
+    <el-drawer
+      v-model="detailDrawerVisible"
+      title="数据详情"
+      size="52%"
+      destroy-on-close
+    >
+      <template v-if="selectedDataset">
+        <div class="detail-overview">
+          <div class="detail-chip">
+            <span class="detail-chip-label">用户ID</span>
+            <span class="detail-chip-value">{{ selectedDataset.userId }}</span>
+          </div>
+          <div class="detail-chip">
+            <span class="detail-chip-label">任务ID</span>
+            <span class="detail-chip-value">{{ selectedDataset.taskId }}</span>
+          </div>
+          <div class="detail-chip">
+            <span class="detail-chip-label">批次号</span>
+            <span class="detail-chip-value">{{ selectedDataset.batchId }}</span>
+          </div>
+          <div class="detail-chip">
+            <span class="detail-chip-label">协议</span>
+            <span class="detail-chip-value">{{ selectedDataset.algorithm }}</span>
+          </div>
+        </div>
+
+        <el-table :data="dataDetails" style="width: 100%">
+          <el-table-column label="序号" type="index" width="80" />
+          <el-table-column prop="userId" label="用户ID" />
+          <el-table-column prop="taskId" label="任务ID" />
+          <el-table-column prop="batchId" label="批次号" min-width="180" />
+          <el-table-column prop="attribute" label="属性名" min-width="180" />
+          <el-table-column prop="rawValue" label="原始值" min-width="160" />
+          <el-table-column prop="reportedValue" label="上报值" min-width="180" />
+          <el-table-column prop="mode" label="模式" width="140" />
+          <el-table-column prop="algorithm" label="算法" width="120" />
+          <el-table-column prop="uploadTime" label="上传时间" min-width="180" />
+        </el-table>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -174,12 +172,12 @@ const tableRef = ref(null);
 const selectedRows = ref([]);
 const currentPage = ref(1);
 const pageSize = ref(10);
-const generateCount = ref('10');
 const tasks = ref([]);
 const selectedTaskId = ref('');
 const filterTaskId = ref('');
 const selectedDataset = ref(null);
 const dataDetails = ref([]);
+const detailDrawerVisible = ref(false);
 const loading = ref(false);
 const rawSubmissions = ref([]);
 
@@ -287,35 +285,80 @@ function formatArrLabel(value) {
 }
 
 function buildDatasetRows(submissions) {
-  return submissions.map((item, index) => {
-    const meta = getTaskMeta(item.taskId);
-    const hasReport = Boolean(item.reportData);
-    return {
+  const rows = [];
+
+  submissions.forEach((item, index) => {
+    if (Array.isArray(item?.samples)) {
+      const taskId = item.task_id ?? item.taskId;
+      const meta = getTaskMeta(taskId);
+      item.samples.forEach((sample, sampleIndex) => {
+        rows.push({
+          id: `${index + 1}-${sampleIndex + 1}`,
+          sourceIndex: index,
+          sourceType: 'batch',
+          sampleIndex,
+          userId: item.user_id || item.userId || `用户${String(index + 1).padStart(3, '0')}`,
+          taskId,
+          batchId: item.batch_id || '--',
+          uploadTime: formatDateTime(item.upload_time || item.uploadTime || Date.now()),
+          status: '已上报',
+          algorithm: item.protocol || meta.algorithm
+        });
+      });
+      return;
+    }
+
+    const taskId = item.task_id ?? item.taskId;
+    const meta = getTaskMeta(taskId);
+    rows.push({
       id: index + 1,
       sourceIndex: index,
-      userId: item.userId || `用户${String(index + 1).padStart(3, '0')}`,
-      taskId: item.taskId,
-      uploadTime: formatDateTime(item.uploadTime || Date.now()),
-      status: hasReport ? '已上报' : '已扰动',
-      algorithm: item.reportData?.protocol || meta.algorithm
-    };
+      sourceType: 'single',
+      userId: item.user_id || item.userId || `用户${String(index + 1).padStart(3, '0')}`,
+      taskId,
+      batchId: item.batch_id || item.sampleMeta?.batchId || '--',
+      uploadTime: formatDateTime(item.upload_time || item.uploadTime || Date.now()),
+      status: item.reportData ? '已上报' : '已扰动',
+      algorithm: item.protocol || item.reportData?.protocol || meta.algorithm
+    });
   });
+
+  return rows;
 }
 
 function buildDetailRows(submission, dataset) {
   if (!submission) return [];
 
   const meta = getTaskMeta(dataset.taskId);
-  const scenario = submission.rawData?.scenario;
 
-  if (submission.reportData && scenario === 'arr') {
-    const rawValue = Number(submission.rawData?.fallAlarm ?? 0);
-    const reportValue = submission.reportData?.perturbedValue;
+  if (dataset.sourceType === 'batch' && Array.isArray(submission.samples)) {
+    const sample = submission.samples[dataset.sampleIndex] || {};
+    const reportValue = sample.perturbed_value ?? sample.report_value;
     return [{
       userId: dataset.userId,
       taskId: dataset.taskId,
+      batchId: dataset.batchId,
       attribute: meta.attributeName,
-      rawValue: `${formatArrLabel(rawValue)}（${rawValue}）`,
+      rawValue: '--',
+      reportedValue: `${formatArrLabel(reportValue)}（${reportValue}）`,
+      mode: meta.mode,
+      algorithm: dataset.algorithm,
+      uploadTime: dataset.uploadTime
+    }];
+  }
+
+  const scenario = submission.rawData?.scenario;
+
+  if (submission.reportData && (scenario === 'arr' || submission.reportData?.protocol === 'ARR')) {
+    const hasRawValue = submission.rawData?.fallAlarm !== undefined && submission.rawData?.fallAlarm !== null;
+    const rawValue = hasRawValue ? Number(submission.rawData.fallAlarm) : null;
+    const reportValue = submission.reportData?.perturbedValue ?? submission.reportData?.reportValue;
+    return [{
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      batchId: dataset.batchId,
+      attribute: meta.attributeName,
+      rawValue: hasRawValue ? `${formatArrLabel(rawValue)}（${rawValue}）` : '--',
       reportedValue: `${submission.reportData?.perturbedLabel || formatArrLabel(reportValue)}（${reportValue}）`,
       mode: meta.mode,
       algorithm: submission.reportData?.protocol || meta.algorithm,
@@ -323,76 +366,15 @@ function buildDetailRows(submission, dataset) {
     }];
   }
 
-  if (submission.reportData && scenario === 'agrr') {
-    return [{
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: meta.attributeName,
-      rawValue: `${submission.rawData?.standMinutes ?? '--'} 分钟 -> ${submission.rawData?.standBucket || '--'}`,
-      reportedValue: submission.reportData?.perturbedLabel || submission.reportData?.perturbedValue || '--',
-      mode: meta.mode,
-      algorithm: submission.reportData?.protocol || meta.algorithm,
-      uploadTime: dataset.uploadTime
-    }];
-  }
-
-  if (submission.reportData && scenario === 'aoue') {
-    return [{
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: meta.attributeName,
-      rawValue: `${submission.rawData?.dailySteps ?? '--'} 步 -> ${submission.rawData?.stepsBucket || '--'}`,
-      reportedValue: submission.reportData?.perturbedLabel || submission.reportData?.perturbedValue || '--',
-      mode: meta.mode,
-      algorithm: submission.reportData?.protocol || meta.algorithm,
-      uploadTime: dataset.uploadTime
-    }];
-  }
-
-  if (submission.reportData && scenario === 'tsp') {
-    const missingText = Number(submission.rawData?.sleepMissing) === 1 ? '缺失' : '非缺失';
-    const scoreText = Number(submission.rawData?.sleepMissing) === 1 ? '--' : submission.rawData?.sleepScore ?? '--';
-    return [{
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: meta.attributeName,
-      rawValue: `缺失状态: ${missingText}，评分: ${scoreText}`,
-      reportedValue: submission.reportData?.perturbedLabel || submission.reportData?.perturbedValue || '--',
-      mode: meta.mode,
-      algorithm: submission.reportData?.protocol || meta.algorithm,
-      uploadTime: dataset.uploadTime
-    }];
-  }
-
-  if (submission.perturbedData) {
-    const attributeMap = {
-      sleepHours: '睡眠时长',
-      dailySteps: '日均步数',
-      exerciseFrequency: '近7天运动频次',
-      heartRate: '平均静息心率',
-      mood: '今日感觉'
-    };
-
-    return Object.entries(submission.perturbedData).map(([key, value]) => ({
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      attribute: attributeMap[key] || key,
-      rawValue: submission.rawData?.[key] != null ? String(submission.rawData[key]) : '--',
-      reportedValue: value != null ? String(value) : '--',
-      mode: '差分隐私',
-      algorithm: 'Laplace',
-      uploadTime: dataset.uploadTime
-    }));
-  }
-
   return [{
     userId: dataset.userId,
     taskId: dataset.taskId,
+    batchId: dataset.batchId,
     attribute: meta.attributeName,
     rawValue: '--',
     reportedValue: '--',
     mode: meta.mode,
-    algorithm: meta.algorithm,
+    algorithm: dataset.algorithm,
     uploadTime: dataset.uploadTime
   }];
 }
@@ -433,49 +415,7 @@ function viewDataDetail(dataset) {
   selectedDataset.value = dataset;
   const submission = rawSubmissions.value[dataset.sourceIndex] || null;
   dataDetails.value = buildDetailRows(submission, dataset);
-}
-
-function generateData() {
-  if (!selectedTaskId.value) {
-    ElMessage.warning('请选择任务ID');
-    return;
-  }
-
-  loading.value = true;
-  setTimeout(() => {
-    const count = Number(generateCount.value);
-    const meta = getTaskMeta(selectedTaskId.value);
-    const existing = safeParse('submittedData', []);
-    const generated = [];
-
-    for (let i = 0; i < count; i += 1) {
-      const rawValue = Math.random() < 0.25 ? 1 : 0;
-      const reportValue = Math.random() < 0.5 ? rawValue : 1 - rawValue;
-      generated.push({
-        userId: `模拟用户${String(existing.length + i + 1).padStart(3, '0')}`,
-        taskId: selectedTaskId.value,
-        uploadTime: new Date().toISOString(),
-        rawData: {
-          scenario: meta.algorithm === 'ARR' ? 'arr' : 'legacy',
-          fallAlarm: rawValue
-        },
-        reportData: {
-          protocol: meta.algorithm,
-          perturbedValue: reportValue,
-          perturbedLabel: formatArrLabel(reportValue),
-          params: {
-            p: '0.8500',
-            q: '0.1500'
-          }
-        }
-      });
-    }
-
-    localStorage.setItem('submittedData', JSON.stringify([...existing, ...generated]));
-    loadDataFromStorage();
-    ElMessage.success(`已为任务 ${selectedTaskId.value} 生成 ${count} 条演示数据`);
-    loading.value = false;
-  }, 600);
+  detailDrawerVisible.value = true;
 }
 
 function startAggregation() {
@@ -521,6 +461,7 @@ function batchDelete() {
     selectedRows.value = [];
     selectedDataset.value = null;
     dataDetails.value = [];
+    detailDrawerVisible.value = false;
     if (tableRef.value) {
       tableRef.value.clearSelection();
     }
@@ -615,35 +556,36 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-.batch-generate {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.generate-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.generate-buttons {
-  display: flex;
+.detail-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
+  margin-bottom: 18px;
 }
 
-.hint {
-  color: #909399;
-  margin-left: 8px;
+.detail-chip {
+  padding: 12px 14px;
+  border: 1px solid #e8eef6;
+  border-radius: 10px;
+  background: #f7fbff;
+}
+
+.detail-chip-label {
+  display: block;
+  font-size: 12px;
+  color: #7a8ca5;
+  margin-bottom: 6px;
+}
+
+.detail-chip-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #183153;
+  word-break: break-all;
 }
 
 @media (max-width: 1200px) {
-  .dataset-header,
-  .batch-generate {
+  .dataset-header {
     flex-direction: column;
     align-items: flex-start;
   }

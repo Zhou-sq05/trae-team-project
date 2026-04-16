@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="login-container">
     <div class="login-form-wrapper">
       <h2>{{ pageTitle }}</h2>
@@ -54,18 +54,18 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
-// 从路由参数获取类型
-const userType = ref(route.query.type || 'user')
+const validUserTypes = ['user', 'admin']
+const normalizeUserType = (type) => (validUserTypes.includes(type) ? type : 'user')
+
+const userType = ref(normalizeUserType(route.query.type))
 const activeTab = ref(route.query.tab || 'login')
 const loading = ref(false)
 const errorMessage = ref('')
 
-// 根据类型显示不同的页面标题
 const pageTitle = computed(() => {
   const titles = {
     user: '用户端登录',
-    admin: '管理端登录',
-    setting: '设置端登录'
+    admin: '管理端登录'
   }
   return titles[userType.value] || '登录'
 })
@@ -91,11 +91,11 @@ const registerForm = reactive({
 const registerRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 20, message: '用户名长度在3-20之间', trigger: 'blur' }
+    { min: 3, max: 20, message: '用户名长度在 3-20 之间', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+    { min: 6, message: '密码长度至少 6 位', trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
@@ -112,7 +112,6 @@ const registerRules = {
   ]
 }
 
-// 从本地存储获取用户数据
 const getUsers = () => {
   try {
     const users = localStorage.getItem('users')
@@ -123,7 +122,6 @@ const getUsers = () => {
   }
 }
 
-// 保存用户数据到本地存储
 const saveUsers = (users) => {
   try {
     localStorage.setItem('users', JSON.stringify(users))
@@ -135,48 +133,42 @@ const saveUsers = (users) => {
 const handleLogin = async () => {
   errorMessage.value = ''
   if (!loginFormRef.value) return
-  
+
   try {
     await loginFormRef.value.validate()
     loading.value = true
-    
-    // 获取存储的用户数据
+
     const users = getUsers()
     const userData = users[loginForm.username]
-    
-    // 验证用户是否存在且密码正确
+
     if (!userData) {
       loading.value = false
       errorMessage.value = '用户不存在，请先注册'
       return
     }
-    
+
     if (userData.password !== loginForm.password) {
       loading.value = false
       errorMessage.value = '密码错误'
       return
     }
-    
-    // 模拟登录请求延迟
+
     setTimeout(() => {
       loading.value = false
-      // 使用Pinia store存储用户信息
       userStore.login({
         username: loginForm.username,
         token: 'mock-token-' + Date.now(),
         type: userType.value
       })
-      // 根据用户类型跳转到不同的页面
+
       if (userType.value === 'admin') {
         router.push('/admin/dashboard')
-      } else if (userType.value === 'user') {
+      } else {
         router.push('/user/device')
-      } else if (userType.value === 'setting') {
-        router.push('/admin/attr-config')
       }
     }, 1000)
   } catch (error) {
-    console.error('登录验证失败:', error)
+    console.error('登录校验失败:', error)
     loading.value = false
   }
 }
@@ -184,41 +176,36 @@ const handleLogin = async () => {
 const handleRegister = async () => {
   errorMessage.value = ''
   if (!registerFormRef.value) return
-  
+
   try {
     await registerFormRef.value.validate()
     loading.value = true
-    
-    // 获取存储的用户数据
+
     const users = getUsers()
-    
-    // 检查用户名是否已存在
+
     if (users[registerForm.username]) {
       loading.value = false
       errorMessage.value = '用户名已存在'
       return
     }
-    
-    // 保存新用户
+
     users[registerForm.username] = {
       password: registerForm.password,
       type: userType.value,
       createdAt: new Date().toISOString()
     }
     saveUsers(users)
-    
-    // 模拟注册请求延迟
+
     setTimeout(() => {
       loading.value = false
       errorMessage.value = '注册成功，请登录'
       activeTab.value = 'login'
-      // 清空注册表单
       registerForm.username = ''
       registerForm.password = ''
       registerForm.confirmPassword = ''
     }, 1000)
   } catch (error) {
-    console.error('注册验证失败:', error)
+    console.error('注册校验失败:', error)
     loading.value = false
   }
 }
@@ -227,9 +214,8 @@ const goBack = () => {
   router.push('/')
 }
 
-// 监听路由参数变化
 onMounted(() => {
-  userType.value = route.query.type || 'user'
+  userType.value = normalizeUserType(route.query.type)
   activeTab.value = route.query.tab || 'login'
 })
 </script>

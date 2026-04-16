@@ -1,9 +1,9 @@
-<template>
+﻿<template>
   <div class="home-container">
     <div class="home-header">
       <h1>基于内在不确定性的本地差分隐私演示系统</h1>
       <div class="help-link">
-        <el-button type="text">帮助/关于</el-button>
+        <el-button type="text">帮助 / 关于</el-button>
       </div>
     </div>
     <div class="home-content">
@@ -17,8 +17,8 @@
       <div class="jump-box">
         <h2>管理端</h2>
         <div class="button-group">
-          <el-button type="primary" @click="goToRegister('setting')">注册</el-button>
-          <el-button @click="goToLogin('setting')">登录</el-button>
+          <el-button type="primary" @click="goToRegister('admin')">注册</el-button>
+          <el-button @click="goToLogin('admin')">登录</el-button>
         </div>
       </div>
     </div>
@@ -31,12 +31,10 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const goToLogin = (type) => {
-  // 跳转到登录页面，可以通过query参数传递类型
   router.push({ path: '/login', query: { type } })
 }
 
 const goToRegister = (type) => {
-  // 跳转到注册页面，可以通过query参数传递类型
   router.push({ path: '/login', query: { type, tab: 'register' } })
 }
 </script>
