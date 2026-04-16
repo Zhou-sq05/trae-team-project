@@ -6,36 +6,57 @@
         <el-button type="text">帮助 / 关于</el-button>
       </div>
     </div>
+    
     <div class="home-content">
       <div class="jump-box">
         <h2>用户端</h2>
         <div class="button-group">
-          <el-button type="primary" @click="goToRegister('user')">注册</el-button>
-          <el-button @click="goToLogin('user')">登录</el-button>
+          <el-button type="primary" @click="goToLogin('user')">进入用户端</el-button>
         </div>
       </div>
       <div class="jump-box">
         <h2>管理端</h2>
         <div class="button-group">
-          <el-button type="primary" @click="goToRegister('admin')">注册</el-button>
-          <el-button @click="goToLogin('admin')">登录</el-button>
+          <el-button type="primary" @click="goToLogin('admin')">进入管理端</el-button>
         </div>
       </div>
     </div>
+
+    <!-- 右下角注册按钮 -->
+    <div class="register-footer">
+      <el-button type="text" @click="showRegisterDialog = true">注册账号</el-button>
+    </div>
+
+    <!-- 注册类型选择弹窗 -->
+    <el-dialog v-model="showRegisterDialog" title="选择注册类型" width="320px" :align-center="true">
+      <div class="register-options">
+        <el-button type="primary" @click="goToRegister('user')" style="width: 100%; margin-bottom: 15px;">
+          注册用户端
+        </el-button>
+        <el-button type="success" @click="goToRegister('admin')" style="width: 100%;">
+          注册管理端
+        </el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
+// 控制弹窗显示
+const showRegisterDialog = ref(false)
 
 const goToLogin = (type) => {
   router.push({ path: '/login', query: { type } })
 }
 
 const goToRegister = (type) => {
-  router.push({ path: '/login', query: { type, tab: 'register' } })
+  showRegisterDialog.value = false
+  router.push({ path: '/register', query: { type } }) 
 }
 </script>
 
@@ -47,6 +68,7 @@ const goToRegister = (type) => {
   display: flex;
   flex-direction: column;
   padding: 40px;
+  position: relative;
 }
 
 .home-header {
@@ -99,23 +121,11 @@ const goToRegister = (type) => {
 .button-group {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  align-items: center;
+  width: 100%;
 }
 
 .button-group .el-button {
-  width: 100%;
-  padding: 12px;
-  font-size: 16px;
-}
-
-.jump-box .button-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center; 
-  width: 100%;
-}
-
-.jump-box .button-group .el-button {
   width: 100% !important;
   min-width: 120px !important;
   margin: 0 auto !important;
@@ -127,4 +137,25 @@ const goToRegister = (type) => {
   height: 40px !important;            
 }
 
+/* 右下角注册按钮 */
+.register-footer {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+}
+
+.register-footer .el-button {
+  color: white;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.register-footer .el-button:hover {
+  opacity: 1;
+}
+
+/* 弹窗内按钮样式 */
+.register-options {
+  padding: 10px 0;
+}
 </style>
