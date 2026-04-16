@@ -1,6 +1,5 @@
 ﻿<template>
   <div class="home-container">
-    <!-- 顶部：标题区（左对齐） -->
     <div class="home-header">
       <h1>基于内在不确定性的本地差分隐私演示系统</h1>
       <p class="subtitle">面向健康手环场景的数据采集、隐私扰动与聚合估计平台</p>
@@ -12,7 +11,6 @@
       </div>
     </div>
 
-    <!-- 中部：系统流程（左对齐） -->
     <div class="flow-section">
       <div class="flow-line">
         <span class="flow-item">属性配置</span>
@@ -30,7 +28,6 @@
       </p>
     </div>
 
-    <!-- 下部：双端入口卡片（居中） -->
     <div class="cards-section">
       <div class="card">
         <div class="card-icon">📱</div>
@@ -59,18 +56,15 @@
       </div>
     </div>
 
-    <!-- 右下角注册入口 -->
     <div class="register-footer">
       <el-button type="text" @click="showRegisterDialog = true">注册账号</el-button>
     </div>
 
-    <!-- 右上角校徽 Logo -->
     <div class="university-logo">
       <img src="/logo.png" alt="山东大学" />
       <span>山东大学 网络空间安全学院</span>
     </div>
 
-    <!-- 注册类型选择弹窗 -->
     <el-dialog v-model="showRegisterDialog" title="选择注册类型" width="320px" :align-center="true">
       <div class="register-options">
         <el-button type="primary" @click="goToRegister('user')" style="width: 100%; margin-bottom: 15px;">
@@ -114,7 +108,6 @@ const goToRegister = (type) => {
   box-sizing: border-box;
 }
 
-/* 所有内容在正常层级 */
 .home-header,
 .flow-section,
 .cards-section,
@@ -123,7 +116,6 @@ const goToRegister = (type) => {
   z-index: 1;
 }
 
-/* ========== 顶部标题区（左对齐） ========== */
 .home-header {
   text-align: left;
   margin-bottom: 50px;
@@ -161,7 +153,6 @@ const goToRegister = (type) => {
   letter-spacing: 1px;
 }
 
-/* ========== 中部流程区（左对齐） ========== */
 .flow-section {
   text-align: left;
   margin-bottom: 60px;
@@ -204,7 +195,6 @@ const goToRegister = (type) => {
   margin-top: 8px;
 }
 
-/* ========== 下部双卡片（居中） ========== */
 .cards-section {
   display: flex;
   justify-content: center;
@@ -275,7 +265,6 @@ const goToRegister = (type) => {
   opacity: 0.9;
 }
 
-/* ========== 右下角注册 ========== */
 .register-footer {
   position: absolute;
   bottom: 24px;
@@ -291,7 +280,6 @@ const goToRegister = (type) => {
   color: white;
 }
 
-/* ========== 右上角校徽 Logo ========== */
 .university-logo {
   position: absolute;
   top: 30px;
