@@ -99,6 +99,7 @@ const goToRegister = (type) => {
   showRegisterDialog.value = false
   router.push({ path: '/register', query: { type } })
 }
+
 </script>
 
 <style scoped>

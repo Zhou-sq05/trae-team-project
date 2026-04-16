@@ -102,7 +102,7 @@ const handleLogin = async () => {
       })
 
       if (userType.value === 'admin') {
-        router.push('/admin/dashboard')
+        router.push('/admin/attr-config')
       } else {
         router.push('/user/device')
       }
