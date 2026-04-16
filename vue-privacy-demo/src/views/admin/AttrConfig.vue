@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="admin-container">
     <el-container>
       <el-header>
@@ -1855,7 +1855,13 @@ function createGeneratedTaskId(attribute) {
   const today = new Date();
   const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
   const nameSlug = String(attribute?.algorithm || 'task').toUpperCase();
-  return `Task_${nameSlug}_${dateStr}_${Date.now()}`;
+  
+  // 生成两位有序序号
+  const todayTaskPrefix = `Task_${nameSlug}_${dateStr}_`;
+  const todayTasks = taskStore.taskList.filter(task => task.id.startsWith(todayTaskPrefix));
+  const sequenceNumber = todayTasks.length.toString().padStart(2, '0');
+  
+  return `${todayTaskPrefix}${sequenceNumber}`;
 }
 
 function validateTaskId(taskIdValue) {
