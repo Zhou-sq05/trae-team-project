@@ -89,8 +89,21 @@
 
             <div v-else-if="currentTaskDetail.scenario === 'agrr'" class="form-item">
               <span>日均站立时长（分钟）</span>
-              <el-input v-model.number="dynamicForm.standMinutes" placeholder="请输入原始分钟数" @input="markFormTouched" />
-              <div class="derived-hint">自动映射分档：{{ derivedStandBucket || '--' }}</div>
+              <el-input-number
+                v-model="dynamicForm.standMinutes"
+                :min="0"
+                :step="1"
+                controls-position="right"
+                placeholder="请输入原始分钟数"
+                @change="handleAgrrMinutesChange"
+              />
+              <div class="derived-hint">原始分钟数会先映射为固定分档，再进入 AGRR 扰动流程。</div>
+              <div class="derived-hint derived-hint--strong">当前分档：{{ derivedStandBucket || '--' }}</div>
+              <div class="bucket-rule-list">
+                <span v-for="rule in standDurationBucketRules" :key="rule.label" class="bucket-rule-chip">
+                  {{ rule.label }}：{{ rule.rangeText }}
+                </span>
+              </div>
             </div>
 
             <div v-else-if="currentTaskDetail.scenario === 'aoue'" class="form-item">
@@ -137,7 +150,7 @@
           <div v-else class="dynamic-form batch-simulator">
             <div class="derived-hint">点击后将基于当前采集输入执行一次本地扰动，并自动切换到右侧“单次扰动演示”页签。</div>
             <div class="action-row">
-              <el-button type="primary" @click="refreshData" :disabled="!currentTaskDetail">加载示例数据</el-button>
+              <el-button type="primary" @click="refreshData" :disabled="!currentTaskDetail">生成示例输入</el-button>
               <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
                 执行单次扰动演示
               </el-button>
@@ -182,7 +195,7 @@
 
       <div class="right-section">
         <h3>演示调试区域</h3>
-        <template v-if="currentTaskDetail?.scenario === 'arr'">
+        <template v-if="['arr', 'agrr'].includes(currentTaskDetail?.scenario)">
           <div class="demo-tab-bar">
             <button
               type="button"
@@ -222,9 +235,9 @@
             </div>
 
             <div class="summary-block">
-              <h4>原始输入</h4>
+                <h4>原始输入</h4>
               <div class="card-grid">
-                <div v-for="item in arrRawCards" :key="item.label" class="summary-card">
+                <div v-for="item in singleRawCards" :key="item.label" class="summary-card">
                   <div class="card-label">{{ item.label }}</div>
                   <div class="card-value">{{ item.value }}</div>
                 </div>
@@ -237,13 +250,17 @@
                 <span class="section-tip">从管理端当前任务的已保存配置中读取</span>
               </div>
               <div class="card-grid">
-                <div v-for="item in arrParameterCards" :key="item.label" class="summary-card">
+                <div v-for="item in parameterCards" :key="item.label" class="summary-card">
                   <div class="card-label">{{ item.label }}</div>
                   <div class="card-value">{{ item.value }}</div>
                 </div>
               </div>
-              <div v-if="!arrParametersReady" class="preview-tip">
-                当前任务尚未在管理端完成 ARR 参数保存，暂时无法执行本地扰动。
+              <div v-if="currentPerturbationStatus" class="perturbation-status-banner" :class="`is-${currentPerturbationStatus.statusKey}`">
+                <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
+                <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
+              </div>
+              <div v-if="(currentTaskDetail?.scenario === 'arr' && !arrParametersReady) || (currentTaskDetail?.scenario === 'agrr' && !agrrParametersReady)" class="preview-tip">
+                当前任务尚未在管理端完成 {{ currentTaskDetail?.protocol }} 参数保存，暂时无法执行本地扰动。
               </div>
             </div>
             <div class="summary-block">
@@ -252,13 +269,13 @@
                 <span class="section-tip">同一原始值下可重复随机模拟</span>
               </div>
               <div class="card-grid">
-                <div v-for="item in arrResultCards" :key="item.label" class="summary-card preview-card">
+                <div v-for="item in resultCards" :key="item.label" class="summary-card preview-card">
                   <div class="card-label">{{ item.label }}</div>
                   <div class="card-value">{{ item.value }}</div>
                 </div>
               </div>
               <div class="preview-tip">
-                ARR 会按当前原始编码值与参数 p、q 进行一次本地随机扰动，再生成本次上报值。
+                {{ currentTaskDetail?.scenario === 'agrr' ? 'AGRR 会先对原始分钟数做分档，再按当前档位编码值与参数 p、q 执行一次本地随机扰动。' : 'ARR 会按当前原始编码值与参数 p、q 进行一次本地随机扰动，再生成本次上报值。' }}
               </div>
             </div>
 
@@ -269,7 +286,7 @@
               </div>
               <div class="action-row">
                 <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                  {{ arrSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
+                  {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
                 </el-button>
                 <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
                   提交上报
@@ -282,24 +299,24 @@
             <div class="summary-block">
               <div class="summary-heading">
                 <h4>连续采集结果</h4>
-                <span class="section-tip">展示健康手环连续采集并重复执行 ARR 的汇总结果</span>
+                <span class="section-tip">展示健康手环连续采集并重复执行 {{ currentTaskDetail?.protocol || '--' }} 的汇总结果</span>
               </div>
-              <div v-if="!arrBatchResult" class="empty-box">
+              <div v-if="!currentBatchResult" class="empty-box">
                 <p>点击左侧“手环连续采集”后，这里会展示本次连续采集的统计结果和前 10 条样本明细。</p>
               </div>
               <template v-else>
                 <div class="batch-summary-strip">
                   <div class="batch-summary-item">
-                    <div class="card-label">本次连续采集次数</div>
-                    <div class="batch-summary-value">{{ arrBatchSummaryCards[0].value }}</div>
+                    <div class="card-label">{{ currentBatchSummaryCards[0]?.label || '样本总数' }}</div>
+                    <div class="batch-summary-value">{{ currentBatchSummaryCards[0]?.value }}</div>
                   </div>
                   <div class="batch-summary-item">
-                    <div class="card-label">当前任务名称</div>
-                    <div class="batch-summary-value">{{ arrBatchSummaryCards[1].value }}</div>
+                    <div class="card-label">{{ currentBatchSummaryCards[1]?.label || '当前任务名称' }}</div>
+                    <div class="batch-summary-value">{{ currentBatchSummaryCards[1]?.value }}</div>
                   </div>
                   <div class="batch-summary-item">
-                    <div class="card-label">当前协议</div>
-                    <div class="batch-summary-value">{{ arrBatchSummaryCards[2].value }}</div>
+                    <div class="card-label">{{ currentBatchSummaryCards[2]?.label || '当前协议' }}</div>
+                    <div class="batch-summary-value">{{ currentBatchSummaryCards[2]?.value }}</div>
                   </div>
                 </div>
 
@@ -315,7 +332,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="row in arrDistributionComparisonRows" :key="row.status">
+                      <tr v-for="row in currentDistributionComparisonRows" :key="row.status">
                         <td>{{ row.status }}</td>
                         <td>{{ row.rawCount }}</td>
                         <td>{{ row.reportCount }}</td>
@@ -327,7 +344,7 @@
                   </table>
 
                   <div class="compare-bars">
-                    <div v-for="row in arrDistributionComparisonRows" :key="`${row.status}-bars`" class="compare-bar-row">
+                    <div v-for="row in currentDistributionComparisonRows" :key="`${row.status}-bars`" class="compare-bar-row">
                       <div class="compare-bar-label">{{ row.status }}</div>
                       <div class="compare-bar-track">
                         <div class="compare-bar-group">
@@ -350,7 +367,11 @@
                 </div>
 
                 <div class="preview-tip">
-                  当前结果为手环端连续执行本地扰动后的统计结果，用于演示设备持续采集并立即本地上报的过程。
+                  {{ currentBatchResultTip }}
+                </div>
+                <div v-if="currentPerturbationStatus" class="perturbation-status-banner perturbation-status-banner--batch" :class="`is-${currentPerturbationStatus.statusKey}`">
+                  <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
+                  <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
                 </div>
 
                 <div class="summary-block batch-upload-block">
@@ -362,12 +383,12 @@
                     <el-button
                       type="primary"
                       @click="uploadCurrentBatchResult"
-                      :disabled="!arrBatchResult || batchUploadState?.batchId === arrBatchResult.batchId"
+                      :disabled="!currentBatchResult || batchUploadState?.batchId === currentBatchResult.batchId"
                     >
                       上报本次连续采集结果
                     </el-button>
                   </div>
-                  <div v-if="batchUploadState && batchUploadState.batchId === arrBatchResult.batchId" class="preview-tip">
+                  <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="preview-tip">
                     本次上报状态：{{ batchUploadState.status }}，本次上报记录数：{{ batchUploadState.count }} 条
                   </div>
                   <div v-else class="preview-tip">
@@ -376,24 +397,16 @@
                 </div>
 
                 <div class="batch-detail-table">
-                  <div class="batch-table-title">前 {{ arrBatchPreviewRows.length }} 条样本明细</div>
+                  <div class="batch-table-title">前 {{ currentBatchPreviewRows.length }} 条样本明细</div>
                   <table>
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>原始值</th>
-                        <th>原始编码</th>
-                        <th>扰动结果</th>
-                        <th>上报值</th>
+                        <th v-for="column in batchPreviewColumns" :key="column.key">{{ column.label }}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="row in arrBatchPreviewRows" :key="row.index">
-                        <td>{{ row.index }}</td>
-                        <td>{{ row.rawLabel }}</td>
-                        <td>{{ row.rawValue }}</td>
-                        <td>{{ row.perturbedLabel }}</td>
-                        <td>{{ row.reportValue }}</td>
+                      <tr v-for="row in currentBatchPreviewRows" :key="row.index">
+                        <td v-for="column in batchPreviewColumns" :key="column.key">{{ row[column.key] }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -444,7 +457,7 @@
               </div>
             </div>
             <div v-if="currentTaskDetail" class="preview-tip">
-              当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。
+              {{ processPreviewTip }}
             </div>
             <div class="action-row" v-if="currentTaskDetail">
               <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
@@ -466,7 +479,18 @@ import { ElMessage } from 'element-plus';
 import { useUserStore } from '../../store/user';
 import { useTaskStore } from '../../store/task';
 import { useAttributeConfigStore } from '../../store/attributeConfig';
-import { ARR } from '../../utils/ldpAlgorithms';
+import { ARR, AGRR } from '../../utils/ldpAlgorithms';
+import { STAND_BUCKET_ORDER } from '../../utils/constants';
+import {
+  STAND_DURATION_BUCKET_RULES,
+  createEmptyStandBucketCounts,
+  getStandBucketCode,
+  getStandBucketCodeByMinutes,
+  getStandBucketLabelByCode,
+  getStandDurationBucket,
+  normalizeStandBucketCounts
+} from '../../utils/standDurationBuckets';
+import { getPerturbationStatus } from '../../utils/perturbationStatus';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -480,9 +504,12 @@ const systemStatus = ref(0);
 const formTouched = ref(false);
 const arrSimulationResult = ref(null);
 const arrBatchResult = ref(null);
+const agrrSimulationResult = ref(null);
+const agrrBatchResult = ref(null);
 const batchSimulationCount = ref(100);
 const activeDemoTab = ref('single');
 const batchUploadState = ref(null);
+const standDurationBucketRules = STAND_DURATION_BUCKET_RULES;
 
 const dynamicForm = reactive({
   fallAlarm: 0,
@@ -569,23 +596,69 @@ const arrConfigParams = computed(() => {
   };
 });
 
+const agrrConfigParams = computed(() => {
+  if (currentTaskDetail.value?.scenario !== 'agrr') return null;
+  const calibratedParams = currentAttributeConfig.value?.calibratedParams;
+  if (!calibratedParams) return null;
+
+  const p = Number(calibratedParams.p);
+  const q = Number(calibratedParams.q);
+  if (!Number.isFinite(p) || !Number.isFinite(q)) return null;
+
+  return {
+    p,
+    q,
+    epsilon: currentAttributeConfig.value?.epsilon ?? currentTaskDetail.value?.epsilon ?? '--',
+    d: STAND_BUCKET_ORDER.length
+  };
+});
+
 const arrParametersReady = computed(() => Boolean(arrConfigParams.value));
+const agrrParametersReady = computed(() => Boolean(agrrConfigParams.value));
+const arrPerturbationStatus = computed(() => getPerturbationStatus('ARR', arrConfigParams.value));
+const agrrPerturbationStatus = computed(() => getPerturbationStatus('AGRR', agrrConfigParams.value));
+const currentPerturbationStatus = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrPerturbationStatus.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'arr') {
+    return arrPerturbationStatus.value;
+  }
+  return null;
+});
 const canSimulateArr = computed(() => currentTaskDetail.value?.scenario === 'arr' && formTouched.value && arrParametersReady.value);
+const canSimulateAgrr = computed(() => (
+  currentTaskDetail.value?.scenario === 'agrr'
+  && formTouched.value
+  && agrrParametersReady.value
+  && Boolean(derivedStandBucket.value)
+));
 const canRunSingleSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
   if (currentTaskDetail.value.scenario === 'arr') {
     return canSimulateArr.value;
   }
+  if (currentTaskDetail.value.scenario === 'agrr') {
+    return canSimulateAgrr.value;
+  }
   return formTouched.value;
 });
 const canRunBatchSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
-  if (currentTaskDetail.value.scenario !== 'arr') return false;
-  return arrParametersReady.value && Number(batchSimulationCount.value) > 0;
+  if (currentTaskDetail.value.scenario === 'arr') {
+    return arrParametersReady.value && Number(batchSimulationCount.value) > 0;
+  }
+  if (currentTaskDetail.value.scenario === 'agrr') {
+    return agrrParametersReady.value && Number(batchSimulationCount.value) > 0;
+  }
+  return false;
 });
 const displayEpsilon = computed(() => {
   if (currentTaskDetail.value?.scenario === 'arr' && arrConfigParams.value) {
     return arrConfigParams.value.epsilon;
+  }
+  if (currentTaskDetail.value?.scenario === 'agrr' && agrrConfigParams.value) {
+    return agrrConfigParams.value.epsilon;
   }
   return currentTaskDetail.value?.epsilon ?? '--';
 });
@@ -593,6 +666,9 @@ const canSubmitCurrentTask = computed(() => {
   if (!currentTaskDetail.value) return false;
   if (currentTaskDetail.value.scenario === 'arr') {
     return Boolean(arrSimulationResult.value);
+  }
+  if (currentTaskDetail.value.scenario === 'agrr') {
+    return Boolean(agrrSimulationResult.value);
   }
   return formTouched.value;
 });
@@ -621,12 +697,11 @@ const statusColor = computed(() => {
 });
 
 const derivedStandBucket = computed(() => {
-  const value = Number(dynamicForm.standMinutes);
-  if (!Number.isFinite(value)) return '';
-  if (value < 120) return '低站立';
-  if (value < 240) return '中低站立';
-  if (value < 360) return '中高站立';
-  return '高站立';
+  return getStandDurationBucket(dynamicForm.standMinutes);
+});
+
+const derivedStandBucketCode = computed(() => {
+  return getStandBucketCodeByMinutes(dynamicForm.standMinutes);
 });
 
 const derivedStepsBucket = computed(() => {
@@ -675,9 +750,20 @@ const arrRawCards = computed(() => [
   { label: '原始编码值', value: String(dynamicForm.fallAlarm) }
 ]);
 
+const agrrRawCards = computed(() => [
+  { label: '原始分钟数', value: dynamicForm.standMinutes ?? '--' },
+  { label: '当前分档', value: derivedStandBucket.value || '--' },
+  { label: '原始编码值', value: derivedStandBucketCode.value ? String(derivedStandBucketCode.value) : '--' }
+]);
+
 const arrParameterCards = computed(() => [
   { label: 'p（保留原值概率）', value: arrParametersReady.value ? arrConfigParams.value.p.toFixed(4) : '--' },
   { label: 'q（翻转为相反值概率）', value: arrParametersReady.value ? arrConfigParams.value.q.toFixed(4) : '--' }
+]);
+
+const agrrParameterCards = computed(() => [
+  { label: 'p（保留原档位概率）', value: agrrParametersReady.value ? agrrConfigParams.value.p.toFixed(4) : '--' },
+  { label: 'q（扰动到其他档位概率）', value: agrrParametersReady.value ? agrrConfigParams.value.q.toFixed(4) : '--' }
 ]);
 
 const arrResultCards = computed(() => [
@@ -691,6 +777,52 @@ const arrResultCards = computed(() => [
   }
 ]);
 
+const agrrResultCards = computed(() => [
+  {
+    label: '扰动后档位',
+    value: agrrSimulationResult.value ? agrrSimulationResult.value.perturbedLabel : '--'
+  },
+  {
+    label: '上报值',
+    value: agrrSimulationResult.value ? String(agrrSimulationResult.value.reportValue) : '--'
+  }
+]);
+
+const currentSimulationResult = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrSimulationResult.value;
+  }
+  return arrSimulationResult.value;
+});
+
+const singleRawCards = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrRawCards.value;
+  }
+  return arrRawCards.value;
+});
+
+const parameterCards = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrParameterCards.value;
+  }
+  return arrParameterCards.value;
+});
+
+const resultCards = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrResultCards.value;
+  }
+  return arrResultCards.value;
+});
+
+const currentBatchResult = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrBatchResult.value;
+  }
+  return arrBatchResult.value;
+});
+
 const arrBatchSummaryCards = computed(() => {
   if (!arrBatchResult.value) return [];
   return [
@@ -702,6 +834,22 @@ const arrBatchSummaryCards = computed(() => {
     { label: '上报“触发”数量', value: String(arrBatchResult.value.countOne) },
     { label: '上报“未触发”数量', value: String(arrBatchResult.value.countZero) }
   ];
+});
+
+const agrrBatchSummaryCards = computed(() => {
+  if (!agrrBatchResult.value) return [];
+  return [
+    { label: '样本总数', value: String(agrrBatchResult.value.totalRuns) },
+    { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
+    { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' }
+  ];
+});
+
+const currentBatchSummaryCards = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrBatchSummaryCards.value;
+  }
+  return arrBatchSummaryCards.value;
 });
 
 const arrDistributionComparisonRows = computed(() => {
@@ -732,7 +880,69 @@ const arrDistributionComparisonRows = computed(() => {
   });
 });
 
+const agrrDistributionComparisonRows = computed(() => {
+  if (!agrrBatchResult.value) return [];
+
+  const total = agrrBatchResult.value.totalRuns || 1;
+  return STAND_BUCKET_ORDER.map(bucket => {
+    const rawCount = Number(agrrBatchResult.value.rawBucketCounts?.[bucket] ?? 0);
+    const reportCount = Number(agrrBatchResult.value.reportBucketCounts?.[bucket] ?? 0);
+    const delta = reportCount - rawCount;
+
+    return {
+      status: bucket,
+      rawCount,
+      reportCount,
+      delta,
+      deltaDisplay: delta > 0 ? `+${delta}` : `${delta}`,
+      rawPercent: Number(((rawCount / total) * 100).toFixed(1)),
+      reportPercent: Number(((reportCount / total) * 100).toFixed(1))
+    };
+  });
+});
+
+const currentDistributionComparisonRows = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrDistributionComparisonRows.value;
+  }
+  return arrDistributionComparisonRows.value;
+});
+
 const arrBatchPreviewRows = computed(() => arrBatchResult.value?.samples?.slice(0, 10) || []);
+const agrrBatchPreviewRows = computed(() => agrrBatchResult.value?.samples?.slice(0, 10) || []);
+const currentBatchPreviewRows = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return agrrBatchPreviewRows.value;
+  }
+  return arrBatchPreviewRows.value;
+});
+
+const currentBatchResultTip = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始分钟数样本、映射到 4 档后，再执行 AGRR 本地扰动得到的统计结果。'} 原始分钟数仅用于映射分档，真正执行扰动与上报的是分档后的档位编码。`;
+  }
+  return currentPerturbationStatus.value?.description || '当前结果为手环端连续执行本地扰动后的统计结果，用于演示设备持续采集并立即本地上报的过程。';
+});
+
+const batchPreviewColumns = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return [
+      { key: 'index', label: '#' },
+      { key: 'rawMinutes', label: '原始分钟数' },
+      { key: 'rawLabel', label: '原始档位' },
+      { key: 'perturbedLabel', label: '扰动后档位' },
+      { key: 'reportValue', label: '上报值' }
+    ];
+  }
+
+  return [
+    { key: 'index', label: '#' },
+    { key: 'rawLabel', label: '原始值' },
+    { key: 'rawValue', label: '原始编码' },
+    { key: 'perturbedLabel', label: '扰动结果' },
+    { key: 'reportValue', label: '上报值' }
+  ];
+});
 
 const processPreviewCards = computed(() => {
   if (!currentTaskDetail.value) return [];
@@ -745,7 +955,7 @@ const processPreviewCards = computed(() => {
       ];
     case 'agrr':
       return [
-        { label: '处理链路', value: '原始分钟数 -> 分档 -> 扰动值（下一步接入）' },
+        { label: '处理链路', value: '原始分钟数 -> 4 档映射 -> AGRR 扰动 -> 上报编码值' },
         { label: '当前分档', value: derivedStandBucket.value || '--' }
       ];
     case 'aoue':
@@ -763,10 +973,18 @@ const processPreviewCards = computed(() => {
   }
 });
 
+const processPreviewTip = computed(() => {
+  if (!currentTaskDetail.value) return '';
+  if (currentTaskDetail.value.scenario === 'agrr') {
+    return '当前 AGRR 已接入单次扰动、连续采集和上报链路，扰动对象为分档后的档位，而不是原始分钟数。';
+  }
+
+  return '当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。';
+});
+
 watch(currentTaskDetail, detail => {
   resetDynamicForm();
-  arrSimulationResult.value = null;
-  arrBatchResult.value = null;
+  clearSimulationState();
   batchUploadState.value = null;
   if (detail) {
     systemStatus.value = 0;
@@ -790,6 +1008,14 @@ watch(
       return;
     }
 
+    if (currentTaskDetail.value.scenario === 'agrr') {
+      agrrSimulationResult.value = null;
+      agrrBatchResult.value = null;
+      batchUploadState.value = null;
+      systemStatus.value = 0;
+      return;
+    }
+
     systemStatus.value = 0;
   },
   { deep: true }
@@ -803,35 +1029,77 @@ function resetDynamicForm() {
   dynamicForm.sleepScore = 3;
 }
 
+function clearSimulationState() {
+  arrSimulationResult.value = null;
+  arrBatchResult.value = null;
+  agrrSimulationResult.value = null;
+  agrrBatchResult.value = null;
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateRandomExampleInput(scenario) {
+  switch (scenario) {
+    case 'arr':
+      return {
+        fallAlarm: Math.random() < 0.5 ? 0 : 1
+      };
+    case 'agrr':
+      return {
+        standMinutes: randomInt(30, 480)
+      };
+    case 'aoue':
+      return {
+        dailySteps: randomInt(1000, 16000)
+      };
+    case 'tsp': {
+      const sleepMissing = Math.random() < 0.35 ? 1 : 0;
+      return {
+        sleepMissing,
+        sleepScore: sleepMissing === 1 ? null : randomInt(1, 5)
+      };
+    }
+    default:
+      return {};
+  }
+}
+
 function refreshData() {
   if (!currentTaskDetail.value) return;
 
+  const exampleInput = generateRandomExampleInput(currentTaskDetail.value.scenario);
+
   switch (currentTaskDetail.value.scenario) {
     case 'arr':
-      dynamicForm.fallAlarm = 1;
+      dynamicForm.fallAlarm = exampleInput.fallAlarm ?? 0;
       break;
     case 'agrr':
-      dynamicForm.standMinutes = 285;
+      dynamicForm.standMinutes = exampleInput.standMinutes ?? null;
       break;
     case 'aoue':
-      dynamicForm.dailySteps = 10850;
+      dynamicForm.dailySteps = exampleInput.dailySteps ?? null;
       break;
     case 'tsp':
-      dynamicForm.sleepMissing = 0;
-      dynamicForm.sleepScore = 4;
+      dynamicForm.sleepMissing = exampleInput.sleepMissing ?? 0;
+      dynamicForm.sleepScore = exampleInput.sleepScore ?? null;
       break;
   }
 
   formTouched.value = true;
   systemStatus.value = 0;
-  // 加载示例数据后自动切换到单次扰动演示标签页
+  // 生成示例输入后自动切换到单次扰动演示标签页
   activeDemoTab.value = 'single';
-  arrBatchResult.value = null;
+  clearSimulationState();
   batchUploadState.value = null;
   if (currentTaskDetail.value.scenario === 'arr' && arrParametersReady.value) {
     simulateArrPerturbation(false);
   }
-  ElMessage.success('已加载当前任务的示例输入');
+  if (currentTaskDetail.value.scenario === 'agrr' && agrrParametersReady.value) {
+    simulateAgrrPerturbation(false);
+  }
+  ElMessage.success('已生成当前任务的随机示例输入');
 }
 
 function markFormTouched() {
@@ -851,6 +1119,14 @@ function handleArrOptionClick(value) {
   if (arrParametersReady.value) {
     simulateArrPerturbation(false);
   }
+}
+
+function handleAgrrMinutesChange() {
+  markFormTouched();
+  agrrSimulationResult.value = null;
+  agrrBatchResult.value = null;
+  batchUploadState.value = null;
+  systemStatus.value = 0;
 }
 
 function handleSleepMissingChange(value) {
@@ -887,6 +1163,54 @@ function simulateArrPerturbation(showMessage = true) {
   }
 }
 
+function performAgrrPerturbation(rawMinutes) {
+  if (!agrrParametersReady.value) {
+    return null;
+  }
+
+  const rawLabel = getStandDurationBucket(rawMinutes);
+  const rawValue = getStandBucketCode(rawLabel);
+  if (!rawLabel || !rawValue) {
+    return null;
+  }
+
+  const reportValue = AGRR(rawValue, agrrConfigParams.value.epsilon, STAND_BUCKET_ORDER.length, agrrConfigParams.value.p, agrrConfigParams.value.q);
+  const perturbedLabel = getStandBucketLabelByCode(reportValue);
+
+  return {
+    rawMinutes,
+    rawLabel,
+    rawValue,
+    reportValue,
+    perturbedLabel,
+    perturbedValue: reportValue
+  };
+}
+
+function simulateAgrrPerturbation(showMessage = true) {
+  if (!canSimulateAgrr.value) {
+    if (showMessage) {
+      ElMessage.warning('请先填写原始分钟数，并确保管理端已保存当前 AGRR 参数');
+    }
+    return;
+  }
+
+  const result = performAgrrPerturbation(dynamicForm.standMinutes);
+  if (!result) {
+    if (showMessage) {
+      ElMessage.warning('当前分钟数无法映射到有效分档，请先检查输入');
+    }
+    return;
+  }
+
+  agrrSimulationResult.value = result;
+  systemStatus.value = 1;
+
+  if (showMessage) {
+    ElMessage.success('已完成一次 AGRR 本地扰动');
+  }
+}
+
 function simulateCurrentTaskOnce() {
   if (!currentTaskDetail.value) {
     ElMessage.warning('请先选择任务');
@@ -899,11 +1223,34 @@ function simulateCurrentTaskOnce() {
     return;
   }
 
+  if (currentTaskDetail.value.scenario === 'agrr') {
+    activeDemoTab.value = 'single';
+    simulateAgrrPerturbation(true);
+    return;
+  }
+
   ElMessage.info('当前优先完成 ARR 场景，其他协议的单次扰动演示将在下一步接入');
 }
 
 function generateArrRawSample() {
   return Math.random() < 0.15 ? 1 : 0;
+}
+
+function generateAgrrRawSample() {
+  const bucketWeights = [
+    { label: '低站立', weight: 0.2, min: 0, max: 119 },
+    { label: '中低站立', weight: 0.3, min: 120, max: 239 },
+    { label: '中高站立', weight: 0.3, min: 240, max: 359 },
+    { label: '高站立', weight: 0.2, min: 360, max: 480 }
+  ];
+  const randomValue = Math.random();
+  let cumulative = 0;
+  const selectedBucket = bucketWeights.find(bucket => {
+    cumulative += bucket.weight;
+    return randomValue <= cumulative;
+  }) || bucketWeights[bucketWeights.length - 1];
+
+  return Math.floor(Math.random() * (selectedBucket.max - selectedBucket.min + 1)) + selectedBucket.min;
 }
 
 function runBatchSimulation() {
@@ -912,19 +1259,57 @@ function runBatchSimulation() {
     return;
   }
 
-  if (currentTaskDetail.value.scenario !== 'arr') {
-    ElMessage.info('批量采集当前优先支持 ARR 场景，其他协议预留扩展接口');
-    return;
-  }
-
   if (!canRunBatchSimulation.value) {
-    ElMessage.warning('请确保当前 ARR 参数已就绪');
+    ElMessage.warning(`请确保当前 ${currentTaskDetail.value.protocol} 参数已就绪`);
     return;
   }
 
   activeDemoTab.value = 'batch';
+  batchUploadState.value = null;
 
   const totalRuns = Number(batchSimulationCount.value);
+
+  if (currentTaskDetail.value.scenario === 'agrr') {
+    const samples = [];
+    const rawBucketCounts = createEmptyStandBucketCounts();
+    const reportBucketCounts = createEmptyStandBucketCounts();
+
+    for (let i = 0; i < totalRuns; i += 1) {
+      const rawMinutes = generateAgrrRawSample();
+      const sampleResult = performAgrrPerturbation(rawMinutes);
+      if (!sampleResult) {
+        continue;
+      }
+
+      rawBucketCounts[sampleResult.rawLabel] += 1;
+      reportBucketCounts[sampleResult.perturbedLabel] += 1;
+
+      samples.push({
+        index: i + 1,
+        ...sampleResult
+      });
+    }
+
+    agrrBatchResult.value = {
+      batchId: `${currentTaskDetail.value.taskId}-${Date.now()}`,
+      totalRuns,
+      rawBucketCounts,
+      reportBucketCounts,
+      samples
+    };
+
+    if (samples.length > 0) {
+      agrrSimulationResult.value = {
+        ...samples[0]
+      };
+    }
+
+    batchUploadState.value = null;
+    systemStatus.value = 1;
+    ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
+    return;
+  }
+
   const samples = [];
   let countOne = 0;
   let countZero = 0;
@@ -987,12 +1372,12 @@ function uploadCurrentBatchResult() {
     return;
   }
 
-  if (!arrBatchResult.value?.samples?.length) {
+  if (!currentBatchResult.value?.samples?.length) {
     ElMessage.warning('请先模拟连续采集');
     return;
   }
 
-  if (batchUploadState.value?.batchId === arrBatchResult.value.batchId) {
+  if (batchUploadState.value?.batchId === currentBatchResult.value.batchId) {
     ElMessage.info('本次连续采集结果已上报');
     return;
   }
@@ -1000,44 +1385,96 @@ function uploadCurrentBatchResult() {
   try {
     const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
     const uploadTime = new Date().toISOString();
-    const records = arrBatchResult.value.samples.map(sample => ({
-      userId: user.value?.username || '用户001',
-      user_id: user.value?.username || '用户001',
-      taskId: currentTaskDetail.value.taskId,
-      task_id: currentTaskDetail.value.taskId,
-      batch_id: arrBatchResult.value.batchId,
-      protocol: currentTaskDetail.value.protocol,
-      uploadTime,
-      upload_time: uploadTime,
-      report_value: sample.reportValue,
-      reportData: {
-        protocol: currentTaskDetail.value.protocol,
-        perturbedValue: sample.reportValue,
-        perturbedLabel: sample.perturbedLabel,
-        reportValue: sample.reportValue
-      },
-      batchSummary: {
-        sampleCount: arrBatchResult.value.samples.length,
-        rawTriggerCount: arrBatchResult.value.rawCountOne,
-        rawNonTriggerCount: arrBatchResult.value.rawCountZero,
-        reportTriggerCount: arrBatchResult.value.countOne,
-        reportNonTriggerCount: arrBatchResult.value.countZero
-      },
-      sampleMeta: {
-        source: 'continuous-collection',
-        batchId: arrBatchResult.value.batchId,
-        sampleIndex: sample.index
+    const userId = user.value?.username || '用户001';
+    const records = currentBatchResult.value.samples.map(sample => {
+      if (currentTaskDetail.value.scenario === 'agrr') {
+        return {
+          userId,
+          user_id: userId,
+          taskId: currentTaskDetail.value.taskId,
+          task_id: currentTaskDetail.value.taskId,
+          batch_id: currentBatchResult.value.batchId,
+          protocol: currentTaskDetail.value.protocol,
+          uploadTime,
+          upload_time: uploadTime,
+          report_value: sample.reportValue,
+          original_minutes: sample.rawMinutes,
+          original_bucket: sample.rawLabel,
+          original_bucket_code: sample.rawValue,
+          perturbed_bucket: sample.perturbedLabel,
+          perturbed_bucket_code: sample.reportValue,
+          rawData: {
+            scenario: 'agrr',
+            standMinutes: sample.rawMinutes,
+            standBucket: sample.rawLabel,
+            standBucketCode: sample.rawValue
+          },
+          reportData: {
+            protocol: currentTaskDetail.value.protocol,
+            perturbedValue: sample.reportValue,
+            perturbedLabel: sample.perturbedLabel,
+            reportValue: sample.reportValue,
+            rawBucket: sample.rawLabel,
+            rawBucketCode: sample.rawValue,
+            perturbedBucket: sample.perturbedLabel,
+            perturbedBucketCode: sample.reportValue,
+            params: {
+              p: agrrConfigParams.value.p.toFixed(4),
+              q: agrrConfigParams.value.q.toFixed(4)
+            }
+          },
+          batchSummary: {
+            sampleCount: currentBatchResult.value.samples.length,
+            rawBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.rawBucketCounts),
+            reportBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.reportBucketCounts)
+          },
+          sampleMeta: {
+            source: 'continuous-collection',
+            batchId: currentBatchResult.value.batchId,
+            sampleIndex: sample.index
+          }
+        };
       }
-    }));
+
+      return {
+        userId,
+        user_id: userId,
+        taskId: currentTaskDetail.value.taskId,
+        task_id: currentTaskDetail.value.taskId,
+        batch_id: currentBatchResult.value.batchId,
+        protocol: currentTaskDetail.value.protocol,
+        uploadTime,
+        upload_time: uploadTime,
+        report_value: sample.reportValue,
+        reportData: {
+          protocol: currentTaskDetail.value.protocol,
+          perturbedValue: sample.reportValue,
+          perturbedLabel: sample.perturbedLabel,
+          reportValue: sample.reportValue
+        },
+        batchSummary: {
+          sampleCount: currentBatchResult.value.samples.length,
+          rawTriggerCount: currentBatchResult.value.rawCountOne,
+          rawNonTriggerCount: currentBatchResult.value.rawCountZero,
+          reportTriggerCount: currentBatchResult.value.countOne,
+          reportNonTriggerCount: currentBatchResult.value.countZero
+        },
+        sampleMeta: {
+          source: 'continuous-collection',
+          batchId: currentBatchResult.value.batchId,
+          sampleIndex: sample.index
+        }
+      };
+    });
 
     localStorage.setItem('submittedData', JSON.stringify([...storedData, ...records]));
     batchUploadState.value = {
-      batchId: arrBatchResult.value.batchId,
+      batchId: currentBatchResult.value.batchId,
       status: '已上报',
-      count: arrBatchResult.value.samples.length
+      count: currentBatchResult.value.samples.length
     };
     systemStatus.value = 2;
-    ElMessage.success(`已成功上报 ${arrBatchResult.value.samples.length} 条连续采集扰动记录到管理端`);
+    ElMessage.success(`已成功上报 ${currentBatchResult.value.samples.length} 条连续采集扰动记录到管理端`);
   } catch (error) {
     console.error('批量上报连续采集结果失败:', error);
     ElMessage.error('上报失败，请稍后重试');
@@ -1060,6 +1497,11 @@ function submitData() {
     return;
   }
 
+  if (currentTaskDetail.value.scenario === 'agrr' && !agrrSimulationResult.value) {
+    ElMessage.warning('请先完成一次 AGRR 本地扰动');
+    return;
+  }
+
   submitting.value = true;
 
   setTimeout(() => {
@@ -1068,26 +1510,65 @@ function submitData() {
 
     try {
       const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
+      const uploadTime = new Date().toISOString();
+      const userId = user.value?.username || '用户001';
       storedData.push({
-        userId: user.value?.username || '用户001',
+        userId,
+        user_id: userId,
         taskId: currentTaskDetail.value.taskId,
-        uploadTime: new Date().toISOString(),
+        task_id: currentTaskDetail.value.taskId,
+        protocol: currentTaskDetail.value.protocol,
+        uploadTime,
+        upload_time: uploadTime,
+        report_value: currentTaskDetail.value.scenario === 'arr'
+          ? arrSimulationResult.value?.reportValue ?? null
+          : currentTaskDetail.value.scenario === 'agrr'
+            ? agrrSimulationResult.value?.reportValue ?? null
+            : null,
+        original_minutes: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawMinutes ?? null : null,
+        original_bucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawLabel ?? null : null,
+        original_bucket_code: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawValue ?? null : null,
+        perturbed_bucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.perturbedLabel ?? null : null,
+        perturbed_bucket_code: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.reportValue ?? null : null,
         rawData: {
           scenario: currentTaskDetail.value.scenario,
           ...JSON.parse(JSON.stringify(dynamicForm)),
           standBucket: derivedStandBucket.value || null,
+          standBucketCode: derivedStandBucketCode.value || null,
           stepsBucket: derivedStepsBucket.value || null
         },
         reportData: {
           protocol: currentTaskDetail.value.protocol,
-          perturbedValue: currentTaskDetail.value.scenario === 'arr' ? arrSimulationResult.value?.reportValue ?? null : null,
-          perturbedLabel: currentTaskDetail.value.scenario === 'arr' ? arrSimulationResult.value?.perturbedLabel ?? null : null,
+          perturbedValue: currentTaskDetail.value.scenario === 'arr'
+            ? arrSimulationResult.value?.reportValue ?? null
+            : currentTaskDetail.value.scenario === 'agrr'
+              ? agrrSimulationResult.value?.reportValue ?? null
+              : null,
+          perturbedLabel: currentTaskDetail.value.scenario === 'arr'
+            ? arrSimulationResult.value?.perturbedLabel ?? null
+            : currentTaskDetail.value.scenario === 'agrr'
+              ? agrrSimulationResult.value?.perturbedLabel ?? null
+              : null,
+          reportValue: currentTaskDetail.value.scenario === 'agrr'
+            ? agrrSimulationResult.value?.reportValue ?? null
+            : currentTaskDetail.value.scenario === 'arr'
+              ? arrSimulationResult.value?.reportValue ?? null
+              : null,
+          rawBucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawLabel ?? null : null,
+          rawBucketCode: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawValue ?? null : null,
+          perturbedBucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.perturbedLabel ?? null : null,
+          perturbedBucketCode: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.reportValue ?? null : null,
           params: currentTaskDetail.value.scenario === 'arr' && arrConfigParams.value
             ? {
                 p: arrConfigParams.value.p.toFixed(4),
                 q: arrConfigParams.value.q.toFixed(4)
               }
-            : null
+            : currentTaskDetail.value.scenario === 'agrr' && agrrConfigParams.value
+              ? {
+                  p: agrrConfigParams.value.p.toFixed(4),
+                  q: agrrConfigParams.value.q.toFixed(4)
+                }
+              : null
         }
       });
       localStorage.setItem('submittedData', JSON.stringify(storedData));
@@ -1309,6 +1790,63 @@ onMounted(() => {
   color: #6b7785;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.perturbation-status-banner {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #d7e7ff;
+  background: #f4f8ff;
+}
+
+.perturbation-status-banner.is-no_extra_perturbation {
+  background: #f0f9eb;
+  border-color: #c2e7b0;
+}
+
+.perturbation-status-banner.is-active_perturbation {
+  background: #fff7e8;
+  border-color: #f3d19e;
+}
+
+.perturbation-status-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.perturbation-status-desc {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #5f6b7a;
+}
+
+.perturbation-status-banner--batch {
+  margin-bottom: 16px;
+}
+
+.derived-hint--strong {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.bucket-rule-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bucket-rule-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .section-tip {

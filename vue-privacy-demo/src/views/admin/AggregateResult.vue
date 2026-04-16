@@ -64,14 +64,14 @@
 
               <div v-if="perturbationData.length === 0" class="no-data">
                 <el-empty description="暂无聚合结果" />
-                <p class="empty-tip">请先完成用户端连续采集并上报 ARR 数据，再查看聚合结果。</p>
+                <p class="empty-tip">请先完成用户端连续采集并上报当前任务的数据，再查看聚合结果。</p>
               </div>
 
               <template v-else-if="currentData">
                 <section class="summary-section summary-section--compact">
                   <div class="section-heading">
                     <h3>任务摘要</h3>
-                    <p>将任务信息、协议参数和样本规模压缩到同一层，先快速看清本次恢复对象。</p>
+                    <p>优先保留评委第一眼最需要确认的任务信息、协议信息和样本规模。</p>
                   </div>
                   <div class="summary-strip">
                     <div class="summary-card summary-card--adaptive" v-for="item in compactSummaryCards" :key="item.label">
@@ -115,7 +115,7 @@
                 <section class="summary-section">
                   <div class="section-heading">
                     <h3>真实与聚合估计对照</h3>
-                    <p>对比 ARR 两种状态下的真实分布与聚合恢复结果。</p>
+                    <p>对比 {{ currentData.algorithm }} 场景下真实分布与聚合恢复结果。</p>
                   </div>
                   <div class="compare-layout">
                     <div class="compare-panel compare-panel--table">
@@ -138,15 +138,15 @@
                       <tbody>
                         <tr v-for="row in currentData.compareRows" :key="row.label">
                           <td>{{ row.label }}</td>
-                          <td>{{ formatMetric(row.realValue) }}</td>
-                          <td>{{ formatMetric(row.estimatedValue) }}</td>
-                          <td :class="['error-text', row.error > 0 ? 'increase' : row.error < 0 ? 'decrease' : 'neutral']">
-                            {{ formatArrowDelta(row.error) }}
+                          <td>{{ formatMetric(row.trueCount) }}</td>
+                          <td>{{ formatMetric(row.estimatedCount) }}</td>
+                          <td :class="['error-text', row.countError > 0 ? 'increase' : row.countError < 0 ? 'decrease' : 'neutral']">
+                            {{ formatArrowDelta(row.countError) }}
                           </td>
-                          <td>{{ formatFrequency(row.realFrequency) }}</td>
-                          <td>{{ formatFrequency(row.estimatedFrequency) }}</td>
-                          <td :class="['error-text', row.frequencyError > 0 ? 'increase' : row.frequencyError < 0 ? 'decrease' : 'neutral']">
-                            {{ formatFrequencyArrowDelta(row.frequencyError) }}
+                          <td>{{ formatFrequency(row.trueFreq) }}</td>
+                          <td>{{ formatFrequency(row.estimatedFreq) }}</td>
+                          <td :class="['error-text', row.freqError > 0 ? 'increase' : row.freqError < 0 ? 'decrease' : 'neutral']">
+                            {{ formatFrequencyArrowDelta(row.freqError) }}
                           </td>
                         </tr>
                       </tbody>
@@ -167,18 +167,34 @@
                     <h3>结果说明</h3>
                     <p>{{ currentData.sourceDescription }}</p>
                   </div>
+                  <div v-if="currentData.perturbationStatus" class="perturbation-status-panel" :class="`is-${currentData.perturbationStatus.statusKey}`">
+                    <div class="perturbation-status-panel__title">{{ currentData.perturbationStatus.title }}</div>
+                    <div class="perturbation-status-panel__desc">{{ currentData.perturbationStatus.description }}</div>
+                  </div>
                 </section>
 
                 <section class="summary-section compact-section">
                   <div class="section-heading">
                     <h3>详细指标</h3>
-                    <p>这些指标用于补充评估，不作为页面的第一视觉重点。</p>
+                    <p>这些指标用于补充评估和参数说明，不作为页面的第一视觉重点。</p>
                   </div>
-                  <div class="detail-metrics">
-                    <div class="detail-item" v-for="item in detailMetricCards" :key="item.label">
-                      <span class="detail-item-label">{{ item.label }}</span>
-                      <span class="detail-item-value">{{ item.value }}</span>
-                    </div>
+                  <div class="detail-table-wrap">
+                    <table class="detail-table">
+                      <thead>
+                        <tr>
+                          <th>指标名称</th>
+                          <th>数值</th>
+                          <th>说明</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="item in detailMetricCards" :key="item.label">
+                          <td class="detail-table__label">{{ item.label }}</td>
+                          <td class="detail-table__value">{{ item.value }}</td>
+                          <td class="detail-table__desc">{{ item.description || '--' }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </section>
               </template>
@@ -196,7 +212,7 @@ import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { House, Setting, Document, DataAnalysis, ArrowDown, QuestionFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
-import { getAggregateResults, getTotalDataCount } from '../../services/taskAggregateService'
+import { getAggregateResults, getTotalDataCount } from '../../services/taskAggregateMetricsService'
 
 const route = useRoute()
 const router = useRouter()
@@ -215,73 +231,15 @@ let comparisonChartInstance = null
 const currentData = computed(() => perturbationData.value.find(item => item.id === selectedData.value) || null)
 
 const compactSummaryCards = computed(() => {
-  if (!currentData.value) return []
-  return [
-    { label: '任务名称', value: currentData.value.attributeName },
-    { label: '任务 ID', value: currentData.value.taskId || selectedTaskId.value || '--' },
-    { label: '协议', value: currentData.value.algorithm },
-    { label: '防护模式', value: currentData.value.protectionMode },
-    { label: '样本量', value: String(currentData.value.sampleCount || totalCount.value || 0) },
-    { label: '隐私预算 ε', value: currentData.value.epsilon },
-    { label: 'α', value: currentData.value.alpha },
-    { label: 'β', value: currentData.value.beta }
-  ]
+  return currentData.value?.summaryCards || []
 })
 
 const coreMetricCards = computed(() => {
-  if (!currentData.value) return []
-  return [
-    {
-      label: '样本总数',
-      value: String(currentData.value.sampleCount || totalCount.value || 0),
-      helper: '本次参与 ARR 聚合的扰动样本数量',
-      cardClass: ''
-    },
-    {
-      label: '频率 MSE',
-      value: currentData.value.mse,
-      helper: '按论文定义计算的平均平方频率误差',
-      cardClass: 'core-card--highlight',
-      tooltip: {
-        formula: 'MSE_f = (1 / |Ω_A|) * Σ_i (f_i - f̂_i)^2',
-        notes: [
-          'f_i = 真实频率',
-          'f̂_i = 聚合估计频率',
-          '当前 ARR 场景中 |Ω_A| = 2',
-          'f_i = true_count_i / N',
-          'f̂_i = estimated_count_i / N'
-        ]
-      }
-    },
-    {
-      label: '频率 MAE',
-      value: currentData.value.mae,
-      helper: '按论文定义计算的平均绝对频率误差',
-      cardClass: 'core-card--highlight core-card--soft',
-      tooltip: {
-        formula: 'MAE_f = (1 / |Ω_A|) * Σ_i |f_i - f̂_i|',
-        notes: [
-          'f_i = 真实频率',
-          'f̂_i = 聚合估计频率',
-          '当前 ARR 场景中 |Ω_A| = 2',
-          'f_i = true_count_i / N',
-          'f̂_i = estimated_count_i / N'
-        ]
-      }
-    },
-
-  ]
+  return currentData.value?.coreMetricCards || []
 })
 
 const detailMetricCards = computed(() => {
-  if (!currentData.value) return []
-  return [
-    { label: '计数均方误差（Count-MSE）', value: currentData.value.countMse },
-    { label: '计数平均绝对误差（Count-MAE）', value: currentData.value.countMae },
-    { label: '聚合估计方差', value: currentData.value.aggVariance },
-    { label: '估计误差上界', value: currentData.value.estimationError },
-    { label: '分布拟合说明', value: currentData.value.distributionFit }
-  ]
+  return currentData.value?.detailMetricCards || []
 })
 
 const handleLogout = () => {
@@ -372,20 +330,20 @@ function updateComparisonChart() {
     },
     yAxis: {
       type: 'value',
-      name: '样本数'
+      name: '频率'
     },
     series: [
       {
         name: '真实频率',
         type: 'bar',
         barGap: '20%',
-        data: currentData.value.compareRows.map(row => row.realFrequency),
+        data: currentData.value.chartData.map(row => row.trueFreq),
         itemStyle: { color: '#67c23a', borderRadius: [6, 6, 0, 0] }
       },
       {
         name: '估计频率',
         type: 'bar',
-        data: currentData.value.compareRows.map(row => row.estimatedFrequency),
+        data: currentData.value.chartData.map(row => row.estimatedFreq),
         itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
       }
     ]
@@ -811,29 +769,83 @@ watch(selectedData, async () => {
   padding: 18px;
 }
 
-.detail-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
+.perturbation-status-panel {
+  margin-top: 14px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: #f7f9fc;
-  border: 1px solid #e8eef5;
+  background: #f4f8ff;
+  border: 1px solid #d7e7ff;
 }
 
-.detail-item-label {
-  color: #6f8097;
+.perturbation-status-panel.is-no_extra_perturbation {
+  background: #f0f9eb;
+  border-color: #c2e7b0;
 }
 
-.detail-item-value {
+.perturbation-status-panel.is-active_perturbation {
+  background: #fff7e8;
+  border-color: #f3d19e;
+}
+
+.perturbation-status-panel__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.perturbation-status-panel__desc {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #5f6b7a;
+}
+
+.detail-table-wrap {
+  border: 1px solid #e6edf7;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fbfcfe;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detail-table th,
+.detail-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+  vertical-align: top;
+}
+
+.detail-table th {
+  background: #f4f8fc;
+  color: #5f738b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detail-table tr:last-child td {
+  border-bottom: none;
+}
+
+.detail-table__label {
+  width: 180px;
+  color: #425466;
+  font-weight: 700;
+}
+
+.detail-table__value {
+  width: 180px;
   color: #1f2d3d;
   font-weight: 700;
+}
+
+.detail-table__desc {
+  color: #6b7b8d;
+  line-height: 1.6;
 }
 
 .no-data {

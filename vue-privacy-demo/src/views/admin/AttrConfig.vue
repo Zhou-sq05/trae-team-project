@@ -287,6 +287,10 @@
                 <div class="result-value">{{ calibratedParams ? calibratedParams.q : '--' }}</div>
               </div>
             </div>
+            <div v-if="arrPerturbationStatus" class="calibration-status-strip" :class="`is-${arrPerturbationStatus.statusKey}`">
+              <div class="calibration-status-title">{{ arrPerturbationStatus.title }}</div>
+              <div class="calibration-status-desc">{{ arrPerturbationStatus.description }}</div>
+            </div>
             <div class="calibration-tip">由 ε、α、β 自动校准</div>
             <div class="calibration-tip">满足 p + q = 1</div>
             <div v-if="calibratedParams" class="calibration-info">
@@ -463,9 +467,14 @@
                 <div class="result-value">{{ standCalibratedParams ? standCalibratedParams.q : '--' }}</div>
               </div>
             </div>
+            <div v-if="agrrPerturbationStatus" class="calibration-status-strip" :class="`is-${agrrPerturbationStatus.statusKey}`">
+              <div class="calibration-status-title">{{ agrrPerturbationStatus.title }}</div>
+              <div class="calibration-status-desc">{{ agrrPerturbationStatus.description }}</div>
+            </div>
             <div class="calibration-tip">由 ε、α、β 自动校准</div>
             <div class="calibration-tip">d = 4 表示 A 的域大小</div>
             <div class="calibration-tip">满足 p + (d-1)q = 1</div>
+            <div class="calibration-tip">固定分档顺序：低站立 0-119，中低站立 120-239，中高站立 240-359，高站立 360+</div>
             <div v-if="standCalibratedParams" class="calibration-info">
               <p>隐私预算 ε = {{ standCalibratedParams.epsilon }}</p>
               <p>域大小 d = {{ standCalibratedParams.d || standCalibratedParams.k }}</p>
@@ -1045,6 +1054,7 @@ import {
   loadSleepMissingMatrixFromCSV
 } from '../../utils/sleepQualityMissingMatrix.js';
 import { calculateARRParameters, calculateAGRParameters, calculateAOUEParameters, calculateTSPParameters } from '../../utils/ldpAlgorithms.js';
+import { getPerturbationStatus } from '../../utils/perturbationStatus.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -1138,6 +1148,8 @@ const standAlphaBetaResult = ref(null);
 const standColumnStats = ref([]);
 const standCalibrationLoading = ref(false);
 const standCalibratedParams = ref(null);
+const arrPerturbationStatus = computed(() => getPerturbationStatus('ARR', calibratedParams.value));
+const agrrPerturbationStatus = computed(() => getPerturbationStatus('AGRR', standCalibratedParams.value));
 
 const stepsMatrixLoading = ref(false);
 const stepsMatrixData = ref(null);
@@ -2489,6 +2501,37 @@ onMounted(() => {
   font-size: 13px;
   color: #7b8794;
   margin-top: 8px;
+}
+
+.calibration-status-strip {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #d9ecff;
+  background: #f4f8ff;
+}
+
+.calibration-status-strip.is-no_extra_perturbation {
+  background: #f0f9eb;
+  border-color: #c2e7b0;
+}
+
+.calibration-status-strip.is-active_perturbation {
+  background: #fff7e8;
+  border-color: #f3d19e;
+}
+
+.calibration-status-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.calibration-status-desc {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #5f6b7a;
 }
 
 .calibration-info {

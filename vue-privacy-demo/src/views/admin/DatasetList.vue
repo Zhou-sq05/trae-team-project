@@ -284,6 +284,16 @@ function formatArrLabel(value) {
   return Number(value) === 1 ? '触发' : '未触发';
 }
 
+function formatAgrrLabel(bucket, code) {
+  if (!bucket && (code === null || code === undefined || code === '')) {
+    return '--';
+  }
+  if (bucket && (code === null || code === undefined || code === '')) {
+    return bucket;
+  }
+  return `${bucket || '--'}（${code}）`;
+}
+
 function buildDatasetRows(submissions) {
   const rows = [];
 
@@ -360,6 +370,26 @@ function buildDetailRows(submission, dataset) {
       attribute: meta.attributeName,
       rawValue: hasRawValue ? `${formatArrLabel(rawValue)}（${rawValue}）` : '--',
       reportedValue: `${submission.reportData?.perturbedLabel || formatArrLabel(reportValue)}（${reportValue}）`,
+      mode: meta.mode,
+      algorithm: submission.reportData?.protocol || meta.algorithm,
+      uploadTime: dataset.uploadTime
+    }];
+  }
+
+  if (submission.reportData && (scenario === 'agrr' || submission.reportData?.protocol === 'AGRR')) {
+    const rawMinutes = submission.original_minutes ?? submission.rawData?.standMinutes ?? '--';
+    const rawBucket = submission.original_bucket || submission.rawData?.standBucket || submission.reportData?.rawBucket || '--';
+    const rawCode = submission.original_bucket_code ?? submission.rawData?.standBucketCode ?? submission.reportData?.rawBucketCode ?? '--';
+    const reportBucket = submission.perturbed_bucket || submission.reportData?.perturbedBucket || submission.reportData?.perturbedLabel || '--';
+    const reportCode = submission.perturbed_bucket_code ?? submission.reportData?.perturbedBucketCode ?? submission.reportData?.perturbedValue ?? submission.reportData?.reportValue ?? '--';
+
+    return [{
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      batchId: dataset.batchId,
+      attribute: meta.attributeName,
+      rawValue: `${rawMinutes} 分钟 -> ${formatAgrrLabel(rawBucket, rawCode)}`,
+      reportedValue: formatAgrrLabel(reportBucket, reportCode),
       mode: meta.mode,
       algorithm: submission.reportData?.protocol || meta.algorithm,
       uploadTime: dataset.uploadTime

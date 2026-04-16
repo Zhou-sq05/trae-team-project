@@ -2,6 +2,11 @@
  * 聚合算法模块
  * 实现ARR、AGRR、AOUE等算法的聚合计算
  */
+import {
+  calculateAggregateVariance,
+  calculateMeanAbsoluteError,
+  calculateMeanSquaredError
+} from './aggregateMetrics';
 
 /**
  * AGRR算法的聚合函数
@@ -109,20 +114,7 @@ export function aggregateAOUE(perturbedData, epsilon, domainSize) {
  * @returns {number} 均方误差
  */
 export function calculateMSE(originalValues, estimatedValues) {
-  if (!Array.isArray(originalValues) || !Array.isArray(estimatedValues) || originalValues.length === 0) {
-    return 0;
-  }
-
-  // 计算原始值的平均值
-  const originalAvg = originalValues.reduce((sum, val) => sum + val, 0) / originalValues.length;
-  
-  // 计算估计值的平均值
-  const estimatedAvg = estimatedValues.length > 0 
-    ? estimatedValues.reduce((sum, val) => sum + val, 0) / estimatedValues.length 
-    : 0;
-
-  // 计算均方误差
-  return Math.pow(originalAvg - estimatedAvg, 2);
+  return calculateMeanSquaredError(originalValues, estimatedValues);
 }
 
 /**
@@ -155,18 +147,7 @@ export function calculateConsistency(originalValues, estimatedValues) {
  * @returns {number} 平均绝对误差
  */
 export function calculateMAE(originalValues, estimatedValues) {
-  if (!Array.isArray(originalValues) || !Array.isArray(estimatedValues) || originalValues.length === 0) {
-    return 0;
-  }
-
-  const minLength = Math.min(originalValues.length, estimatedValues.length);
-  let sumAbsError = 0;
-
-  for (let i = 0; i < minLength; i++) {
-    sumAbsError += Math.abs(originalValues[i] - estimatedValues[i]);
-  }
-
-  return sumAbsError / minLength;
+  return calculateMeanAbsoluteError(originalValues, estimatedValues);
 }
 
 /**
@@ -175,13 +156,5 @@ export function calculateMAE(originalValues, estimatedValues) {
  * @returns {number} 方差
  */
 export function calculateVariance(estimatedValues) {
-  if (!Array.isArray(estimatedValues) || estimatedValues.length <= 1) {
-    return 0;
-  }
-
-  const mean = estimatedValues.reduce((sum, val) => sum + val, 0) / estimatedValues.length;
-  const squaredDifferences = estimatedValues.map(val => Math.pow(val - mean, 2));
-  const variance = squaredDifferences.reduce((sum, val) => sum + val, 0) / (estimatedValues.length - 1);
-
-  return variance;
+  return calculateAggregateVariance(estimatedValues);
 }

@@ -13,6 +13,12 @@ import {
   generateConditionalProbs 
 } from '../utils/ldpAlgorithms';
 import { loadCSVFile, processCSVData, generateAggregateConditionalProbs } from '../utils/dataProcessing';
+import {
+  buildAggregateMetrics,
+  calculateAggregateVariance,
+  calculateMeanAbsoluteError,
+  calculateMeanSquaredError
+} from '../utils/aggregate/aggregateMetrics';
 
 // 存储从CSV计算的条件概率表
 let csvConditionalProbs = null;
@@ -36,16 +42,6 @@ async function loadCSVConditionalProbs() {
   return csvConditionalProbs;
 }
 
-// 计算指标的辅助函数
-function calculateMSE(original, estimated) {
-  if (original.length !== estimated.length) return 0;
-  let sum = 0;
-  for (let i = 0; i < original.length; i++) {
-    sum += Math.pow(original[i] - estimated[i], 2);
-  }
-  return sum / original.length;
-}
-
 function calculateConsistency(original, estimated) {
   if (original.length === 0) return 0;
   let count = 0;
@@ -53,22 +49,6 @@ function calculateConsistency(original, estimated) {
     if (Math.abs(original[i] - estimated[i]) < 1) count++;
   }
   return count / original.length;
-}
-
-function calculateMAE(original, estimated) {
-  if (original.length !== estimated.length) return 0;
-  let sum = 0;
-  for (let i = 0; i < original.length; i++) {
-    sum += Math.abs(original[i] - estimated[i]);
-  }
-  return sum / original.length;
-}
-
-function calculateVariance(data) {
-  if (data.length === 0) return 0;
-  const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
-  const sum = data.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0);
-  return sum / data.length;
 }
 
 /**
@@ -271,14 +251,23 @@ function aggregateAttribute(data, attributeName, epsilon, algorithm = 'agrr') {
   }
 
   // 计算指标
-  const mse = calculateMSE(originalValues, aggregatedData);
+  const labels = originalValues.map((_, index) => `值 ${index + 1}`);
+  const metrics = buildAggregateMetrics({
+    labels,
+    trueCounts: originalValues,
+    estimatedCounts: aggregatedData,
+    sampleCount: originalValues.reduce((sum, value) => sum + value, 0),
+    consistencyThreshold: 0.05
+  });
+  const mse = calculateMeanSquaredError(originalValues, aggregatedData);
   const consistency = calculateConsistency(originalValues, aggregatedData);
-  const mae = calculateMAE(originalValues, aggregatedData);
-  const variance = calculateVariance(aggregatedData);
+  const mae = calculateMeanAbsoluteError(originalValues, aggregatedData);
+  const variance = calculateAggregateVariance(aggregatedData);
 
   return {
     estimated: aggregatedData,
     real: originalValues,
+    metrics,
     mse,
     consistency,
     mae,
