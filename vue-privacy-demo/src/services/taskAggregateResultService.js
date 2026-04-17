@@ -335,19 +335,19 @@ function buildTspDiagnostics({
   summary,
   estimatedCounts,
   rawResultSections,
-  legacyResultSections,
+  displayResultSections,
   trueValueSource
 }) {
   const reportDomainCounts = summary.reportCounts.map(value => Number(value ?? 0));
   const trueDomainCounts = (summary.hasRawSummary ? summary.rawCounts : summary.reportCounts).map(value => Number(value ?? 0));
   const unbiasedMissingEstimates = rawResultSections.find(section => section.key === 'missing')?.metrics?.estimatedCounts || [];
   const unbiasedScoreEstimates = rawResultSections.find(section => section.key === 'score')?.metrics?.estimatedCounts || [];
-  const legacyDisplayMissingEstimates = legacyResultSections.find(section => section.key === 'missing')?.metrics?.estimatedCounts || [];
-  const legacyDisplayScoreEstimates = legacyResultSections.find(section => section.key === 'score')?.metrics?.estimatedCounts || [];
+  const displayAdjustedMissingEstimates = displayResultSections.find(section => section.key === 'missing')?.metrics?.estimatedCounts || [];
+  const displayAdjustedScoreEstimates = displayResultSections.find(section => section.key === 'score')?.metrics?.estimatedCounts || [];
 
   let displayDistortionReason = '当前页面展示直接使用原始恢复结果，不再执行额外的截断和归一化覆盖。';
   if (unbiasedMissingEstimates.some(value => Number(value) < 0)) {
-    displayDistortionReason = '旧版页面先把负估计截断为 0，再按总样本数重新归一化；当某一类原始恢复值为负时，另一类会被直接拉满，因此会出现 100/0 或 0/100。';
+    displayDistortionReason = '若采用额外的非负截断与重新归一化处理，当某一类原始恢复值为负时，另一类可能会被直接拉满，出现 100/0 或 0/100。';
   }
 
   return {
@@ -375,8 +375,8 @@ function buildTspDiagnostics({
     unbiasedDomainEstimates: estimatedCounts.map(value => Number(value ?? 0)),
     unbiasedMissingEstimates: unbiasedMissingEstimates.map(value => Number(value ?? 0)),
     unbiasedScoreEstimates: unbiasedScoreEstimates.map(value => Number(value ?? 0)),
-    legacyDisplayMissingEstimates: legacyDisplayMissingEstimates.map(value => Number(value ?? 0)),
-    legacyDisplayScoreEstimates: legacyDisplayScoreEstimates.map(value => Number(value ?? 0)),
+    displayAdjustedMissingEstimates: displayAdjustedMissingEstimates.map(value => Number(value ?? 0)),
+    displayAdjustedScoreEstimates: displayAdjustedScoreEstimates.map(value => Number(value ?? 0)),
     displayDistortionReason,
     recordsTable: buildTspRecordRows(records)
   };
@@ -656,12 +656,12 @@ function getTspAggregateResults(records, task, taskId, scope) {
     consistencyThreshold: 0.05
   });
   const rawResultSections = buildTspResultSections(summary, estimatedCounts, false);
-  const legacyResultSections = buildTspResultSections(summary, estimatedCounts, true);
+  const displayResultSections = buildTspResultSections(summary, estimatedCounts, true);
   const resultSections = rawResultSections;
   const missingSection = rawResultSections.find(section => section.key === 'missing');
   const scoreSection = rawResultSections.find(section => section.key === 'score');
-  const displayMissingSection = legacyResultSections.find(section => section.key === 'missing');
-  const displayScoreSection = legacyResultSections.find(section => section.key === 'score');
+  const displayMissingSection = displayResultSections.find(section => section.key === 'missing');
+  const displayScoreSection = displayResultSections.find(section => section.key === 'score');
   const stageOneConstraint = config.p1 + (config.scoreDomainSize - 1) * config.q1;
   const stageTwoConstraint = config.p2 + config.scoreDomainSize * config.q2;
   const trueValueSource = summary.hasRawSummary
@@ -673,7 +673,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
     summary,
     estimatedCounts,
     rawResultSections,
-    legacyResultSections,
+    displayResultSections,
     trueValueSource
   });
 
@@ -704,7 +704,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: 'Count-MAE', value: overallMetrics.countMae.toFixed(4), description: '计数平均绝对误差，用于补充查看计数层面的整体偏移。' },
       { label: '顶部频率 MSE 口径', value: '统一域 {0,1,2,3,4,5}', description: '当前页顶核心频率 MSE 基于完整统一域上的 6 类频率误差计算，不是把两个结果块直接混合平均。' },
       { label: '顶部频率 MAE 口径', value: '统一域 {0,1,2,3,4,5}', description: '当前页顶核心频率 MAE 同样基于完整统一域上的 6 类频率误差计算。' },
-      { label: '预算逻辑', value: config.versionMeta.label, description: config.versionMeta.usesUnifiedEpsilon ? '当前任务按论文定义使用统一的总隐私预算 ε 联合求解两阶段参数，不再拆分 ε1 / ε2。' : '该任务为历史兼容结果，沿用旧版 ε1 / ε2 均分逻辑，仅用于继续读取旧任务。' },
+      { label: '预算逻辑', value: config.versionMeta.label, description: '当前任务按论文定义使用统一的总隐私预算 ε 联合求解两阶段参数，不再拆分预算。' },
       { label: '原始无偏缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], [estimatedCounts[0], estimatedCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0)]), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
       { label: '原始无偏评分块估计值', value: formatCountSnapshot(['1 分', '2 分', '3 分', '4 分', '5 分'], estimatedCounts.slice(1)), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
       { label: '原始无偏统一域估计方差', value: overallMetrics.estimateVariance.toFixed(4), description: '保留未加展示约束的统一域估计方差。若原始无偏恢复结果处于高方差区间，该值可能失真或不可直接用于答辩展示。' },
@@ -762,7 +762,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
       }
     ],
     sourceDescription: `${`当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} ${config.versionMeta.description} 当前表格与图表默认展示的是“约束后分布”，用于保证结果可读性与可视化稳定性；原始无偏恢复结果及理论指标保留在详细指标中。`,
-    metricDescription: `TSP 使用统一的总隐私预算 ε 联合求解两阶段扰动参数。${config.versionMeta.usesUnifiedEpsilon ? '' : '当前任务为旧版兼容任务，仍按历史均分预算参数解释。'} 表格、图表以及顶部方差/误差上界卡片现在统一基于约束后展示结果计算，以保证结果可读性与口径一致；原始无偏恢复结果及其理论指标继续保留在详细指标区。`
+    metricDescription: 'TSP 使用统一的总隐私预算 ε 联合求解两阶段扰动参数。表格、图表以及顶部方差/误差上界卡片现在统一基于约束后展示结果计算，以保证结果可读性与口径一致；原始无偏恢复结果及其理论指标继续保留在详细指标区。'
   })];
 }
 

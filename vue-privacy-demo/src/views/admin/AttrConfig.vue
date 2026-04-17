@@ -1506,10 +1506,10 @@ function applySavedConfig(config) {
     sleepMissingCalibratedParams.value = config?.calibratedParams
       ? {
           ...config.calibratedParams,
-          tspVersion: config.calibratedParams.tspVersion ?? config.tspVersion ?? 'legacy_split_budget',
-          versionLabel: config.calibratedParams.versionLabel ?? getTspVersionMeta(config.calibratedParams.tspVersion ?? config.tspVersion ?? 'legacy_split_budget').label,
+          tspVersion: config.calibratedParams.tspVersion ?? config.tspVersion ?? 'paper_unified_budget',
+          versionLabel: config.calibratedParams.versionLabel ?? getTspVersionMeta(config.calibratedParams.tspVersion ?? config.tspVersion ?? 'paper_unified_budget').label,
           budgetExplanation: config.calibratedParams.budgetExplanation
-            || 'TSP 使用统一的总隐私预算 ε 联合求解两阶段参数；若当前是历史任务，则仅以旧版标识解释历史结果。'
+            || 'TSP 使用统一的总隐私预算 ε 联合求解两阶段参数。'
         }
       : null;
     hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);

@@ -1,6 +1,5 @@
-import { calculateAGRParameters, calculateLegacySplitBudgetTSPParameters, calculateTSPParameters } from './ldpAlgorithms.js';
+import { calculateAGRParameters, calculateTSPParameters } from './ldpAlgorithms.js';
 
-export const TSP_VERSION_LEGACY_SPLIT_BUDGET = 'legacy_split_budget';
 export const TSP_VERSION_PAPER_UNIFIED_BUDGET = 'paper_unified_budget';
 
 function approximatelyEqual(left, right, tolerance = 1e-3) {
@@ -11,63 +10,16 @@ function hasFiniteProbabilities(values) {
   return values.every(Number.isFinite);
 }
 
-function getRawTspVersion(snapshot = {}) {
-  return snapshot?.tspVersion
-    || snapshot?.calibratedParams?.tspVersion
-    || snapshot?.notes?.tspVersion
-    || '';
-}
-
-export function getTspVersion(versionOrSnapshot) {
-  const rawVersion = typeof versionOrSnapshot === 'string'
-    ? versionOrSnapshot
-    : getRawTspVersion(versionOrSnapshot);
-
-  if (rawVersion === TSP_VERSION_LEGACY_SPLIT_BUDGET) {
-    return TSP_VERSION_LEGACY_SPLIT_BUDGET;
-  }
-
-  if (rawVersion === TSP_VERSION_PAPER_UNIFIED_BUDGET) {
-    return TSP_VERSION_PAPER_UNIFIED_BUDGET;
-  }
-
-  if (typeof versionOrSnapshot === 'object' && versionOrSnapshot) {
-    const hasLegacyBudgetFields = versionOrSnapshot?.epsilonStage1 != null
-      || versionOrSnapshot?.epsilonStage2 != null
-      || versionOrSnapshot?.calibratedParams?.epsilonStage1 != null
-      || versionOrSnapshot?.calibratedParams?.epsilonStage2 != null;
-
-    if (hasLegacyBudgetFields) {
-      return TSP_VERSION_LEGACY_SPLIT_BUDGET;
-    }
-  }
-
+export function getTspVersion() {
   return TSP_VERSION_PAPER_UNIFIED_BUDGET;
 }
 
-export function isLegacyTspVersion(versionOrSnapshot) {
-  return getTspVersion(versionOrSnapshot) === TSP_VERSION_LEGACY_SPLIT_BUDGET;
-}
-
-export function getTspVersionMeta(versionOrSnapshot) {
-  const version = getTspVersion(versionOrSnapshot);
-
-  if (version === TSP_VERSION_LEGACY_SPLIT_BUDGET) {
-    return {
-      version,
-      label: '旧版均分预算逻辑',
-      shortLabel: '旧版',
-      description: '该任务沿用了早期的 ε1 / ε2 均分实现，仅用于兼容历史结果展示，不再作为新任务默认逻辑。',
-      usesUnifiedEpsilon: false
-    };
-  }
-
+export function getTspVersionMeta() {
   return {
-    version,
+    version: TSP_VERSION_PAPER_UNIFIED_BUDGET,
     label: '论文统一 ε 逻辑',
     shortLabel: '论文版',
-    description: '该任务按论文定义使用统一的总隐私预算 ε 联合求解两阶段扰动参数。',
-    usesUnifiedEpsilon: true
+    description: '该任务按论文定义使用统一的总隐私预算 ε 联合求解两阶段扰动参数。'
   };
 }
 
@@ -98,10 +50,8 @@ export function resolveTspTaskConfig(taskOrSnapshot, scoreDomainSize = 5) {
   const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
   const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
   const epsilon = Number(snapshot.epsilon ?? taskOrSnapshot?.privacyBudget ?? 1);
-  const version = getTspVersion(snapshot);
-  const calculated = version === TSP_VERSION_LEGACY_SPLIT_BUDGET
-    ? calculateLegacySplitBudgetTSPParameters(alpha, beta, epsilon, scoreDomainSize)
-    : calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize);
+  const version = getTspVersion();
+  const calculated = calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize);
 
   let p1 = Number(snapshot.calibratedParams?.p1);
   let q1 = Number(snapshot.calibratedParams?.q1);
@@ -125,14 +75,6 @@ export function resolveTspTaskConfig(taskOrSnapshot, scoreDomainSize = 5) {
     qStar = constraints.expectedQStar;
   }
 
-  const legacyBudgetInfo = version === TSP_VERSION_LEGACY_SPLIT_BUDGET
-    ? {
-        epsilonStage1: Number(snapshot.calibratedParams?.epsilonStage1 ?? snapshot.epsilonStage1 ?? calculated.epsilonStage1),
-        epsilonStage2: Number(snapshot.calibratedParams?.epsilonStage2 ?? snapshot.epsilonStage2 ?? calculated.epsilonStage2),
-        displayOnly: true
-      }
-    : null;
-
   return {
     alpha,
     beta,
@@ -146,8 +88,7 @@ export function resolveTspTaskConfig(taskOrSnapshot, scoreDomainSize = 5) {
     scoreDomainSize,
     unifiedDomainSize: scoreDomainSize + 1,
     version,
-    versionMeta: getTspVersionMeta(version),
-    legacyBudgetInfo
+    versionMeta: getTspVersionMeta()
   };
 }
 
@@ -172,13 +113,6 @@ export function aggregateTspDomainCounts(reportCounts, sampleCount, config) {
   }
 
   return estimatedCounts;
-}
-
-export function calculateLegacyUnifiedBudgetComparison(alpha, beta, epsilon, scoreDomainSize = 5) {
-  return {
-    legacy: calculateLegacySplitBudgetTSPParameters(alpha, beta, epsilon, scoreDomainSize),
-    paper: calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize)
-  };
 }
 
 export function calculateTspCompositeTarget(alpha, beta, epsilon, scoreDomainSize = 5) {

@@ -205,7 +205,7 @@ function sampleAlternativeValue(domainValues, currentValue) {
   return fallbackValues[Math.floor(Math.random() * fallbackValues.length)];
 }
 
-// TSP 论文版使用统一总预算 epsilon，而不是把预算拆成 epsilonStage1 / epsilonStage2。
+// TSP 论文版使用统一总预算 epsilon。
 // 记 d = 有效评分域大小，此处默认 d = 5，对应取值 {1,2,3,4,5}；
 // 第二阶段在统一域 {0,1,...,d} 上执行，因此统一域大小是 d + 1。
 //
@@ -309,35 +309,6 @@ export function applyTSP(rawValue, params) {
     stageOneValue,
     stageTwoInput,
     stageTwoValue
-  };
-}
-
-// 旧版兼容实现：历史任务曾把总预算均分给两阶段。
-// 新任务不要再调用这条路径；仅供 tspProtocol.js 读取 legacy_split_budget 任务快照时使用。
-export function calculateLegacySplitBudgetTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
-  const epsilonStage1 = epsilon / 2;
-  const epsilonStage2 = epsilon - epsilonStage1;
-  const stage1 = calculateAGRParameters(alpha, beta, epsilonStage1, scoreDomainSize);
-  const expStage2 = Math.exp(epsilonStage2);
-  const unifiedDomainSize = scoreDomainSize + 1;
-  const p2 = expStage2 / (expStage2 + unifiedDomainSize - 1);
-  const q2 = 1 / (expStage2 + unifiedDomainSize - 1);
-  const pStar = stage1.p * p2 + (1 - stage1.p) * q2;
-  const qStar = stage1.q * p2 + (1 - stage1.q) * q2;
-
-  return {
-    version: 'legacy_split_budget',
-    epsilon,
-    epsilonStage1,
-    epsilonStage2,
-    p1: stage1.p,
-    q1: stage1.q,
-    p2,
-    q2,
-    pStar,
-    qStar,
-    scoreDomainSize,
-    unifiedDomainSize
   };
 }
 

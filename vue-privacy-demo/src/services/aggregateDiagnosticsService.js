@@ -169,8 +169,8 @@ export function getTspAggregateDiagnostics(scopeInput) {
   const rawScoreCounts = trueCounts.slice(1).map(value => Number(value ?? 0));
   const rawMissingEstimates = [Number(estimatedCounts[0] ?? 0), Number(estimatedCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0).toFixed(4))];
   const rawScoreEstimates = estimatedCounts.slice(1).map(value => Number(value ?? 0));
-  const legacyDisplayMissingEstimates = constrainCountsForDisplay(rawMissingEstimates, summary.sampleCount);
-  const legacyDisplayScoreEstimates = constrainCountsForDisplay(rawScoreEstimates, rawScoreCounts.reduce((sum, value) => sum + value, 0));
+  const displayAdjustedMissingEstimates = constrainCountsForDisplay(rawMissingEstimates, summary.sampleCount);
+  const displayAdjustedScoreEstimates = constrainCountsForDisplay(rawScoreEstimates, rawScoreCounts.reduce((sum, value) => sum + value, 0));
 
   return {
     scope: {
@@ -195,11 +195,11 @@ export function getTspAggregateDiagnostics(scopeInput) {
     unbiasedDomainEstimates: estimatedCounts,
     unbiasedMissingEstimates: rawMissingEstimates,
     unbiasedScoreEstimates: rawScoreEstimates,
-    legacyDisplayMissingEstimates,
-    legacyDisplayScoreEstimates,
+    displayAdjustedMissingEstimates,
+    displayAdjustedScoreEstimates,
     displayDistortionReason: rawMissingEstimates.some(value => Number(value) < 0)
-      ? '旧版页面会先把负估计截断为 0，再按总样本数归一化，所以一旦某一类原始恢复值为负，另一类就会被拉成 100%。'
-      : '当前样本下旧版展示后处理没有把结果推到极端值。',
+      ? '若采用额外的非负截断与归一化处理，一旦某一类原始恢复值为负，另一类就可能被拉成 100%。'
+      : '当前样本下，额外展示后处理没有把结果推到极端值。',
     config: {
       version: config.version,
       versionLabel: config.versionMeta.label,

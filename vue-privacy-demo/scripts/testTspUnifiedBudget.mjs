@@ -5,15 +5,15 @@ import { fileURLToPath } from 'node:url';
 
 import {
   applyTSP,
-  calculateLegacySplitBudgetTSPParameters,
   calculateTSPParameters,
   tspFirstPerturb,
   tspSecondPerturb
 } from '../src/utils/ldpAlgorithms.js';
 import {
   aggregateTspDomainCounts,
+  getTspVersion,
+  getTspVersionMeta,
   resolveTspTaskConfig,
-  TSP_VERSION_LEGACY_SPLIT_BUDGET,
   TSP_VERSION_PAPER_UNIFIED_BUDGET
 } from '../src/utils/tspProtocol.js';
 
@@ -91,24 +91,28 @@ function withMockedRandom(sequence, callback) {
   }
 }
 
-function assertNoLegacyBudgetLabels() {
+function assertNoLegacySplitBudgetResiduals() {
   const filesToCheck = [
-    path.join(projectRoot, 'src/views/user/UserDevice.vue'),
+    path.join(projectRoot, 'src/utils/ldpAlgorithms.js'),
+    path.join(projectRoot, 'src/utils/tspProtocol.js'),
     path.join(projectRoot, 'src/views/admin/AttrConfig.vue'),
+    path.join(projectRoot, 'src/views/user/UserDevice.vue'),
     path.join(projectRoot, 'src/services/taskAggregateResultService.js')
   ];
-  const forbiddenLabels = [
-    '第一阶段预算 ε1',
-    '第二阶段预算 ε2',
-    '使用预算 ε1',
-    '使用预算 ε2',
-    '默认均分 ε1 / ε2'
+  const forbiddenTokens = [
+    ['epsilonStage', '1'].join(''),
+    ['epsilonStage', '2'].join(''),
+    ['legacy', 'split', 'budget'].join('_'),
+    ['calculate', 'Legacy', 'Split', 'Budget', 'TSP', 'Parameters'].join(''),
+    ['TSP', 'VERSION', 'LEGACY', 'SPLIT', 'BUDGET'].join('_'),
+    ['is', 'Legacy', 'Tsp', 'Version'].join(''),
+    ['calculate', 'Legacy', 'Unified', 'Budget', 'Comparison'].join('')
   ];
 
   filesToCheck.forEach(filePath => {
     const content = fs.readFileSync(filePath, 'utf8');
-    forbiddenLabels.forEach(label => {
-      assert.ok(!content.includes(label), `${path.basename(filePath)} still contains forbidden label: ${label}`);
+    forbiddenTokens.forEach(token => {
+      assert.ok(!content.includes(token), `${path.basename(filePath)} still contains forbidden token: ${token}`);
     });
   });
 }
@@ -122,7 +126,6 @@ function run() {
   const secondarySample = { alpha: 0.6, beta: 0.1, epsilon: 1, scoreDomainSize: 5 };
 
   const paper = calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize);
-  const legacy = calculateLegacySplitBudgetTSPParameters(alpha, beta, epsilon, scoreDomainSize);
   const teacher = calculateTeacherTspParameters(alpha, beta, epsilon, scoreDomainSize);
   const secondaryPaper = calculateTSPParameters(
     secondarySample.alpha,
@@ -137,9 +140,9 @@ function run() {
     secondarySample.scoreDomainSize
   );
 
+  assert.equal(getTspVersion(), TSP_VERSION_PAPER_UNIFIED_BUDGET);
+  assert.equal(getTspVersionMeta().version, TSP_VERSION_PAPER_UNIFIED_BUDGET);
   assert.equal(paper.version, TSP_VERSION_PAPER_UNIFIED_BUDGET);
-  assert.ok(!('epsilonStage1' in paper));
-  assert.ok(!('epsilonStage2' in paper));
   assert.equal(paper.p2, 1, 'paper p2 should follow TSP threshold branch when alpha / beta <= exp(epsilon)');
   assert.equal(paper.q2, 0, 'paper q2 should be 0 when p2 is 1');
   approx(paper.p1 + (scoreDomainSize - 1) * paper.q1, 1, 1e-9, 'paper stage-one normalization');
@@ -163,10 +166,6 @@ function run() {
   approx(secondaryPaper.q1, secondaryTeacher.q1, 1e-12, 'secondary paper q1 should match teacher TSP.py');
   approx(secondaryPaper.p2, secondaryTeacher.p2, 1e-12, 'secondary paper p2 should match teacher TSP.py');
   approx(secondaryPaper.q2, secondaryTeacher.q2, 1e-12, 'secondary paper q2 should match teacher TSP.py');
-
-  assert.equal(legacy.version, TSP_VERSION_LEGACY_SPLIT_BUDGET);
-  assert.ok('epsilonStage1' in legacy && 'epsilonStage2' in legacy);
-  assert.notEqual(Number(legacy.p2.toFixed(8)), Number(paper.p2.toFixed(8)), 'legacy and paper p2 should differ for the sample');
 
   assert.equal(withMockedRandom([0.2], () => tspFirstPerturb(0, scoreDomainSize, 0.3)), 0);
   assert.equal(withMockedRandom([0.1], () => tspFirstPerturb(4, scoreDomainSize, 1)), 4);
@@ -200,24 +199,17 @@ function run() {
       d: scoreDomainSize
     }
   };
-  const legacySnapshot = {
+  const incompleteSnapshot = {
     epsilon,
     alphaBetaResult: { alpha, beta },
     calibratedParams: {
-      p1: legacy.p1.toFixed(4),
-      q1: legacy.q1.toFixed(4),
-      p2: legacy.p2.toFixed(4),
-      q2: legacy.q2.toFixed(4),
-      pStar: legacy.pStar.toFixed(4),
-      qStar: legacy.qStar.toFixed(4),
-      epsilonStage1: legacy.epsilonStage1.toFixed(4),
-      epsilonStage2: legacy.epsilonStage2.toFixed(4),
-      d: scoreDomainSize
+      p1: paper.p1.toFixed(4),
+      q1: paper.q1.toFixed(4)
     }
   };
 
   assert.equal(resolveTspTaskConfig(paperSnapshot, scoreDomainSize).version, TSP_VERSION_PAPER_UNIFIED_BUDGET);
-  assert.equal(resolveTspTaskConfig(legacySnapshot, scoreDomainSize).version, TSP_VERSION_LEGACY_SPLIT_BUDGET);
+  assert.equal(resolveTspTaskConfig(incompleteSnapshot, scoreDomainSize).version, TSP_VERSION_PAPER_UNIFIED_BUDGET);
 
   const trueCounts = [18, 17, 16, 19, 14, 16];
   const expectedReportCounts = buildExpectedReportCounts(trueCounts, paper);
@@ -227,7 +219,7 @@ function run() {
     approx(recoveredCounts[index], value, 1e-3, `recovered count for domain value ${index}`);
   });
 
-  assertNoLegacyBudgetLabels();
+  assertNoLegacySplitBudgetResiduals();
 
   console.log('TSP unified-budget checks passed.');
   console.log(JSON.stringify({
@@ -247,16 +239,6 @@ function run() {
       q2: Number(teacher.q2.toFixed(6)),
       pStar: Number(teacher.pStar.toFixed(6)),
       qStar: Number(teacher.qStar.toFixed(6))
-    },
-    legacy: {
-      epsilonStage1: Number(legacy.epsilonStage1.toFixed(6)),
-      epsilonStage2: Number(legacy.epsilonStage2.toFixed(6)),
-      p1: Number(legacy.p1.toFixed(6)),
-      q1: Number(legacy.q1.toFixed(6)),
-      p2: Number(legacy.p2.toFixed(6)),
-      q2: Number(legacy.q2.toFixed(6)),
-      pStar: Number(legacy.pStar.toFixed(6)),
-      qStar: Number(legacy.qStar.toFixed(6))
     },
     paperVsTeacherDelta: {
       p1: Number((paper.p1 - teacher.p1).toFixed(12)),

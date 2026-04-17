@@ -291,9 +291,6 @@
                   </div>
                 </div>
                 <div class="preview-tip">{{ processPreviewTip }}</div>
-                <div v-if="tspVersionMeta && !tspVersionMeta.usesUnifiedEpsilon" class="preview-tip">
-                  {{ tspVersionMeta.description }}
-                </div>
                 <div v-if="!tspParametersReady" class="preview-tip">
                   当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段扰动演示。
                 </div>
@@ -730,9 +727,7 @@ const tspVersionMeta = computed(() => {
 
 const tspVersionNotice = computed(() => {
   if (!tspVersionMeta.value) return '';
-  return tspVersionMeta.value.usesUnifiedEpsilon
-    ? '当前任务按论文原始定义使用统一的总隐私预算 ε 联合求解 p1/q1 与 p2/q2。'
-    : '当前任务是旧版兼容任务：历史结果沿用 ε1 / ε2 均分逻辑读取，新任务不再使用该方式。';
+  return '当前任务按论文原始定义使用统一的总隐私预算 ε 联合求解 p1/q1 与 p2/q2。';
 });
 
 const arrParametersReady = computed(() => Boolean(arrConfigParams.value));
