@@ -895,7 +895,7 @@
                     <div class="result-subtext">扰动到其他有效评分值的概率</div>
                   </div>
                 </div>
-                <div class="stage-check-line">满足 p1 + 4q1 = 1，对应第一阶段有效值域大小 d = 5</div>
+                <div class="stage-check-line">满足 p1 + (d - 1)q1 = 1；这里 d = 5，因为第一阶段只在有效评分域 {1,2,3,4,5} 上扰动，真值之外只有 4 个错误候选。</div>
               </div>
 
               <div class="stage-panel">
@@ -913,7 +913,7 @@
                     <div class="result-subtext">扰动到统一域其他取值的概率</div>
                   </div>
                 </div>
-                <div class="stage-check-line">满足 p2 + 5q2 = 1，对应第二阶段统一域大小 d+1 = 6</div>
+                <div class="stage-check-line">满足 p2 + dq2 = 1；这里 d = 5、统一域总大小是 d + 1 = 6，因为第二阶段在 {0,1,2,3,4,5} 上扰动时，真值之外只有 5 个错误候选。</div>
               </div>
             </div>
             <div v-if="sleepMissingCalibratedParams" class="calibration-summary-bar">
@@ -921,15 +921,15 @@
             </div>
             <div v-if="sleepMissingCalibratedParams" class="light-summary-card">
               <div class="light-summary-item">隐私预算 ε：{{ sleepMissingCalibratedParams.epsilon }}</div>
-              <div class="light-summary-item">第一阶段预算 ε1：{{ sleepMissingCalibratedParams.epsilonStage1 }}</div>
-              <div class="light-summary-item">第二阶段预算 ε2：{{ sleepMissingCalibratedParams.epsilonStage2 }}</div>
-              <div class="light-summary-item">第一阶段有效值域：{1,2,3,4,5}</div>
-              <div class="light-summary-item">第二阶段统一域：{0,1,2,3,4,5}</div>
+              <div class="light-summary-item">TSP 版本：{{ sleepMissingCalibratedParams.versionLabel }}</div>
+              <div class="light-summary-item">α / β：{{ sleepMissingCalibratedParams.alpha }} / {{ sleepMissingCalibratedParams.beta }}</div>
+              <div class="light-summary-item">第一阶段有效值域：d = 5，对应 {1,2,3,4,5}</div>
+              <div class="light-summary-item">第二阶段统一域：d + 1 = 6，对应 {0,1,2,3,4,5}</div>
               <div class="light-summary-item">组合恢复参数 p*：{{ sleepMissingCalibratedParams.pStar }}</div>
               <div class="light-summary-item">组合恢复参数 q*：{{ sleepMissingCalibratedParams.qStar }}</div>
               <div class="light-summary-item">协议：{{ sleepMissingCalibratedParams.protocol }}</div>
               <div class="light-summary-item">数据源：{{ sleepMissingCalibratedParams.dataSource }}</div>
-              <div class="light-summary-item">机制说明：{{ sleepMissingCalibratedParams.description }}</div>
+              <div class="light-summary-item">机制说明：{{ sleepMissingCalibratedParams.budgetExplanation || sleepMissingCalibratedParams.description }}</div>
               <div class="light-summary-item">组合恢复参数：p* = p1 × p2 + (1 - p1) × q2，q* = q1 × p2 + (1 - q1) × q2</div>
             </div>
           </div>
@@ -1059,6 +1059,7 @@ import {
   loadSleepMissingMatrixFromCSV
 } from '../../utils/sleepQualityMissingMatrix.js';
 import { calculateARRParameters, calculateAGRParameters, calculateAOUEParameters, calculateTSPParameters } from '../../utils/ldpAlgorithms.js';
+import { getTspVersionMeta } from '../../utils/tspProtocol.js';
 import { getPerturbationStatus } from '../../utils/perturbationStatus.js';
 
 const route = useRoute();
@@ -1440,6 +1441,7 @@ function buildCurrentConfigPayload() {
     return {
       attributeName: currentAttribute.value.name,
       sceneType: 'sleepQualityTsp',
+      tspVersion: sleepMissingCalibratedParams.value?.tspVersion ?? null,
       matrixData: sleepMissingMatrixData.value,
       columnStats: sleepMissingColumnStats.value,
       alphaBetaResult: sleepMissingAlphaBetaResult.value,
@@ -1501,7 +1503,15 @@ function applySavedConfig(config) {
     sleepMissingMatrixData.value = config?.matrixData || null;
     sleepMissingAlphaBetaResult.value = config?.alphaBetaResult || null;
     sleepMissingColumnStats.value = config?.columnStats || config?.alphaBetaResult?.stats || [];
-    sleepMissingCalibratedParams.value = config?.calibratedParams || null;
+    sleepMissingCalibratedParams.value = config?.calibratedParams
+      ? {
+          ...config.calibratedParams,
+          tspVersion: config.calibratedParams.tspVersion ?? config.tspVersion ?? 'legacy_split_budget',
+          versionLabel: config.calibratedParams.versionLabel ?? getTspVersionMeta(config.calibratedParams.tspVersion ?? config.tspVersion ?? 'legacy_split_budget').label,
+          budgetExplanation: config.calibratedParams.budgetExplanation
+            || 'TSP 使用统一的总隐私预算 ε 联合求解两阶段参数；若当前是历史任务，则仅以旧版标识解释历史结果。'
+        }
+      : null;
     hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
     privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
     dialogPrivacyBudget.value = config?.epsilonDraft ?? config?.epsilon ?? basicConfig.value.privacyBudget;
@@ -1591,7 +1601,7 @@ async function recalculateMatrix() {
     try {
       const result = await loadSleepMissingMatrixFromCSV();
       sleepMissingMatrixData.value = result.matrix;
-      const alphaBetaResultData = calculateSleepMissingAlphaBeta(result.matrix);
+      const alphaBetaResultData = calculateSleepMissingAlphaBeta(result.matrix, Number(savedPrivacyBudget.value) || 1.0);
       sleepMissingAlphaBetaResult.value = alphaBetaResultData;
       sleepMissingColumnStats.value = alphaBetaResultData.stats;
       hasGeneratedMatrix.value = true;
@@ -1799,28 +1809,32 @@ function calibrateParams() {
 
     try {
       const epsilon = Number(savedPrivacyBudget.value) || 1.0;
-      const { epsilonStage1, epsilonStage2, p1, q1, p2, q2, pStar, qStar, scoreDomainSize, unifiedDomainSize } = calculateTSPParameters(
+      const { version, p1, q1, p2, q2, pStar, qStar, scoreDomainSize, unifiedDomainSize } = calculateTSPParameters(
         sleepMissingAlphaBetaResult.value.alpha,
         sleepMissingAlphaBetaResult.value.beta,
         epsilon,
         5
       );
+      const versionMeta = getTspVersionMeta(version);
 
       sleepMissingCalibratedParams.value = {
+        tspVersion: version,
+        versionLabel: versionMeta.label,
         p1: Number(p1).toFixed(4),
         q1: Number(q1).toFixed(4),
         p2: Number(p2).toFixed(4),
         q2: Number(q2).toFixed(4),
         pStar: Number(pStar).toFixed(4),
         qStar: Number(qStar).toFixed(4),
+        alpha: Number(sleepMissingAlphaBetaResult.value.alpha).toFixed(4),
+        beta: Number(sleepMissingAlphaBetaResult.value.beta).toFixed(4),
         epsilon,
-        epsilonStage1: Number(epsilonStage1).toFixed(4),
-        epsilonStage2: Number(epsilonStage2).toFixed(4),
         d: scoreDomainSize,
         unifiedDomainSize,
         protocol: 'TSP (Two-Stage Perturbation)',
         description: '先基于缺失状态 M 的条件分布 Pr(M|S) 计算内在不确定性；第一阶段仅对非缺失样本的有效评分值 {1,2,3,4,5} 进行扰动，以注入与缺失状态等量的不确定性；第二阶段再将缺失值 0 与第一阶段处理后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动并上报。',
-        dataSource: 'temp_sleep_quality_missing_age_200.csv'
+        budgetExplanation: 'TSP 使用统一的总隐私预算 ε。记有效值域大小 d = 5、统一域总大小 d + 1 = 6。第二阶段先在统一域 {0,1,2,3,4,5} 上求得 p2 / q2，其中满足 p2 + dq2 = 1；第一阶段再在有效评分域 {1,2,3,4,5} 上求得 p1 / q1，其中满足 p1 + (d - 1)q1 = 1。整体满足论文中的统一 ε-LDP 约束。',
+        dataSource: 'temp_sleep_quality_missing_age_500.csv'
       };
 
       ElMessage.success('两阶段扰动参数校准完成');

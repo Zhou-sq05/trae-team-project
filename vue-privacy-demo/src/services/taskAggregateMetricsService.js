@@ -3,9 +3,9 @@ import {
   aggregateAGRR,
   aggregateARR,
   calculateAGRParameters,
-  calculateARRParameters,
-  calculateTSPParameters
+  calculateARRParameters
 } from '../utils/ldpAlgorithms';
+import { aggregateTspDomainCounts, resolveTspTaskConfig } from '../utils/tspProtocol.js';
 import {
   createEmptyStandBucketCounts,
   getStandBucketLabelByCode,
@@ -75,58 +75,6 @@ function getTaskConfig(task, protocol, domainSize) {
   }
 
   return { alpha, beta, epsilon, p, q };
-}
-
-function getTspTaskConfig(task, scoreDomainSize = 5) {
-  const snapshot = task?.configSnapshot || {};
-  const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
-  const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
-  const epsilon = Number(snapshot.epsilon ?? task?.privacyBudget ?? 1);
-
-  let p1 = Number(snapshot.calibratedParams?.p1);
-  let q1 = Number(snapshot.calibratedParams?.q1);
-  let p2 = Number(snapshot.calibratedParams?.p2);
-  let q2 = Number(snapshot.calibratedParams?.q2);
-  let pStar = Number(snapshot.calibratedParams?.pStar);
-  let qStar = Number(snapshot.calibratedParams?.qStar);
-  let epsilonStage1 = Number(snapshot.calibratedParams?.epsilonStage1 ?? snapshot.epsilonStage1);
-  let epsilonStage2 = Number(snapshot.calibratedParams?.epsilonStage2 ?? snapshot.epsilonStage2);
-  const calculated = calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize);
-
-  if (![p1, q1, p2, q2].every(Number.isFinite)) {
-    p1 = calculated.p1;
-    q1 = calculated.q1;
-    p2 = calculated.p2;
-    q2 = calculated.q2;
-    pStar = calculated.pStar;
-    qStar = calculated.qStar;
-  }
-
-  if (!Number.isFinite(pStar) || !Number.isFinite(qStar)) {
-    pStar = p1 * p2 + (1 - p1) * q2;
-    qStar = q1 * p2 + (1 - q1) * q2;
-  }
-
-  if (!Number.isFinite(epsilonStage1) || !Number.isFinite(epsilonStage2)) {
-    epsilonStage1 = calculated.epsilonStage1;
-    epsilonStage2 = calculated.epsilonStage2;
-  }
-
-  return {
-    alpha,
-    beta,
-    epsilon,
-    p1,
-    q1,
-    p2,
-    q2,
-    pStar,
-    qStar,
-    epsilonStage1,
-    epsilonStage2,
-    scoreDomainSize,
-    unifiedDomainSize: scoreDomainSize + 1
-  };
 }
 
 function getProtectionMode(task) {
@@ -281,20 +229,7 @@ function buildTspSummary(tspRecords, scoreDomainSize = 5) {
 }
 
 function aggregateTspCounts(reportCounts, sampleCount, config) {
-  const estimatedCounts = new Array(config.unifiedDomainSize).fill(0);
-  const total = Number(sampleCount) || 0;
-
-  if (!total) {
-    return estimatedCounts;
-  }
-
-  estimatedCounts[0] = (Number(reportCounts[0] ?? 0) - total * config.q2) / (config.p2 - config.q2);
-
-  for (let value = 1; value < config.unifiedDomainSize; value += 1) {
-    estimatedCounts[value] = (Number(reportCounts[value] ?? 0) - total * config.qStar) / (config.pStar - config.qStar);
-  }
-
-  return estimatedCounts.map(value => Number(value.toFixed(4)));
+  return aggregateTspDomainCounts(reportCounts, sampleCount, config);
 }
 
 function createCompareRows(metrics) {
@@ -553,7 +488,7 @@ function getTspAggregateResults(records, task, taskId) {
     return [];
   }
 
-  const config = getTspTaskConfig(task, 5);
+  const config = resolveTspTaskConfig(task, 5);
   const summary = buildTspSummary(tspRecords, config.scoreDomainSize);
   const estimatedCounts = aggregateTspCounts(summary.reportCounts, summary.sampleCount, config);
 

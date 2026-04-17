@@ -190,7 +190,131 @@ export function generalizedRandomizedResponse(rawValue, domainValues, p, q) {
   return fallbackValues[Math.floor(Math.random() * fallbackValues.length)];
 }
 
+function clampProbability(value, fallback = 0) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function sampleAlternativeValue(domainValues, currentValue) {
+  const fallbackValues = Array.from(domainValues || []).filter(value => value !== currentValue);
+  if (!fallbackValues.length) {
+    return currentValue;
+  }
+  return fallbackValues[Math.floor(Math.random() * fallbackValues.length)];
+}
+
+// TSP 论文版使用统一总预算 epsilon，而不是把预算拆成 epsilonStage1 / epsilonStage2。
+// 记 d = 有效评分域大小，此处默认 d = 5，对应取值 {1,2,3,4,5}；
+// 第二阶段在统一域 {0,1,...,d} 上执行，因此统一域大小是 d + 1。
+//
+// 这里复用 calculateAGRParameters(alpha, beta, epsilon, d + 1) 来求 p2：
+// - 老师 TSP.py 的第二阶段公式是
+//     p2 = min(((1-alpha) - (1-beta)e^epsilon) / ((1-(d+1)alpha) - (1-(d+1)beta)e^epsilon), 1)
+// - 这与 AGR 参数求解公式在 domainSize = d + 1 时完全相同
+// - 因而 stageTwo.p 就等价于老师代码里的 p2
+//
+// 第二阶段的 q2 不是对 d + 1 个值平均分，而是对“真值之外的 d 个错误候选”平均分，
+// 所以满足 p2 + d*q2 = 1，而不是 p2 + (d + 1)q2 = 1。
+//
+// 第一阶段只在有效评分域 {1,...,d} 上扰动：
+// - 保持原值的概率是 p1
+// - 其余 d - 1 个错误评分均匀分配概率 q1 = (1 - p1) / (d - 1)
+// 因此满足 p1 + (d - 1)q1 = 1，而不是 p1 + d*q1 = 1。
 export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
+  const unifiedDomainSize = scoreDomainSize + 1;
+  const exp_eps = Math.exp(epsilon);
+  const stageTwo = calculateAGRParameters(alpha, beta, epsilon, unifiedDomainSize);
+  const p2 = clampProbability(stageTwo.p, 1);
+  const q2 = clampProbability((1 - p2) / scoreDomainSize, 0);
+  const delta = p2 - q2;
+  const stageOneDenominator = delta * ((scoreDomainSize - 1) + exp_eps);
+
+  let p1 = 1;
+  if (scoreDomainSize > 1 && stageOneDenominator > 0) {
+    // 等价于老师 TSP.py:
+    // p1 = min((e^epsilon * p2 + ((d - 2)e^epsilon - (d - 1)) * q2) / ((d - 1 + e^epsilon)(p2 - q2)), 1)
+    const stageOneNumerator = (
+      (scoreDomainSize - 1) * q2 * (exp_eps - 1)
+      + exp_eps * delta
+    );
+    p1 = clampProbability(stageOneNumerator / stageOneDenominator, 1);
+  }
+  const q1 = scoreDomainSize > 1
+    ? clampProbability((1 - p1) / (scoreDomainSize - 1), 0)
+    : 0;
+
+  const pStar = p1 * p2 + (1 - p1) * q2;
+  const qStar = q1 * p2 + (1 - q1) * q2;
+
+  return {
+    version: 'paper_unified_budget',
+    epsilon,
+    p1,
+    q1,
+    p2,
+    q2,
+    pStar,
+    qStar,
+    scoreDomainSize,
+    unifiedDomainSize
+  };
+}
+
+export function tspFirstPerturb(value, scoreDomainSize, p1) {
+  const normalizedValue = Number(value);
+  if (normalizedValue === 0) {
+    return 0;
+  }
+
+  const scoreDomain = Array.from({ length: scoreDomainSize }, (_, index) => index + 1);
+  if (!scoreDomain.includes(normalizedValue)) {
+    return normalizedValue;
+  }
+
+  if (Math.random() < p1) {
+    return normalizedValue;
+  }
+
+  return sampleAlternativeValue(scoreDomain, normalizedValue);
+}
+
+export function tspSecondPerturb(value, scoreDomainSize, p2) {
+  const normalizedValue = Number(value);
+  const unifiedDomain = Array.from({ length: scoreDomainSize + 1 }, (_, index) => index);
+  if (!unifiedDomain.includes(normalizedValue)) {
+    return normalizedValue;
+  }
+
+  if (Math.random() < p2) {
+    return normalizedValue;
+  }
+
+  return sampleAlternativeValue(unifiedDomain, normalizedValue);
+}
+
+export function applyTSP(rawValue, params) {
+  const scoreDomainSize = Number(params?.scoreDomainSize ?? 5);
+  const normalizedRawValue = Number(rawValue);
+  const stageOneSkipped = normalizedRawValue === 0;
+  const stageOneValue = stageOneSkipped
+    ? 0
+    : tspFirstPerturb(normalizedRawValue, scoreDomainSize, Number(params?.p1 ?? 1));
+  const stageTwoInput = stageOneSkipped ? 0 : stageOneValue;
+  const stageTwoValue = tspSecondPerturb(stageTwoInput, scoreDomainSize, Number(params?.p2 ?? 1));
+
+  return {
+    stageOneSkipped,
+    stageOneValue,
+    stageTwoInput,
+    stageTwoValue
+  };
+}
+
+// 旧版兼容实现：历史任务曾把总预算均分给两阶段。
+// 新任务不要再调用这条路径；仅供 tspProtocol.js 读取 legacy_split_budget 任务快照时使用。
+export function calculateLegacySplitBudgetTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
   const epsilonStage1 = epsilon / 2;
   const epsilonStage2 = epsilon - epsilonStage1;
   const stage1 = calculateAGRParameters(alpha, beta, epsilonStage1, scoreDomainSize);
@@ -202,6 +326,8 @@ export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5
   const qStar = stage1.q * p2 + (1 - stage1.q) * q2;
 
   return {
+    version: 'legacy_split_budget',
+    epsilon,
     epsilonStage1,
     epsilonStage2,
     p1: stage1.p,
@@ -247,6 +373,10 @@ export function calculateAlphaBeta(conditionalProbs, epsilon) {
   }
   
   return { alpha, beta };
+}
+
+export function calculateTSPAlphaBetaFromMissingProbs(conditionalProbs, epsilon) {
+  return calculateAlphaBeta(conditionalProbs, epsilon);
 }
 
 // 生成模拟的条件概率表（用于测试）

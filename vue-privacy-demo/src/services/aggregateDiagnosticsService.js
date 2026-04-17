@@ -1,4 +1,4 @@
-import { calculateTSPParameters } from '../utils/ldpAlgorithms';
+import { aggregateTspDomainCounts, resolveTspTaskConfig } from '../utils/tspProtocol.js';
 
 function safeParse(key, fallback) {
   try {
@@ -46,95 +46,6 @@ function normalizeTspCode(value, domainSize = 5) {
     return null;
   }
   return numericValue;
-}
-
-function approximatelyEqual(left, right, tolerance = 1e-3) {
-  return Math.abs(Number(left) - Number(right)) <= tolerance;
-}
-
-function getTspTaskConfig(task, scoreDomainSize = 5) {
-  const snapshot = task?.configSnapshot || {};
-  const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
-  const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
-  const epsilon = Number(snapshot.epsilon ?? task?.privacyBudget ?? 1);
-  const calculated = calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize);
-
-  let p1 = Number(snapshot.calibratedParams?.p1);
-  let q1 = Number(snapshot.calibratedParams?.q1);
-  let p2 = Number(snapshot.calibratedParams?.p2);
-  let q2 = Number(snapshot.calibratedParams?.q2);
-  let pStar = Number(snapshot.calibratedParams?.pStar);
-  let qStar = Number(snapshot.calibratedParams?.qStar);
-  let epsilonStage1 = Number(snapshot.calibratedParams?.epsilonStage1 ?? snapshot.epsilonStage1);
-  let epsilonStage2 = Number(snapshot.calibratedParams?.epsilonStage2 ?? snapshot.epsilonStage2);
-
-  const stageOneOthers = scoreDomainSize - 1;
-  const stageTwoOthers = scoreDomainSize;
-  const stageOneConstraint = p1 + stageOneOthers * q1;
-  const stageTwoConstraint = p2 + stageTwoOthers * q2;
-  const expectedPStar = p1 * p2 + (1 - p1) * q2;
-  const expectedQStar = q1 * p2 + (1 - q1) * q2;
-  const hasValidSnapshotParams = [p1, q1, p2, q2].every(Number.isFinite)
-    && approximatelyEqual(stageOneConstraint, 1)
-    && approximatelyEqual(stageTwoConstraint, 1)
-    && (!Number.isFinite(pStar) || approximatelyEqual(pStar, expectedPStar))
-    && (!Number.isFinite(qStar) || approximatelyEqual(qStar, expectedQStar));
-
-  if (!hasValidSnapshotParams) {
-    p1 = calculated.p1;
-    q1 = calculated.q1;
-    p2 = calculated.p2;
-    q2 = calculated.q2;
-    pStar = calculated.pStar;
-    qStar = calculated.qStar;
-  }
-
-  if (!Number.isFinite(pStar) || !Number.isFinite(qStar)) {
-    pStar = p1 * p2 + (1 - p1) * q2;
-    qStar = q1 * p2 + (1 - q1) * q2;
-  }
-
-  if (!Number.isFinite(epsilonStage1) || !Number.isFinite(epsilonStage2)) {
-    epsilonStage1 = calculated.epsilonStage1;
-    epsilonStage2 = calculated.epsilonStage2;
-  }
-
-  return {
-    alpha,
-    beta,
-    epsilon,
-    p1,
-    q1,
-    p2,
-    q2,
-    pStar,
-    qStar,
-    epsilonStage1,
-    epsilonStage2,
-    scoreDomainSize,
-    unifiedDomainSize: scoreDomainSize + 1
-  };
-}
-
-function aggregateTspCounts(reportCounts, sampleCount, config) {
-  const estimatedCounts = new Array(config.unifiedDomainSize).fill(0);
-  const total = Number(sampleCount) || 0;
-  if (!total) {
-    return estimatedCounts;
-  }
-
-  const n0Hat = (Number(reportCounts[0] ?? 0) - total * config.q2) / (config.p2 - config.q2);
-  estimatedCounts[0] = Number(n0Hat.toFixed(4));
-
-  for (let value = 1; value < config.unifiedDomainSize; value += 1) {
-    estimatedCounts[value] = Number(((
-      Number(reportCounts[value] ?? 0)
-      - n0Hat * config.q2
-      - (total - n0Hat) * config.qStar
-    ) / (config.pStar - config.qStar)).toFixed(4));
-  }
-
-  return estimatedCounts;
 }
 
 function constrainCountsForDisplay(estimatedCounts, targetSum) {
@@ -250,9 +161,9 @@ export function getTspAggregateDiagnostics(scopeInput) {
     return null;
   }
 
-  const config = getTspTaskConfig(task, 5);
+  const config = resolveTspTaskConfig(task, 5);
   const summary = buildTspSummary(records, config.scoreDomainSize);
-  const estimatedCounts = aggregateTspCounts(summary.reportCounts, summary.sampleCount, config);
+  const estimatedCounts = aggregateTspDomainCounts(summary.reportCounts, summary.sampleCount, config);
   const trueCounts = summary.hasRawSummary ? summary.rawCounts : summary.reportCounts;
   const rawMissingCounts = [Number(trueCounts[0] ?? 0), Number(trueCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0))];
   const rawScoreCounts = trueCounts.slice(1).map(value => Number(value ?? 0));
@@ -290,11 +201,11 @@ export function getTspAggregateDiagnostics(scopeInput) {
       ? '旧版页面会先把负估计截断为 0，再按总样本数归一化，所以一旦某一类原始恢复值为负，另一类就会被拉成 100%。'
       : '当前样本下旧版展示后处理没有把结果推到极端值。',
     config: {
+      version: config.version,
+      versionLabel: config.versionMeta.label,
       alpha: config.alpha,
       beta: config.beta,
       epsilon: config.epsilon,
-      epsilonStage1: config.epsilonStage1,
-      epsilonStage2: config.epsilonStage2,
       p1: config.p1,
       q1: config.q1,
       p2: config.p2,

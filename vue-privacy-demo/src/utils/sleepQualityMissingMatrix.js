@@ -1,8 +1,9 @@
 ﻿import { MISSING_STATUS_ORDER } from './constants.js';
 import { AGE_GROUP_ORDER, FALL_ALARM_DATA_PATH, getAgeGroup, parseCSV, loadCSVFile } from './fallAlarmMatrix.js';
+import { calculateTSPAlphaBetaFromMissingProbs } from './ldpAlgorithms.js';
 
 export { MISSING_STATUS_ORDER };
-export const SLEEP_QUALITY_MISSING_DATA_PATH = '/data/temp_sleep_quality_missing_age_200.csv';
+export const SLEEP_QUALITY_MISSING_DATA_PATH = '/data/temp_sleep_quality_missing_age_500.csv';
 
 export function getMissingLabel(value) {
   return Number(value) === 1 ? '缺失（M=1）' : '非缺失（M=0）';
@@ -89,16 +90,25 @@ export function calculateMissingColumnStats(matrixData) {
   });
 }
 
-export function calculateSleepMissingAlphaBeta(matrixData) {
+function approximatelyEqual(left, right, tolerance = 1e-9) {
+  return Math.abs(Number(left) - Number(right)) <= tolerance;
+}
+
+// TSP 的 alpha / beta 来源于缺失状态条件分布 Pr(M|S)。
+// 这里保留睡眠质量场景专用入口，避免调用方直接面对通用 calculateAlphaBeta。
+export function calculateSleepMissingAlphaBeta(matrixData, epsilon) {
   const stats = calculateMissingColumnStats(matrixData);
-  const selectedStat = stats.reduce((best, current) => {
-    if (!best) return current;
-    return current.ratio > best.ratio ? current : best;
-  }, null);
+  const rows = buildSleepMissingMatrixRows(matrixData);
+  const conditionalProbs = rows.map(row => MISSING_STATUS_ORDER.map(label => row[label] ?? Number.NaN));
+  const { alpha, beta } = calculateTSPAlphaBetaFromMissingProbs(conditionalProbs, epsilon);
+  const selectedStat = stats.find(stat => (
+    approximatelyEqual(stat.max, alpha) && approximatelyEqual(stat.min, beta)
+  )) || stats[0] || null;
+
   return {
-    selectedLabel: selectedStat.label,
-    alpha: selectedStat.max,
-    beta: selectedStat.min,
+    selectedLabel: selectedStat?.label || '',
+    alpha,
+    beta,
     selectedStat,
     stats
   };

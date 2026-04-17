@@ -232,6 +232,10 @@
                     <span class="demo-top-label">隐私预算 ε</span>
                     <span class="demo-top-value">{{ displayEpsilon }}</span>
                   </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">TSP 版本</span>
+                    <span class="demo-top-value">{{ tspVersionMeta?.label || '--' }}</span>
+                  </div>
                 </div>
               </div>
 
@@ -287,6 +291,9 @@
                   </div>
                 </div>
                 <div class="preview-tip">{{ processPreviewTip }}</div>
+                <div v-if="tspVersionMeta && !tspVersionMeta.usesUnifiedEpsilon" class="preview-tip">
+                  {{ tspVersionMeta.description }}
+                </div>
                 <div v-if="!tspParametersReady" class="preview-tip">
                   当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段扰动演示。
                 </div>
@@ -557,7 +564,7 @@ import { ElMessage } from 'element-plus';
 import { useUserStore } from '../../store/user';
 import { useTaskStore } from '../../store/task';
 import { useAttributeConfigStore } from '../../store/attributeConfig';
-import { ARR, AGRR, generalizedRandomizedResponse } from '../../utils/ldpAlgorithms';
+import { ARR, AGRR, applyTSP } from '../../utils/ldpAlgorithms';
 import { STAND_BUCKET_ORDER } from '../../utils/constants';
 import {
   STAND_DURATION_BUCKET_RULES,
@@ -569,6 +576,12 @@ import {
   normalizeStandBucketCounts
 } from '../../utils/standDurationBuckets';
 import { getPerturbationStatus } from '../../utils/perturbationStatus';
+import {
+  getTspEmpiricalDistribution,
+  sampleTspRawRecordByDistribution,
+  sampleTspRawRecordFromDistribution
+} from '../../utils/tspEmpiricalDistribution';
+import { getTspVersionMeta, resolveTspTaskConfig } from '../../utils/tspProtocol.js';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -657,7 +670,7 @@ const currentTaskDetail = computed(() => {
 const currentAttributeConfig = computed(() => {
   const attribute = currentTaskAttribute.value;
   if (!attribute?.id) return null;
-  return attributeConfigStore.getConfigById(attribute.id);
+  return currentTask.value?.configSnapshot || attributeConfigStore.getConfigById(attribute.id);
 });
 
 const arrConfigParams = computed(() => {
@@ -695,36 +708,31 @@ const agrrConfigParams = computed(() => {
 
 const tspConfigParams = computed(() => {
   if (currentTaskDetail.value?.scenario !== 'tsp') return null;
-  const calibratedParams = currentAttributeConfig.value?.calibratedParams;
-  if (!calibratedParams) return null;
+  const snapshot = currentAttributeConfig.value;
+  if (!snapshot) return null;
 
-  const p1 = Number(calibratedParams.p1);
-  const q1 = Number(calibratedParams.q1);
-  const p2 = Number(calibratedParams.p2);
-  const q2 = Number(calibratedParams.q2);
-  const pStar = Number(calibratedParams.pStar);
-  const qStar = Number(calibratedParams.qStar);
-  const epsilonStage1 = Number(calibratedParams.epsilonStage1);
-  const epsilonStage2 = Number(calibratedParams.epsilonStage2);
-  const unifiedDomainSize = Number(calibratedParams.unifiedDomainSize ?? 6);
+  const resolved = resolveTspTaskConfig(snapshot, Number(snapshot?.calibratedParams?.d ?? 5));
 
-  if (![p1, q1, p2, q2, epsilonStage1, epsilonStage2, unifiedDomainSize].every(Number.isFinite)) {
+  if (![resolved.p1, resolved.q1, resolved.p2, resolved.q2, resolved.unifiedDomainSize].every(Number.isFinite)) {
     return null;
   }
 
-  return {
-    p1,
-    q1,
-    p2,
-    q2,
-    pStar: Number.isFinite(pStar) ? pStar : null,
-    qStar: Number.isFinite(qStar) ? qStar : null,
-    epsilonStage1,
-    epsilonStage2,
-    epsilon: currentAttributeConfig.value?.epsilon ?? currentTaskDetail.value?.epsilon ?? '--',
-    scoreDomainSize: Number(calibratedParams.d ?? 5),
-    unifiedDomainSize
-  };
+  return resolved;
+});
+
+const tspVersionMeta = computed(() => {
+  if (currentTaskDetail.value?.scenario !== 'tsp' || !tspConfigParams.value) {
+    return null;
+  }
+
+  return getTspVersionMeta(tspConfigParams.value.version);
+});
+
+const tspVersionNotice = computed(() => {
+  if (!tspVersionMeta.value) return '';
+  return tspVersionMeta.value.usesUnifiedEpsilon
+    ? '当前任务按论文原始定义使用统一的总隐私预算 ε 联合求解 p1/q1 与 p2/q2。'
+    : '当前任务是旧版兼容任务：历史结果沿用 ε1 / ε2 均分逻辑读取，新任务不再使用该方式。';
 });
 
 const arrParametersReady = computed(() => Boolean(arrConfigParams.value));
@@ -928,17 +936,21 @@ const tspRawCards = computed(() => [
 
 const tspStageOneCards = computed(() => [
   { label: '第一阶段输入', value: tspSimulationResult.value?.stageOneInputDisplay || '--' },
-  { label: '使用预算 ε1', value: tspParametersReady.value ? tspConfigParams.value.epsilonStage1.toFixed(4) : '--' },
+  { label: '总隐私预算 ε', value: tspParametersReady.value ? String(tspConfigParams.value.epsilon) : '--' },
+  { label: '第一阶段值域', value: 'd = 5，对应 {1,2,3,4,5}' },
   { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
   { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' },
+  { label: '归一约束', value: 'p1 + (d - 1)q1 = 1' },
   { label: '第一阶段扰动结果', value: tspSimulationResult.value?.stageOneLabel || '--' }
 ]);
 
 const tspStageTwoCards = computed(() => [
   { label: '第二阶段输入', value: tspSimulationResult.value?.stageTwoInputDisplay ?? '--' },
-  { label: '使用预算 ε2', value: tspParametersReady.value ? tspConfigParams.value.epsilonStage2.toFixed(4) : '--' },
+  { label: 'TSP 版本', value: tspParametersReady.value ? tspVersionMeta.value?.label || '--' : '--' },
+  { label: '第二阶段值域', value: 'd + 1 = 6，对应 {0,1,2,3,4,5}' },
   { label: '参数 p2', value: tspParametersReady.value ? tspConfigParams.value.p2.toFixed(4) : '--' },
   { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' },
+  { label: '归一约束', value: 'p2 + dq2 = 1' },
   { label: '第二阶段扰动结果', value: tspSimulationResult.value?.stageTwoLabel || '--' }
 ]);
 
@@ -1018,8 +1030,8 @@ const tspBatchSummaryCards = computed(() => {
     { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
     { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' },
     { label: '隐私预算 ε', value: tspConfigParams.value ? String(tspConfigParams.value.epsilon) : '--' },
-    { label: '第一阶段预算 ε1', value: tspConfigParams.value ? tspConfigParams.value.epsilonStage1.toFixed(4) : '--' },
-    { label: '第二阶段预算 ε2', value: tspConfigParams.value ? tspConfigParams.value.epsilonStage2.toFixed(4) : '--' }
+    { label: 'TSP 版本', value: tspConfigParams.value ? tspVersionMeta.value?.label || '--' : '--' },
+    { label: 'α / β', value: tspConfigParams.value ? `${tspConfigParams.value.alpha.toFixed(4)} / ${tspConfigParams.value.beta.toFixed(4)}` : '--' }
   ];
 });
 
@@ -1234,7 +1246,7 @@ const processPreviewTip = computed(() => {
   }
 
   if (currentTaskDetail.value.scenario === 'tsp') {
-    return '当前 TSP 单次演示会先基于缺失状态 M 的内在不确定性，对非缺失样本的有效评分执行第一阶段扰动；随后再将缺失值 0 与第一阶段后的有效值统一执行第二阶段扰动并上报。';
+    return `${tspVersionNotice.value} 当前 TSP 单次演示会先基于缺失状态 M 的内在不确定性，对非缺失样本的有效评分执行第一阶段扰动；随后再将缺失值 0 与第一阶段后的有效值统一执行第二阶段扰动并上报。`;
   }
 
   return '当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。';
@@ -1308,7 +1320,7 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateRandomExampleInput(scenario) {
+async function generateRandomExampleInput(scenario) {
   switch (scenario) {
     case 'arr':
       return {
@@ -1323,10 +1335,10 @@ function generateRandomExampleInput(scenario) {
         dailySteps: randomInt(1000, 16000)
       };
     case 'tsp': {
-      const sleepMissing = Math.random() < 0.35 ? 1 : 0;
+      const sample = await sampleTspRawRecordByDistribution();
       return {
-        sleepMissing,
-        sleepScore: sleepMissing === 1 ? null : randomInt(1, 5)
+        sleepMissing: sample.rawMissing,
+        sleepScore: sample.rawScore
       };
     }
     default:
@@ -1334,10 +1346,18 @@ function generateRandomExampleInput(scenario) {
   }
 }
 
-function refreshData() {
+async function refreshData() {
   if (!currentTaskDetail.value) return;
 
-  const exampleInput = generateRandomExampleInput(currentTaskDetail.value.scenario);
+  let exampleInput = null;
+
+  try {
+    exampleInput = await generateRandomExampleInput(currentTaskDetail.value.scenario);
+  } catch (error) {
+    console.error('生成示例输入失败:', error);
+    ElMessage.error('生成示例输入失败，请检查 TSP 基础样本数据');
+    return;
+  }
 
   switch (currentTaskDetail.value.scenario) {
     case 'arr':
@@ -1492,21 +1512,23 @@ function performTspPerturbation(rawMissingInput, rawScoreInput) {
   const rawMissing = Number(rawMissingInput) === 1 ? 1 : 0;
   const rawMissingLabel = rawMissing === 1 ? '缺失（M=1）' : '非缺失（M=0）';
   const rawScore = rawMissing === 1 ? null : Number(rawScoreInput);
-  const scoreDomain = [1, 2, 3, 4, 5];
-  const unifiedDomain = [0, 1, 2, 3, 4, 5];
-  const stageOneSkipped = rawMissing === 1;
+  const rawValue = rawMissing === 1 ? 0 : rawScore;
+  const {
+    stageOneSkipped,
+    stageOneValue: tspStageOneValue,
+    stageTwoInput,
+    stageTwoValue
+  } = applyTSP(rawValue, tspConfigParams.value);
 
   let stageOneValue = null;
   let stageOneLabel = '已跳过';
   let stageOneInputDisplay = '缺失样本不进入第一阶段';
   if (!stageOneSkipped) {
-    stageOneValue = generalizedRandomizedResponse(rawScore, scoreDomain, tspConfigParams.value.p1, tspConfigParams.value.q1);
+    stageOneValue = tspStageOneValue;
     stageOneLabel = `${stageOneValue} 分`;
     stageOneInputDisplay = `${rawScore} 分`;
   }
 
-  const stageTwoInput = stageOneSkipped ? 0 : stageOneValue;
-  const stageTwoValue = generalizedRandomizedResponse(stageTwoInput, unifiedDomain, tspConfigParams.value.p2, tspConfigParams.value.q2);
   const stageTwoLabel = stageTwoValue === 0 ? '缺失值 0' : `${stageTwoValue} 分`;
   const reportMissingLabel = stageTwoValue === 0 ? '缺失（M=1）' : '非缺失（M=0）';
   const reportScoreDisplay = stageTwoValue === 0 ? '--' : `${stageTwoValue} 分`;
@@ -1609,15 +1631,34 @@ function generateAgrrRawSample() {
   return Math.floor(Math.random() * (selectedBucket.max - selectedBucket.min + 1)) + selectedBucket.min;
 }
 
-function generateTspRawSample() {
-  const rawMissing = Math.random() < 0.35 ? 1 : 0;
+function buildTspReportParams() {
+  if (!tspConfigParams.value) {
+    return null;
+  }
+
   return {
-    rawMissing,
-    rawScore: rawMissing === 1 ? null : randomInt(1, 5)
+    tspVersion: tspConfigParams.value.version,
+    epsilon: Number(tspConfigParams.value.epsilon).toFixed(4),
+    p1: tspConfigParams.value.p1.toFixed(4),
+    q1: tspConfigParams.value.q1.toFixed(4),
+    p2: tspConfigParams.value.p2.toFixed(4),
+    q2: tspConfigParams.value.q2.toFixed(4),
+    pStar: tspConfigParams.value.pStar != null ? tspConfigParams.value.pStar.toFixed(4) : null,
+    qStar: tspConfigParams.value.qStar != null ? tspConfigParams.value.qStar.toFixed(4) : null,
+    alpha: tspConfigParams.value.alpha.toFixed(4),
+    beta: tspConfigParams.value.beta.toFixed(4)
   };
 }
 
-function runBatchSimulation() {
+async function generateTspRawSample(distribution = null) {
+  if (distribution) {
+    return sampleTspRawRecordFromDistribution(distribution);
+  }
+
+  return sampleTspRawRecordByDistribution();
+}
+
+async function runBatchSimulation() {
   if (!currentTaskDetail.value) {
     ElMessage.warning('请先选择任务');
     return;
@@ -1675,6 +1716,16 @@ function runBatchSimulation() {
   }
 
   if (currentTaskDetail.value.scenario === 'tsp') {
+    let distribution = null;
+
+    try {
+      distribution = await getTspEmpiricalDistribution();
+    } catch (error) {
+      console.error('加载 TSP 基础分布失败:', error);
+      ElMessage.error('无法加载 TSP 基础样本分布，请检查基础数据文件');
+      return;
+    }
+
     const samples = [];
     const rawMissingCounts = { missing: 0, nonMissing: 0 };
     const reportMissingCounts = { missing: 0, nonMissing: 0 };
@@ -1682,7 +1733,7 @@ function runBatchSimulation() {
     const reportScoreCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 
     for (let i = 0; i < totalRuns; i += 1) {
-      const sampleInput = generateTspRawSample();
+      const sampleInput = await generateTspRawSample(distribution);
       const sampleResult = performTspPerturbation(sampleInput.rawMissing, sampleInput.rawScore);
       if (!sampleResult) {
         continue;
@@ -1890,14 +1941,7 @@ function uploadCurrentBatchResult() {
             reportMissingLabel: sample.reportMissingLabel,
             reportScore: sample.reportScore,
             reportScoreDisplay: sample.reportScoreDisplay,
-            params: {
-              epsilonStage1: tspConfigParams.value.epsilonStage1.toFixed(4),
-              epsilonStage2: tspConfigParams.value.epsilonStage2.toFixed(4),
-              p1: tspConfigParams.value.p1.toFixed(4),
-              q1: tspConfigParams.value.q1.toFixed(4),
-              p2: tspConfigParams.value.p2.toFixed(4),
-              q2: tspConfigParams.value.q2.toFixed(4)
-            }
+            params: buildTspReportParams()
           },
           batchSummary: {
             sampleCount: currentBatchResult.value.samples.length,
@@ -2060,16 +2104,7 @@ function submitData() {
                   q: agrrConfigParams.value.q.toFixed(4)
                 }
               : currentTaskDetail.value.scenario === 'tsp' && tspConfigParams.value
-                ? {
-                    epsilonStage1: tspConfigParams.value.epsilonStage1.toFixed(4),
-                    epsilonStage2: tspConfigParams.value.epsilonStage2.toFixed(4),
-                    p1: tspConfigParams.value.p1.toFixed(4),
-                    q1: tspConfigParams.value.q1.toFixed(4),
-                    p2: tspConfigParams.value.p2.toFixed(4),
-                    q2: tspConfigParams.value.q2.toFixed(4),
-                    pStar: tspConfigParams.value.pStar != null ? tspConfigParams.value.pStar.toFixed(4) : null,
-                    qStar: tspConfigParams.value.qStar != null ? tspConfigParams.value.qStar.toFixed(4) : null
-                  }
+                ? buildTspReportParams()
               : null
           ,
           stageOneResult: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageOneValue ?? null : null,
@@ -2106,6 +2141,9 @@ function handleLogout() {
 onMounted(() => {
   taskStore.loadFromLocalStorage();
   attributeConfigStore.loadFromLocalStorage();
+  getTspEmpiricalDistribution().catch(error => {
+    console.error('预加载 TSP 基础样本分布失败:', error);
+  });
   if (taskStore.taskList.length > 0) {
     currentTaskId.value = taskStore.taskList[0].id;
   }

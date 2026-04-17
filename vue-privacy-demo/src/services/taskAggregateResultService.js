@@ -3,8 +3,7 @@ import {
   aggregateAGRR,
   aggregateARR,
   calculateAGRParameters,
-  calculateARRParameters,
-  calculateTSPParameters
+  calculateARRParameters
 } from '../utils/ldpAlgorithms';
 import {
   createEmptyStandBucketCounts,
@@ -13,6 +12,7 @@ import {
 } from '../utils/standDurationBuckets';
 import { buildAggregateMetrics } from '../utils/aggregate/aggregateMetrics';
 import { getPerturbationStatus } from '../utils/perturbationStatus';
+import { aggregateTspDomainCounts, resolveTspTaskConfig } from '../utils/tspProtocol.js';
 
 function safeParse(key, fallback) {
   try {
@@ -76,10 +76,6 @@ function normalizeTspCode(value, domainSize = 5) {
   return numericValue;
 }
 
-function approximatelyEqual(left, right, tolerance = 1e-3) {
-  return Math.abs(Number(left) - Number(right)) <= tolerance;
-}
-
 function getTaskConfig(task, protocol, domainSize) {
   const snapshot = task?.configSnapshot || {};
   const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
@@ -98,70 +94,6 @@ function getTaskConfig(task, protocol, domainSize) {
   }
 
   return { alpha, beta, epsilon, p, q };
-}
-
-function getTspTaskConfig(task, scoreDomainSize = 5) {
-  const snapshot = task?.configSnapshot || {};
-  const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
-  const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
-  const epsilon = Number(snapshot.epsilon ?? task?.privacyBudget ?? 1);
-  const calculated = calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize);
-
-  let p1 = Number(snapshot.calibratedParams?.p1);
-  let q1 = Number(snapshot.calibratedParams?.q1);
-  let p2 = Number(snapshot.calibratedParams?.p2);
-  let q2 = Number(snapshot.calibratedParams?.q2);
-  let pStar = Number(snapshot.calibratedParams?.pStar);
-  let qStar = Number(snapshot.calibratedParams?.qStar);
-  let epsilonStage1 = Number(snapshot.calibratedParams?.epsilonStage1 ?? snapshot.epsilonStage1);
-  let epsilonStage2 = Number(snapshot.calibratedParams?.epsilonStage2 ?? snapshot.epsilonStage2);
-
-  const stageOneOthers = scoreDomainSize - 1;
-  const stageTwoOthers = scoreDomainSize;
-  const stageOneConstraint = p1 + stageOneOthers * q1;
-  const stageTwoConstraint = p2 + stageTwoOthers * q2;
-  const expectedPStar = p1 * p2 + (1 - p1) * q2;
-  const expectedQStar = q1 * p2 + (1 - q1) * q2;
-  const hasValidSnapshotParams = [p1, q1, p2, q2].every(Number.isFinite)
-    && approximatelyEqual(stageOneConstraint, 1)
-    && approximatelyEqual(stageTwoConstraint, 1)
-    && (!Number.isFinite(pStar) || approximatelyEqual(pStar, expectedPStar))
-    && (!Number.isFinite(qStar) || approximatelyEqual(qStar, expectedQStar));
-
-  if (!hasValidSnapshotParams) {
-    p1 = calculated.p1;
-    q1 = calculated.q1;
-    p2 = calculated.p2;
-    q2 = calculated.q2;
-    pStar = calculated.pStar;
-    qStar = calculated.qStar;
-  }
-
-  if (!Number.isFinite(pStar) || !Number.isFinite(qStar)) {
-    pStar = p1 * p2 + (1 - p1) * q2;
-    qStar = q1 * p2 + (1 - q1) * q2;
-  }
-
-  if (!Number.isFinite(epsilonStage1) || !Number.isFinite(epsilonStage2)) {
-    epsilonStage1 = calculated.epsilonStage1;
-    epsilonStage2 = calculated.epsilonStage2;
-  }
-
-  return {
-    alpha,
-    beta,
-    epsilon,
-    p1,
-    q1,
-    p2,
-    q2,
-    pStar,
-    qStar,
-    epsilonStage1,
-    epsilonStage2,
-    scoreDomainSize,
-    unifiedDomainSize: scoreDomainSize + 1
-  };
 }
 
 function getProtectionMode(task) {
@@ -316,25 +248,7 @@ function buildTspSummary(tspRecords, scoreDomainSize = 5) {
 }
 
 function aggregateTspCounts(reportCounts, sampleCount, config) {
-  const estimatedCounts = new Array(config.unifiedDomainSize).fill(0);
-  const total = Number(sampleCount) || 0;
-
-  if (!total) {
-    return estimatedCounts;
-  }
-
-  const n0Hat = (Number(reportCounts[0] ?? 0) - total * config.q2) / (config.p2 - config.q2);
-  estimatedCounts[0] = n0Hat;
-
-  for (let value = 1; value < config.unifiedDomainSize; value += 1) {
-    estimatedCounts[value] = (
-      Number(reportCounts[value] ?? 0)
-      - n0Hat * config.q2
-      - (total - n0Hat) * config.qStar
-    ) / (config.pStar - config.qStar);
-  }
-
-  return estimatedCounts.map(value => Number(value.toFixed(4)));
+  return aggregateTspDomainCounts(reportCounts, sampleCount, config);
 }
 
 function constrainCountsForDisplay(estimatedCounts, targetSum) {
@@ -723,7 +637,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
     return [];
   }
 
-  const config = getTspTaskConfig(task, 5);
+  const config = resolveTspTaskConfig(task, 5);
   const summary = buildTspSummary(tspRecords, config.scoreDomainSize);
   const estimatedCounts = aggregateTspCounts(summary.reportCounts, summary.sampleCount, config);
   const overallMetrics = buildAggregateMetrics({
@@ -782,15 +696,15 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: '防护模式', value: getProtectionMode(task) },
       { label: '样本量', value: String(summary.sampleCount || 0) },
       { label: '总隐私预算 ε', value: String(config.epsilon) },
-      { label: '第一阶段预算 ε1', value: Number(config.epsilonStage1).toFixed(4) },
-      { label: '第二阶段预算 ε2', value: Number(config.epsilonStage2).toFixed(4) }
+      { label: 'TSP 版本', value: config.versionMeta.label },
+      { label: 'α / β', value: `${config.alpha.toFixed(4)} / ${config.beta.toFixed(4)}` }
     ],
     detailMetricCards: [
       { label: 'Count-MSE', value: overallMetrics.countMse.toFixed(4), description: '计数均方误差，仅用于辅助观察恢复计数偏差。' },
       { label: 'Count-MAE', value: overallMetrics.countMae.toFixed(4), description: '计数平均绝对误差，用于补充查看计数层面的整体偏移。' },
       { label: '顶部频率 MSE 口径', value: '统一域 {0,1,2,3,4,5}', description: '当前页顶核心频率 MSE 基于完整统一域上的 6 类频率误差计算，不是把两个结果块直接混合平均。' },
       { label: '顶部频率 MAE 口径', value: '统一域 {0,1,2,3,4,5}', description: '当前页顶核心频率 MAE 同样基于完整统一域上的 6 类频率误差计算。' },
-      { label: '预算分配策略', value: '默认均分 ε1 / ε2', description: '当前采用默认预算平分策略，即 ε1 = ε / 2，ε2 = ε / 2。若后续需要进一步验证论文效果，可再比较不同预算分配方案。' },
+      { label: '预算逻辑', value: config.versionMeta.label, description: config.versionMeta.usesUnifiedEpsilon ? '当前任务按论文定义使用统一的总隐私预算 ε 联合求解两阶段参数，不再拆分 ε1 / ε2。' : '该任务为历史兼容结果，沿用旧版 ε1 / ε2 均分逻辑，仅用于继续读取旧任务。' },
       { label: '原始无偏缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], [estimatedCounts[0], estimatedCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0)]), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
       { label: '原始无偏评分块估计值', value: formatCountSnapshot(['1 分', '2 分', '3 分', '4 分', '5 分'], estimatedCounts.slice(1)), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
       { label: '原始无偏统一域估计方差', value: overallMetrics.estimateVariance.toFixed(4), description: '保留未加展示约束的统一域估计方差。若原始无偏恢复结果处于高方差区间，该值可能失真或不可直接用于答辩展示。' },
@@ -803,13 +717,13 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: '评分分布块频率 MAE', value: scoreSection?.metrics?.freqMae?.toFixed(6) || '0.000000', description: '仅对有效评分 1~5 结果块单独计算的频率 MAE。' },
       { label: 'α', value: config.alpha.toFixed(4), description: '基于缺失状态 M 的条件分布 Pr(M|S) 学习得到的内在不确定性参数 α。' },
       { label: 'β', value: config.beta.toFixed(4), description: '基于缺失状态 M 的条件分布 Pr(M|S) 学习得到的内在不确定性参数 β。' },
-      { label: 'p1', value: config.p1.toFixed(4), description: '第一阶段对有效评分域 {1,2,3,4,5} 扰动时使用的命中概率。' },
-      { label: 'q1', value: config.q1.toFixed(4), description: '第一阶段对有效评分域 {1,2,3,4,5} 扰动时使用的非命中概率。' },
-      { label: 'p1 + (d - 1)q1', value: stageOneConstraint.toFixed(4), description: '检查第一阶段参数是否满足 p1 + (d - 1)q1 = 1，其中 d = 5。' },
+      { label: 'p1', value: config.p1.toFixed(4), description: '第一阶段只在有效评分域 {1,2,3,4,5} 上扰动，d = 5；p1 是保留真实评分的概率。' },
+      { label: 'q1', value: config.q1.toFixed(4), description: '第一阶段只会落到其余 d - 1 = 4 个错误评分之一，因此 q1 是对单个错误评分的均匀概率。' },
+      { label: 'p1 + (d - 1)q1', value: stageOneConstraint.toFixed(4), description: '检查第一阶段参数是否满足 p1 + (d - 1)q1 = 1。这里不是 p1 + dq1 = 1，因为真值之外只有 4 个错误候选。' },
       { label: 'p1 - q1', value: (config.p1 - config.q1).toFixed(4), description: '第一阶段恢复分辨率。该值越小，第一阶段有效评分恢复的方差通常越大。' },
-      { label: 'p2', value: config.p2.toFixed(4), description: '第二阶段统一域 {0,1,2,3,4,5} 扰动时，对真实输入命中的概率。' },
-      { label: 'q2', value: config.q2.toFixed(4), description: '第二阶段统一域 {0,1,2,3,4,5} 扰动时，对非真实输入命中的概率。' },
-      { label: 'p2 + dq2', value: stageTwoConstraint.toFixed(4), description: '检查第二阶段参数是否满足 p2 + dq2 = 1，其中 d = 5，对应统一域 {0,1,2,3,4,5}。' },
+      { label: 'p2', value: config.p2.toFixed(4), description: '第二阶段在统一域 {0,1,2,3,4,5} 上扰动；统一域总大小是 d + 1 = 6，但 p2 仍是命中真实输入的概率。' },
+      { label: 'q2', value: config.q2.toFixed(4), description: '第二阶段只会落到真值之外的 d = 5 个错误候选之一，因此 q2 是对单个错误候选的均匀概率。' },
+      { label: 'p2 + dq2', value: stageTwoConstraint.toFixed(4), description: '检查第二阶段参数是否满足 p2 + dq2 = 1。这里不是 p2 + (d + 1)q2 = 1，因为统一域虽然有 6 个值，但真值之外只有 5 个错误候选。' },
       { label: 'p2 - q2', value: (config.p2 - config.q2).toFixed(4), description: '第二阶段恢复分辨率。该值越小，统一域恢复的方差通常越大。' },
       { label: 'p*', value: config.pStar.toFixed(4), description: '有效值 1~5 的恢复使用组合参数 p* = p1 × p2 + (1 - p1) × q2。' },
       { label: 'q*', value: config.qStar.toFixed(4), description: '有效值 1~5 的恢复使用组合参数 q* = q1 × p2 + (1 - q1) × q2。' },
@@ -847,8 +761,8 @@ function getTspAggregateResults(records, task, taskId, scope) {
         isStatus: true
       }
     ],
-    sourceDescription: `${`当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} 当前表格与图表默认展示的是“约束后分布”，用于保证结果可读性与可视化稳定性；原始无偏恢复结果及理论指标保留在详细指标中。`,
-    metricDescription: 'TSP 表格、图表以及顶部方差/误差上界卡片现在统一基于约束后展示结果计算，以保证结果可读性与口径一致；原始无偏恢复结果及其理论指标继续保留在详细指标区。'
+    sourceDescription: `${`当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} ${config.versionMeta.description} 当前表格与图表默认展示的是“约束后分布”，用于保证结果可读性与可视化稳定性；原始无偏恢复结果及理论指标保留在详细指标中。`,
+    metricDescription: `TSP 使用统一的总隐私预算 ε 联合求解两阶段扰动参数。${config.versionMeta.usesUnifiedEpsilon ? '' : '当前任务为旧版兼容任务，仍按历史均分预算参数解释。'} 表格、图表以及顶部方差/误差上界卡片现在统一基于约束后展示结果计算，以保证结果可读性与口径一致；原始无偏恢复结果及其理论指标继续保留在详细指标区。`
   })];
 }
 
