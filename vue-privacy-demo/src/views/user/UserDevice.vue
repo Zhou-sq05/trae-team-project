@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="user-device-container">
     <div class="header">
       <div class="header-left">
@@ -181,7 +181,12 @@
 
             <div class="derived-hint">点击后将由手环端自动连续采集 {{ batchSimulationCount }} 次，并自动切换到右侧“连续采集结果”页签。</div>
             <div class="action-row">
-              <el-button type="success" @click="runBatchSimulation" :disabled="!canRunBatchSimulation">
+              <el-button
+                type="success"
+                @click="runBatchSimulation"
+                :loading="batchSimulationRunning"
+                :disabled="!canRunBatchSimulation || batchSimulationRunning"
+              >
                 手环连续采集
               </el-button>
             </div>
@@ -195,7 +200,7 @@
 
       <div class="right-section">
         <h3>演示调试区域</h3>
-        <template v-if="['arr', 'agrr'].includes(currentTaskDetail?.scenario)">
+        <template v-if="['arr', 'agrr', 'aoue'].includes(currentTaskDetail?.scenario)">
           <div class="demo-tab-bar">
             <button
               type="button"
@@ -216,201 +221,289 @@
           </div>
 
           <template v-if="activeDemoTab === 'single'">
-            <div class="summary-block">
-              <h4>任务摘要</h4>
-              <div class="demo-top-card">
-                <div class="demo-top-item">
-                  <span class="demo-top-label">任务 ID：  </span>
-                  <span class="demo-top-value">{{ currentTaskDetail?.taskId || '--' }}</span>
+            <template v-if="currentTaskDetail?.scenario === 'aoue'">
+              <AoueDemoPanel
+                :demo="aoueDemoViewModel"
+                mode="compact"
+                :show-expand-action="true"
+              />
+              <el-dialog
+                v-model="aoueExpandedVisible"
+                fullscreen
+                title="AOUE 放大演示"
+                class="aoue-expanded-dialog"
+                :destroy-on-close="false"
+              >
+                <div class="aoue-expanded-dialog__body">
+                  <AoueDemoPanel
+                    :demo="aoueDemoViewModel"
+                    mode="expanded"
+                  />
                 </div>
-                <div class="demo-top-item">
-                  <span class="demo-top-label">协议：  </span>
-                  <span class="demo-top-value">{{ currentTaskDetail?.protocol || '--' }}</span>
-                </div>
-                <div class="demo-top-item">
-                  <span class="demo-top-label">隐私预算 ε：  </span>
-                  <span class="demo-top-value">{{ displayEpsilon }}</span>
-                </div>
-              </div>
-            </div>
+              </el-dialog>
+            </template>
 
-            <div class="summary-block">
-                <h4>原始输入</h4>
-              <div class="card-grid">
-                <div v-for="item in singleRawCards" :key="item.label" class="summary-card">
-                  <div class="card-label">{{ item.label }}</div>
-                  <div class="card-value">{{ item.value }}</div>
+            <template v-else>
+              <div class="summary-block">
+                <h4>任务摘要</h4>
+                <div class="demo-top-card">
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">任务 ID：  </span>
+                    <span class="demo-top-value">{{ currentTaskDetail?.taskId || '--' }}</span>
+                  </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">协议：  </span>
+                    <span class="demo-top-value">{{ currentTaskDetail?.protocol || '--' }}</span>
+                  </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">隐私预算 ε：  </span>
+                    <span class="demo-top-value">{{ displayEpsilon }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="summary-block">
-              <div class="summary-heading">
-                <h4>扰动参数</h4>
-                <span class="section-tip">从管理端当前任务的已保存配置中读取</span>
-              </div>
-              <div class="card-grid">
-                <div v-for="item in parameterCards" :key="item.label" class="summary-card">
-                  <div class="card-label">{{ item.label }}</div>
-                  <div class="card-value">{{ item.value }}</div>
+              <div class="summary-block">
+                  <h4>原始输入</h4>
+                <div class="card-grid">
+                  <div v-for="item in singleRawCards" :key="item.label" class="summary-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
                 </div>
               </div>
-              <div v-if="currentPerturbationStatus" class="perturbation-status-banner" :class="`is-${currentPerturbationStatus.statusKey}`">
-                <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
-                <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
-              </div>
-              <div v-if="(currentTaskDetail?.scenario === 'arr' && !arrParametersReady) || (currentTaskDetail?.scenario === 'agrr' && !agrrParametersReady)" class="preview-tip">
-                当前任务尚未在管理端完成 {{ currentTaskDetail?.protocol }} 参数保存，暂时无法执行本地扰动。
-              </div>
-            </div>
-            <div class="summary-block">
-              <div class="summary-heading">
-                <h4>扰动结果</h4>
-                <span class="section-tip">同一原始值下可重复随机模拟</span>
-              </div>
-              <div class="card-grid">
-                <div v-for="item in resultCards" :key="item.label" class="summary-card preview-card">
-                  <div class="card-label">{{ item.label }}</div>
-                  <div class="card-value">{{ item.value }}</div>
-                </div>
-              </div>
-              <div class="preview-tip">
-                {{ currentTaskDetail?.scenario === 'agrr' ? 'AGRR 会先对原始分钟数做分档，再按当前档位编码值与参数 p、q 执行一次本地随机扰动。' : 'ARR 会按当前原始编码值与参数 p、q 进行一次本地随机扰动，再生成本次上报值。' }}
-              </div>
-            </div>
 
-            <div class="summary-block">
-              <div class="summary-heading">
-                <h4>操作区</h4>
-                <span class="section-tip">先执行一次扰动，再提交上报</span>
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>扰动参数</h4>
+                  <span class="section-tip">从管理端当前任务的已保存配置中读取</span>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in parameterCards" :key="item.label" class="summary-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+                <div v-if="currentPerturbationStatus" class="perturbation-status-banner" :class="`is-${currentPerturbationStatus.statusKey}`">
+                  <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
+                  <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
+                </div>
+                <div v-if="(currentTaskDetail?.scenario === 'arr' && !arrParametersReady) || (currentTaskDetail?.scenario === 'agrr' && !agrrParametersReady)" class="preview-tip">
+                  当前任务尚未在管理端完成 {{ currentTaskDetail?.protocol }} 参数保存，暂时无法执行本地扰动。
+                </div>
               </div>
-              <div class="action-row">
-                <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                  {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
-                </el-button>
-                <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
-                  提交上报
-                </el-button>
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>扰动结果</h4>
+                  <span class="section-tip">同一原始值下可重复随机模拟</span>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in resultCards" :key="item.label" class="summary-card preview-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+                <div class="preview-tip">
+                  <template v-if="currentTaskDetail?.scenario === 'agrr'">
+                    AGRR 会先对原始分钟数做分档，再按当前档位编码值与参数 p、q 执行一次本地随机扰动。
+                  </template>
+                  <template v-else>
+                    ARR 会按当前原始编码值与参数 p、q 进行一次本地随机扰动，再生成本次上报值。
+                  </template>
+                </div>
               </div>
-            </div>
+
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>操作区</h4>
+                  <span class="section-tip">先执行一次扰动，再提交上报</span>
+                </div>
+                <div class="action-row">
+                  <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
+                    {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
+                  </el-button>
+                  <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
+                    提交上报
+                  </el-button>
+                </div>
+              </div>
+            </template>
           </template>
 
           <template v-else>
             <div class="summary-block">
-              <div class="summary-heading">
-                <h4>连续采集结果</h4>
-                <span class="section-tip">展示健康手环连续采集并重复执行 {{ currentTaskDetail?.protocol || '--' }} 的汇总结果</span>
+              <div class="summary-heading summary-heading--with-action">
+                <div class="summary-heading__copy">
+                  <h4>连续采集结果</h4>
+                  <span class="section-tip">展示健康手环连续采集并重复执行 {{ currentTaskDetail?.protocol || '--' }} 的汇总结果</span>
+                </div>
+                <el-button
+                  v-if="currentTaskDetail?.scenario === 'aoue'"
+                  plain
+                  class="aoue-expand-trigger"
+                  @click="openAoueBatchExpandedDialog"
+                  :disabled="!currentBatchResult"
+                >
+                  <el-icon><FullScreen /></el-icon>
+                  放大查看
+                </el-button>
               </div>
               <div v-if="!currentBatchResult" class="empty-box">
                 <p>点击左侧“手环连续采集”后，这里会展示本次连续采集的统计结果和前 10 条样本明细。</p>
               </div>
               <template v-else>
-                <div class="batch-summary-strip">
-                  <div class="batch-summary-item">
-                    <div class="card-label">{{ currentBatchSummaryCards[0]?.label || '样本总数' }}</div>
-                    <div class="batch-summary-value">{{ currentBatchSummaryCards[0]?.value }}</div>
-                  </div>
-                  <div class="batch-summary-item">
-                    <div class="card-label">{{ currentBatchSummaryCards[1]?.label || '当前任务名称' }}</div>
-                    <div class="batch-summary-value">{{ currentBatchSummaryCards[1]?.value }}</div>
-                  </div>
-                  <div class="batch-summary-item">
-                    <div class="card-label">{{ currentBatchSummaryCards[2]?.label || '当前协议' }}</div>
-                    <div class="batch-summary-value">{{ currentBatchSummaryCards[2]?.value }}</div>
-                  </div>
-                </div>
+                <template v-if="currentTaskDetail?.scenario === 'aoue'">
+                  <AoueBatchCollectionPanel :batch="aoueBatchViewModel" />
+                  <el-dialog
+                    v-model="aoueBatchExpandedVisible"
+                    fullscreen
+                    title="AOUE 连续采集结果"
+                    class="aoue-expanded-dialog aoue-batch-expanded-dialog"
+                    :destroy-on-close="false"
+                  >
+                    <div class="aoue-expanded-dialog__body">
+                      <AoueBatchCollectionPanel
+                        :batch="aoueBatchViewModel"
+                        mode="expanded"
+                      />
+                    </div>
+                  </el-dialog>
 
-                <div class="compare-panel">
-                  <div class="compare-title">扰动前后分布对比</div>
-                  <table class="compare-table">
-                    <thead>
-                      <tr>
-                        <th>状态</th>
-                        <th>原始值</th>
-                        <th>上报值</th>
-                        <th>变化</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="row in currentDistributionComparisonRows" :key="row.status">
-                        <td>{{ row.status }}</td>
-                        <td>{{ row.rawCount }}</td>
-                        <td>{{ row.reportCount }}</td>
-                        <td :class="['delta-text', row.delta > 0 ? 'increase' : row.delta < 0 ? 'decrease' : 'neutral']">
-                          {{ row.deltaDisplay }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div v-if="currentPerturbationStatus" class="perturbation-status-banner perturbation-status-banner--batch" :class="`is-${currentPerturbationStatus.statusKey}`">
+                    <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
+                    <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
+                  </div>
 
-                  <div class="compare-bars">
-                    <div v-for="row in currentDistributionComparisonRows" :key="`${row.status}-bars`" class="compare-bar-row">
-                      <div class="compare-bar-label">{{ row.status }}</div>
-                      <div class="compare-bar-track">
-                        <div class="compare-bar-group">
-                          <span class="compare-bar-caption">原始</span>
-                          <div class="compare-bar">
-                            <div class="compare-bar-fill raw-fill" :style="{ width: `${row.rawPercent}%` }"></div>
+                  <div class="summary-block batch-upload-block">
+                    <div class="summary-heading">
+                      <h4>批量上报</h4>
+                      <span class="section-tip">将本次连续采集产生的扰动后样本记录批量写入管理端数据源</span>
+                    </div>
+                    <div class="action-row">
+                      <el-button
+                        type="primary"
+                        @click="uploadCurrentBatchResult"
+                        :disabled="!currentBatchResult || batchUploadState?.batchId === currentBatchResult.batchId"
+                      >
+                        上报本次连续采集结果
+                      </el-button>
+                    </div>
+                    <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="preview-tip">
+                      本次上报状态：{{ batchUploadState.status }}，本次上报记录数：{{ batchUploadState.count }} 条
+                    </div>
+                    <div v-else class="preview-tip">
+                      请先完成连续采集模拟，再将本次连续采集产生的扰动后样本记录批量上报到管理端。
+                    </div>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div class="batch-summary-strip">
+                    <div class="batch-summary-item">
+                      <div class="card-label">{{ currentBatchSummaryCards[0]?.label || '样本总数' }}</div>
+                      <div class="batch-summary-value">{{ currentBatchSummaryCards[0]?.value }}</div>
+                    </div>
+                    <div class="batch-summary-item">
+                      <div class="card-label">{{ currentBatchSummaryCards[1]?.label || '当前任务名称' }}</div>
+                      <div class="batch-summary-value">{{ currentBatchSummaryCards[1]?.value }}</div>
+                    </div>
+                    <div class="batch-summary-item">
+                      <div class="card-label">{{ currentBatchSummaryCards[2]?.label || '当前协议' }}</div>
+                      <div class="batch-summary-value">{{ currentBatchSummaryCards[2]?.value }}</div>
+                    </div>
+                  </div>
+
+                  <div class="compare-panel">
+                    <div class="compare-title">扰动前后分布对比</div>
+                    <table class="compare-table">
+                      <thead>
+                        <tr>
+                          <th>状态</th>
+                          <th>原始值</th>
+                          <th>上报值</th>
+                          <th>变化</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in currentDistributionComparisonRows" :key="row.status">
+                          <td>{{ row.status }}</td>
+                          <td>{{ row.rawCount }}</td>
+                          <td>{{ row.reportCount }}</td>
+                          <td :class="['delta-text', row.delta > 0 ? 'increase' : row.delta < 0 ? 'decrease' : 'neutral']">
+                            {{ row.deltaDisplay }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <div class="compare-bars">
+                      <div v-for="row in currentDistributionComparisonRows" :key="`${row.status}-bars`" class="compare-bar-row">
+                        <div class="compare-bar-label">{{ row.status }}</div>
+                        <div class="compare-bar-track">
+                          <div class="compare-bar-group">
+                            <span class="compare-bar-caption">原始</span>
+                            <div class="compare-bar">
+                              <div class="compare-bar-fill raw-fill" :style="{ width: `${row.rawPercent}%` }"></div>
+                            </div>
+                            <span class="compare-bar-number">{{ row.rawCount }}</span>
                           </div>
-                          <span class="compare-bar-number">{{ row.rawCount }}</span>
-                        </div>
-                        <div class="compare-bar-group">
-                          <span class="compare-bar-caption">上报</span>
-                          <div class="compare-bar">
-                            <div class="compare-bar-fill report-fill" :style="{ width: `${row.reportPercent}%` }"></div>
+                          <div class="compare-bar-group">
+                            <span class="compare-bar-caption">上报</span>
+                            <div class="compare-bar">
+                              <div class="compare-bar-fill report-fill" :style="{ width: `${row.reportPercent}%` }"></div>
+                            </div>
+                            <span class="compare-bar-number">{{ row.reportCount }}</span>
                           </div>
-                          <span class="compare-bar-number">{{ row.reportCount }}</span>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="preview-tip">
-                  {{ currentBatchResultTip }}
-                </div>
-                <div v-if="currentPerturbationStatus" class="perturbation-status-banner perturbation-status-banner--batch" :class="`is-${currentPerturbationStatus.statusKey}`">
-                  <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
-                  <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
-                </div>
+                  <div class="preview-tip">
+                    {{ currentBatchResultTip }}
+                  </div>
+                  <div v-if="currentPerturbationStatus" class="perturbation-status-banner perturbation-status-banner--batch" :class="`is-${currentPerturbationStatus.statusKey}`">
+                    <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
+                    <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
+                  </div>
 
-                <div class="summary-block batch-upload-block">
-                  <div class="summary-heading">
-                    <h4>批量上报</h4>
-                    <span class="section-tip">将本次连续采集产生的扰动后样本记录批量写入管理端数据源</span>
+                  <div class="summary-block batch-upload-block">
+                    <div class="summary-heading">
+                      <h4>批量上报</h4>
+                      <span class="section-tip">将本次连续采集产生的扰动后样本记录批量写入管理端数据源</span>
+                    </div>
+                    <div class="action-row">
+                      <el-button
+                        type="primary"
+                        @click="uploadCurrentBatchResult"
+                        :disabled="!currentBatchResult || batchUploadState?.batchId === currentBatchResult.batchId"
+                      >
+                        上报本次连续采集结果
+                      </el-button>
+                    </div>
+                    <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="preview-tip">
+                      本次上报状态：{{ batchUploadState.status }}，本次上报记录数：{{ batchUploadState.count }} 条
+                    </div>
+                    <div v-else class="preview-tip">
+                      请先完成连续采集模拟，再将本次连续采集产生的扰动后样本记录批量上报到管理端。
+                    </div>
                   </div>
-                  <div class="action-row">
-                    <el-button
-                      type="primary"
-                      @click="uploadCurrentBatchResult"
-                      :disabled="!currentBatchResult || batchUploadState?.batchId === currentBatchResult.batchId"
-                    >
-                      上报本次连续采集结果
-                    </el-button>
-                  </div>
-                  <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="preview-tip">
-                    本次上报状态：{{ batchUploadState.status }}，本次上报记录数：{{ batchUploadState.count }} 条
-                  </div>
-                  <div v-else class="preview-tip">
-                    请先完成连续采集模拟，再将本次连续采集产生的扰动后样本记录批量上报到管理端。
-                  </div>
-                </div>
 
-                <div class="batch-detail-table">
-                  <div class="batch-table-title">前 {{ currentBatchPreviewRows.length }} 条样本明细</div>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th v-for="column in batchPreviewColumns" :key="column.key">{{ column.label }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="row in currentBatchPreviewRows" :key="row.index">
-                        <td v-for="column in batchPreviewColumns" :key="column.key">{{ row[column.key] }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                  <div class="batch-detail-table">
+                    <div class="batch-table-title">前 {{ currentBatchPreviewRows.length }} 条样本明细</div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th v-for="column in batchPreviewColumns" :key="column.key">{{ column.label }}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in currentBatchPreviewRows" :key="row.index">
+                          <td v-for="column in batchPreviewColumns" :key="column.key">{{ row[column.key] }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
               </template>
             </div>
           </template>
@@ -474,13 +567,16 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowDown } from '@element-plus/icons-vue';
+import { ArrowDown, FullScreen } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import AoueDemoPanel from '../../components/AoueDemoPanel.vue';
+import AoueBatchCollectionPanel from '../../components/AoueBatchCollectionPanel.vue';
+import { useAoueAnimation } from '../../composables/useAoueAnimation';
 import { useUserStore } from '../../store/user';
 import { useTaskStore } from '../../store/task';
 import { useAttributeConfigStore } from '../../store/attributeConfig';
-import { ARR, AGRR } from '../../utils/ldpAlgorithms';
-import { STAND_BUCKET_ORDER } from '../../utils/constants';
+import { AGRR, ARR, aggregateAOUE, applyTSP, perturbAOUEWithDetails } from '../../utils/ldpAlgorithms';
+import { STAND_BUCKET_ORDER, STEP_BUCKET_ORDER } from '../../utils/constants';
 import {
   STAND_DURATION_BUCKET_RULES,
   createEmptyStandBucketCounts,
@@ -490,7 +586,23 @@ import {
   getStandDurationBucket,
   normalizeStandBucketCounts
 } from '../../utils/standDurationBuckets';
+import {
+  STEPS_BUCKET_RULES,
+  createEmptyStepsBucketCounts,
+  explainPerturbedVector,
+  getStepsBucket,
+  getStepsBucketCode,
+  getStepsBucketCodeBySteps,
+  getStepsBucketLabelByCode,
+  normalizeStepsBucketCounts
+} from '../../utils/stepsBuckets';
 import { getPerturbationStatus } from '../../utils/perturbationStatus';
+import {
+  getTspEmpiricalDistribution,
+  sampleTspRawRecordByDistribution,
+  sampleTspRawRecordFromDistribution
+} from '../../utils/tspEmpiricalDistribution';
+import { getTspVersionMeta, resolveTspTaskConfig } from '../../utils/tspProtocol.js';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -506,10 +618,44 @@ const arrSimulationResult = ref(null);
 const arrBatchResult = ref(null);
 const agrrSimulationResult = ref(null);
 const agrrBatchResult = ref(null);
+const tspSimulationResult = ref(null);
+const tspBatchResult = ref(null);
+const aoueSimulationResult = ref(null);
+const aoueBatchResult = ref(null);
+const aoueLogExpanded = ref(false);
+const aoueBatchLogExpanded = ref(false);
+const aoueExpandedVisible = ref(false);
+const aoueBatchExpandedVisible = ref(false);
 const batchSimulationCount = ref(100);
+const batchSimulationRunning = ref(false);
 const activeDemoTab = ref('single');
 const batchUploadState = ref(null);
 const standDurationBucketRules = STAND_DURATION_BUCKET_RULES;
+const {
+  playMode: aouePlayMode,
+  animationStage: aoueAnimationStage,
+  stepDelayMs: aoueStepDelayMs,
+  currentBitIndex: aoueCurrentBitIndex,
+  encodingStepIndex: aoueEncodingStepIndex,
+  originalVector: aoueOriginalVector,
+  encodingVector: aoueEncodingVector,
+  resultVector: aoueAnimatedResultVector,
+  bitSteps: aoueBitSteps,
+  isPaused: aoueAnimationPaused,
+  currentBitStep: aoueCurrentBitStep,
+  completedBitsCount: aoueCompletedBitsCount,
+  hasPreparedAnimation: hasPreparedAoueAnimation,
+  hasCompletedPerturbation: aoueHasCompletedPerturbation,
+  targetBitIndex: aoueTargetBitIndex,
+  prepareAnimation: prepareAoueAnimation,
+  advanceDemo: advanceAoueDemo,
+  startAutoPlayback: startAoueAutoPlayback,
+  startManualPlayback: startAoueManualPlayback,
+  pausePlayback: pauseAouePlayback,
+  resumeAutoPlayback: resumeAoueAutoPlayback,
+  resetProgress: resetAoueDemoProgress,
+  clearAnimation: resetAoueAnimation
+} = useAoueAnimation();
 
 const dynamicForm = reactive({
   fallAlarm: 0,
@@ -577,7 +723,7 @@ const currentTaskDetail = computed(() => {
 const currentAttributeConfig = computed(() => {
   const attribute = currentTaskAttribute.value;
   if (!attribute?.id) return null;
-  return attributeConfigStore.getConfigById(attribute.id);
+  return currentTask.value?.configSnapshot || attributeConfigStore.getConfigById(attribute.id);
 });
 
 const arrConfigParams = computed(() => {
@@ -613,16 +759,64 @@ const agrrConfigParams = computed(() => {
   };
 });
 
+const aoueConfigParams = computed(() => {
+  if (currentTaskDetail.value?.scenario !== 'aoue') return null;
+  const calibratedParams = currentAttributeConfig.value?.calibratedParams;
+  if (!calibratedParams) return null;
+
+  const p = Number(calibratedParams.p);
+  const q = Number(calibratedParams.q);
+  if (!Number.isFinite(p) || !Number.isFinite(q)) return null;
+
+  return {
+    p,
+    q,
+    epsilon: currentAttributeConfig.value?.epsilon ?? currentTaskDetail.value?.epsilon ?? '--',
+    d: STEP_BUCKET_ORDER.length
+  };
+});
+
+const tspConfigParams = computed(() => {
+  if (currentTaskDetail.value?.scenario !== 'tsp') return null;
+  const snapshot = currentAttributeConfig.value;
+  if (!snapshot) return null;
+
+  const resolved = resolveTspTaskConfig(snapshot, Number(snapshot?.calibratedParams?.d ?? 5));
+
+  if (![resolved.p1, resolved.q1, resolved.p2, resolved.q2, resolved.unifiedDomainSize].every(Number.isFinite)) {
+    return null;
+  }
+
+  return resolved;
+});
+
 const arrParametersReady = computed(() => Boolean(arrConfigParams.value));
 const agrrParametersReady = computed(() => Boolean(agrrConfigParams.value));
+const aoueParametersReady = computed(() => Boolean(aoueConfigParams.value));
+const tspParametersReady = computed(() => Boolean(tspConfigParams.value));
 const arrPerturbationStatus = computed(() => getPerturbationStatus('ARR', arrConfigParams.value));
 const agrrPerturbationStatus = computed(() => getPerturbationStatus('AGRR', agrrConfigParams.value));
+const aouePerturbationStatus = computed(() => getPerturbationStatus('AOUE', aoueConfigParams.value));
+const tspVersionMeta = computed(() => {
+  if (currentTaskDetail.value?.scenario !== 'tsp' || !tspConfigParams.value) {
+    return null;
+  }
+
+  return getTspVersionMeta(tspConfigParams.value.version);
+});
+const tspVersionNotice = computed(() => {
+  if (!tspVersionMeta.value) return '';
+  return '当前任务按统一总隐私预算 ε 求解两阶段参数。';
+});
 const currentPerturbationStatus = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrPerturbationStatus.value;
   }
   if (currentTaskDetail.value?.scenario === 'arr') {
     return arrPerturbationStatus.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aouePerturbationStatus.value;
   }
   return null;
 });
@@ -633,6 +827,18 @@ const canSimulateAgrr = computed(() => (
   && agrrParametersReady.value
   && Boolean(derivedStandBucket.value)
 ));
+const canSimulateAoue = computed(() => (
+  currentTaskDetail.value?.scenario === 'aoue'
+  && formTouched.value
+  && aoueParametersReady.value
+  && Boolean(derivedStepsBucket.value)
+));
+const canSimulateTsp = computed(() => (
+  currentTaskDetail.value?.scenario === 'tsp'
+  && formTouched.value
+  && tspParametersReady.value
+  && (dynamicForm.sleepMissing === 1 || Number.isFinite(Number(dynamicForm.sleepScore)))
+));
 const canRunSingleSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
   if (currentTaskDetail.value.scenario === 'arr') {
@@ -640,6 +846,12 @@ const canRunSingleSimulation = computed(() => {
   }
   if (currentTaskDetail.value.scenario === 'agrr') {
     return canSimulateAgrr.value;
+  }
+  if (currentTaskDetail.value.scenario === 'aoue') {
+    return canSimulateAoue.value;
+  }
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return canSimulateTsp.value;
   }
   return formTouched.value;
 });
@@ -651,6 +863,12 @@ const canRunBatchSimulation = computed(() => {
   if (currentTaskDetail.value.scenario === 'agrr') {
     return agrrParametersReady.value && Number(batchSimulationCount.value) > 0;
   }
+  if (currentTaskDetail.value.scenario === 'aoue') {
+    return aoueParametersReady.value && Number(batchSimulationCount.value) > 0;
+  }
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return tspParametersReady.value && Number(batchSimulationCount.value) > 0;
+  }
   return false;
 });
 const displayEpsilon = computed(() => {
@@ -659,6 +877,12 @@ const displayEpsilon = computed(() => {
   }
   if (currentTaskDetail.value?.scenario === 'agrr' && agrrConfigParams.value) {
     return agrrConfigParams.value.epsilon;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue' && aoueConfigParams.value) {
+    return aoueConfigParams.value.epsilon;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp' && tspConfigParams.value) {
+    return tspConfigParams.value.epsilon;
   }
   return currentTaskDetail.value?.epsilon ?? '--';
 });
@@ -669,6 +893,12 @@ const canSubmitCurrentTask = computed(() => {
   }
   if (currentTaskDetail.value.scenario === 'agrr') {
     return Boolean(agrrSimulationResult.value);
+  }
+  if (currentTaskDetail.value.scenario === 'aoue') {
+    return Boolean(aoueSimulationResult.value) && aoueAnimationStage.value === 'done';
+  }
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return Boolean(tspSimulationResult.value);
   }
   return formTouched.value;
 });
@@ -705,16 +935,11 @@ const derivedStandBucketCode = computed(() => {
 });
 
 const derivedStepsBucket = computed(() => {
-  const value = Number(dynamicForm.dailySteps);
-  if (!Number.isFinite(value)) return '';
-  if (value < 2000) return '0-1999';
-  if (value < 4000) return '2000-3999';
-  if (value < 6000) return '4000-5999';
-  if (value < 8000) return '6000-7999';
-  if (value < 10000) return '8000-9999';
-  if (value < 12000) return '10000-11999';
-  if (value < 14000) return '12000-13999';
-  return '14000+';
+  return getStepsBucket(dynamicForm.dailySteps);
+});
+
+const derivedStepsBucketCode = computed(() => {
+  return getStepsBucketCodeBySteps(dynamicForm.dailySteps);
 });
 
 const rawSummaryCards = computed(() => {
@@ -756,6 +981,12 @@ const agrrRawCards = computed(() => [
   { label: '原始编码值', value: derivedStandBucketCode.value ? String(derivedStandBucketCode.value) : '--' }
 ]);
 
+const aoueRawCards = computed(() => [
+  { label: '原始步数', value: dynamicForm.dailySteps ?? '--' },
+  { label: '当前分桶', value: derivedStepsBucket.value || '--' },
+  { label: '原始编码值', value: derivedStepsBucketCode.value ? String(derivedStepsBucketCode.value) : '--' }
+]);
+
 const arrParameterCards = computed(() => [
   { label: 'p（保留原值概率）', value: arrParametersReady.value ? arrConfigParams.value.p.toFixed(4) : '--' },
   { label: 'q（翻转为相反值概率）', value: arrParametersReady.value ? arrConfigParams.value.q.toFixed(4) : '--' }
@@ -764,6 +995,11 @@ const arrParameterCards = computed(() => [
 const agrrParameterCards = computed(() => [
   { label: 'p（保留原档位概率）', value: agrrParametersReady.value ? agrrConfigParams.value.p.toFixed(4) : '--' },
   { label: 'q（扰动到其他档位概率）', value: agrrParametersReady.value ? agrrConfigParams.value.q.toFixed(4) : '--' }
+]);
+
+const aoueParameterCards = computed(() => [
+  { label: 'p（保留位概率）', value: '0.5000' },
+  { label: 'q（翻转位概率）', value: aoueParametersReady.value ? aoueConfigParams.value.q.toFixed(4) : '--' }
 ]);
 
 const arrResultCards = computed(() => [
@@ -788,9 +1024,523 @@ const agrrResultCards = computed(() => [
   }
 ]);
 
+const aoueResultCards = computed(() => [
+  {
+    label: '原始 one-hot 编码',
+    value: aoueSimulationResult.value ? aoueSimulationResult.value.encodedValueDisplay : '--'
+  },
+  {
+    label: '扰动后向量解释',
+    value: aoueSimulationResult.value ? aoueSimulationResult.value.perturbedLabel : '--'
+  },
+  {
+    label: '上报向量',
+    value: aoueSimulationResult.value ? aoueSimulationResult.value.reportValueDisplay : '--'
+  }
+]);
+
+const tspRawCards = computed(() => [
+  { label: '缺失状态', value: dynamicForm.sleepMissing === 1 ? '缺失（M=1）' : '非缺失（M=0）' },
+  { label: '睡眠质量评分', value: dynamicForm.sleepMissing === 1 ? '--' : dynamicForm.sleepScore ?? '--' }
+]);
+
+const tspStageOneCards = computed(() => [
+  { label: '第一阶段输入', value: tspSimulationResult.value?.stageOneInputDisplay || '--' },
+  { label: '总隐私预算 ε', value: tspParametersReady.value ? String(tspConfigParams.value.epsilon) : '--' },
+  { label: '第一阶段值域', value: 'd = 5，对应 {1,2,3,4,5}' },
+  { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
+  { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' },
+  { label: '归一约束', value: 'p1 + (d - 1)q1 = 1' },
+  { label: '第一阶段扰动结果', value: tspSimulationResult.value?.stageOneLabel || '--' }
+]);
+
+const tspStageTwoCards = computed(() => [
+  { label: '第二阶段输入', value: tspSimulationResult.value?.stageTwoInputDisplay ?? '--' },
+  { label: 'TSP 版本', value: tspParametersReady.value ? tspVersionMeta.value?.label || '--' : '--' },
+  { label: '第二阶段值域', value: 'd + 1 = 6，对应 {0,1,2,3,4,5}' },
+  { label: '参数 p2', value: tspParametersReady.value ? tspConfigParams.value.p2.toFixed(4) : '--' },
+  { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' },
+  { label: '归一约束', value: 'p2 + dq2 = 1' },
+  { label: '第二阶段扰动结果', value: tspSimulationResult.value?.stageTwoLabel || '--' }
+]);
+
+const tspFinalReportCards = computed(() => [
+  { label: '最终上报值', value: tspSimulationResult.value?.reportValueDisplay || '--' },
+  { label: '上报缺失状态', value: tspSimulationResult.value?.reportMissingLabel || '--' },
+  { label: '上报评分', value: tspSimulationResult.value?.reportScoreDisplay ?? '--' }
+]);
+
+const aoueAnimationReady = computed(() => (
+  currentTaskDetail.value?.scenario === 'aoue'
+  && Boolean(aoueSimulationResult.value)
+  && hasPreparedAoueAnimation.value
+));
+
+function analyzeAoueVector(vector = []) {
+  const hitIndices = [];
+  vector.forEach((bit, index) => {
+    if (bit === 1) {
+      hitIndices.push(index);
+    }
+  });
+
+  const hitItems = hitIndices.map(index => ({
+    index,
+    bucketIndex: index + 1,
+    bucketLabel: STEP_BUCKET_ORDER[index] || `第 ${index + 1} 桶`,
+    display: STEP_BUCKET_ORDER[index]
+      ? `第 ${index + 1} 桶（${STEP_BUCKET_ORDER[index]}）`
+      : `第 ${index + 1} 桶`
+  }));
+
+  if (!hitItems.length) {
+    return {
+      resultType: 'none',
+      resultTypeLabel: '无命中',
+      resultDescription: '无命中（AOUE 合法输出）',
+      hitItems
+    };
+  }
+
+  if (hitItems.length === 1) {
+    return {
+      resultType: 'single',
+      resultTypeLabel: '单命中',
+      resultDescription: `命中 ${hitItems[0].display}`,
+      hitItems
+    };
+  }
+
+  return {
+    resultType: 'multi',
+    resultTypeLabel: '多重命中',
+    resultDescription: `多重命中：${hitItems.map(item => item.display).join('、')}`,
+    hitItems
+  };
+}
+
+function formatAoueVectorDisplay(vector = [], pendingSymbol = '?') {
+  if (!Array.isArray(vector) || !vector.length) {
+    return '--';
+  }
+
+  return `[${vector.map(bit => (bit == null ? pendingSymbol : bit)).join(', ')}]`;
+}
+
+const aoueResolvedResultVector = computed(() => {
+  if (!aoueAnimationReady.value) {
+    return [];
+  }
+
+  if (aoueAnimationStage.value === 'done') {
+    return [...aoueAnimatedResultVector.value];
+  }
+
+  return aoueAnimatedResultVector.value.map(bit => (bit == null ? null : bit));
+});
+
+const aoueMetaCards = computed(() => [
+  { label: '任务 ID', value: currentTaskDetail.value?.taskId || '--' },
+  { label: '协议', value: currentTaskDetail.value?.protocol || '--' },
+  { label: 'ε', value: String(displayEpsilon.value ?? '--') },
+  { label: '原始步数', value: String(aoueSimulationResult.value?.rawSteps ?? dynamicForm.dailySteps ?? '--') },
+  { label: '当前分桶', value: aoueSimulationResult.value?.rawLabel ?? derivedStepsBucket.value ?? '--' },
+  { label: '原始编码值', value: String(aoueSimulationResult.value?.rawValue ?? derivedStepsBucketCode.value ?? '--') },
+  { label: 'p', value: aoueParametersReady.value ? aoueConfigParams.value.p.toFixed(4) : '--' },
+  { label: 'q', value: aoueParametersReady.value ? aoueConfigParams.value.q.toFixed(4) : '--' }
+]);
+
+const aouePlayModeText = computed(() => {
+  const labelMap = {
+    idle: '未选择播放模式',
+    auto: aoueAnimationPaused.value ? '自动播放已暂停' : '自动播放',
+    manual: '手动模式'
+  };
+  return labelMap[aouePlayMode.value] || '未选择播放模式';
+});
+
+const aoueAnimationStatusText = computed(() => {
+  const labelMap = {
+    idle: '未开始',
+    bucketing: '原始值与分桶',
+    encoding: 'one-hot 编码',
+    perturbing: '逐位扰动中',
+    done: '生成上报向量'
+  };
+  return labelMap[aoueAnimationStage.value] || '未开始';
+});
+
+const aoueFinalResultAnalysis = computed(() => analyzeAoueVector(aoueSimulationResult.value?.reportValue || []));
+
+const aoueDisplayOriginalVector = computed(() => {
+  if (!aoueAnimationReady.value) {
+    return [];
+  }
+
+  if (aoueAnimationStage.value === 'encoding') {
+    return [...aoueEncodingVector.value];
+  }
+
+  if (['perturbing', 'done'].includes(aoueAnimationStage.value)) {
+    return [...aoueOriginalVector.value];
+  }
+
+  return new Array(aoueOriginalVector.value.length).fill(null);
+});
+
+const aoueOverviewVectorText = computed(() => {
+  if (!aoueAnimationReady.value) {
+    return '--';
+  }
+
+  if (aoueAnimationStage.value === 'done' && aoueSimulationResult.value) {
+    return aoueSimulationResult.value.reportValueDisplay;
+  }
+
+  if (!['perturbing', 'done'].includes(aoueAnimationStage.value)) {
+    return '待生成';
+  }
+
+  return formatAoueVectorDisplay(aoueResolvedResultVector.value, '?');
+});
+
+const aoueOverviewTypeText = computed(() => {
+  if (!aoueAnimationReady.value) {
+    return '等待生成样例';
+  }
+
+  if (aoueAnimationStage.value === 'idle') {
+    return '等待选择播放模式';
+  }
+
+  if (aoueAnimationStage.value === 'bucketing') {
+    return '阶段 1 / 4：原始值与分桶';
+  }
+
+  if (aoueAnimationStage.value === 'encoding') {
+    if (aoueEncodingStepIndex.value === 0) {
+      return '阶段 2 / 4：生成全 0 向量';
+    }
+    if (aoueEncodingStepIndex.value === 1) {
+      return `阶段 2 / 4：高亮第 ${aoueTargetBitIndex.value + 1} 位`;
+    }
+    return `阶段 2 / 4：将第 ${aoueTargetBitIndex.value + 1} 位置为 1`;
+  }
+
+  if (aoueAnimationStage.value === 'perturbing') {
+    const currentStep = Math.min(aoueCompletedBitsCount.value + 1, aoueBitSteps.value.length || 0);
+    return currentStep > aoueBitSteps.value.length
+      ? '阶段 4 / 4：生成上报向量'
+      : `阶段 3 / 4：第 ${currentStep} / ${aoueBitSteps.value.length} 位`;
+  }
+
+  return aoueFinalResultAnalysis.value.resultTypeLabel;
+});
+
+const aoueOverviewHitText = computed(() => {
+  if (!aoueAnimationReady.value) {
+    return '先基于当前输入生成一组 AOUE 示例样本，再选择自动播放或手动模式。';
+  }
+
+  if (aoueAnimationStage.value === 'idle') {
+    return '当前演示保持静止，等待你选择“自动播放”或“手动模式”。';
+  }
+
+  if (aoueAnimationStage.value === 'bucketing') {
+    return `先根据原始步数 ${aoueSimulationResult.value?.rawSteps ?? '--'} 确定所在分桶 ${aoueSimulationResult.value?.rawLabel ?? '--'}。`;
+  }
+
+  if (aoueAnimationStage.value === 'encoding') {
+    return `根据当前分桶位置，将长度为 d 的全 0 向量中第 ${aoueTargetBitIndex.value + 1} 位设为 1，得到 one-hot 编码。`;
+  }
+
+  if (aoueAnimationStage.value === 'perturbing') {
+    return 'AOUE 会对 one-hot 向量的每一位独立采样，结果可以是全 0、单个 1 或多个 1。';
+  }
+
+  return aoueFinalResultAnalysis.value.resultDescription;
+});
+
+const aoueStepperItems = computed(() => {
+  const stepStates = ['pending', 'pending', 'pending', 'pending'];
+
+  if (!aoueAnimationReady.value) {
+    return [
+      { label: '原始值与分桶', state: stepStates[0] },
+      { label: 'one-hot 编码', state: stepStates[1] },
+      { label: '逐位扰动', state: stepStates[2] },
+      { label: '生成上报向量', state: stepStates[3] }
+    ];
+  }
+
+  if (aoueAnimationStage.value === 'bucketing') {
+    stepStates[0] = 'active';
+  } else if (aoueAnimationStage.value === 'encoding') {
+    stepStates[0] = 'done';
+    stepStates[1] = 'active';
+  } else if (aoueAnimationStage.value === 'perturbing') {
+    stepStates[0] = 'done';
+    stepStates[1] = 'done';
+    stepStates[2] = aoueHasCompletedPerturbation.value ? 'done' : 'active';
+    stepStates[3] = aoueHasCompletedPerturbation.value ? 'active' : 'pending';
+  } else if (aoueAnimationStage.value === 'done') {
+    stepStates[0] = 'done';
+    stepStates[1] = 'done';
+    stepStates[2] = 'done';
+    stepStates[3] = 'active';
+  }
+
+  return [
+    { label: '原始值与分桶', state: stepStates[0] },
+    { label: 'one-hot 编码', state: stepStates[1] },
+    { label: '逐位扰动', state: stepStates[2] },
+    { label: '生成上报向量', state: stepStates[3] }
+  ];
+});
+
+const aoueCurrentDisplayStep = computed(() => {
+  if (aoueAnimationStage.value !== 'perturbing') {
+    return null;
+  }
+
+  if (aoueCurrentBitStep.value) {
+    return aoueCurrentBitStep.value;
+  }
+
+  if (aoueCompletedBitsCount.value > 0) {
+    return aoueBitSteps.value[aoueCompletedBitsCount.value - 1] || null;
+  }
+
+  return null;
+});
+
+const aoueCurrentDetailTitle = computed(() => {
+  if (!aoueAnimationReady.value) {
+    return '等待生成样例';
+  }
+
+  if (aoueAnimationStage.value === 'bucketing') {
+    return '原始值与分桶';
+  }
+
+  if (aoueAnimationStage.value === 'encoding') {
+    if (aoueEncodingStepIndex.value === 0) {
+      return 'one-hot 编码：初始化';
+    }
+    if (aoueEncodingStepIndex.value === 1) {
+      return 'one-hot 编码：定位目标位';
+    }
+    return 'one-hot 编码：置位完成';
+  }
+
+  if (aoueAnimationStage.value === 'perturbing' && aoueCurrentDisplayStep.value) {
+    return `第 ${aoueCurrentDisplayStep.value.index} 位扰动`;
+  }
+
+  if (aoueAnimationStage.value === 'done') {
+    return '最终上报结果';
+  }
+
+  return '等待开始';
+});
+
+const aoueVectorDetailText = computed(() => {
+  if (!aoueAnimationReady.value) {
+    return '点击左侧“执行单次扰动演示”或“生成示例输入”后，会先准备当前样例，但不会自动播放。';
+  }
+
+  if (aoueAnimationStage.value === 'idle') {
+    return '当前样例已准备完成。请选择“自动播放”完整演示，或进入“手动模式”逐步推进。';
+  }
+
+  if (aoueAnimationStage.value === 'bucketing') {
+    return `原始步数 = ${aoueSimulationResult.value?.rawSteps ?? '--'}，所属分桶 = ${aoueSimulationResult.value?.rawLabel ?? '--'}，原始编码值 = ${aoueSimulationResult.value?.rawValue ?? '--'}。`;
+  }
+
+  if (aoueAnimationStage.value === 'encoding') {
+    if (aoueEncodingStepIndex.value === 0) {
+      return `先创建一个长度为 d = ${aoueOriginalVector.value.length} 的全 0 向量，准备生成当前样本的 one-hot 编码。`;
+    }
+
+    if (aoueEncodingStepIndex.value === 1) {
+      return `当前样本属于第 ${aoueTargetBitIndex.value + 1} 桶，正在高亮目标位，下一步会把这一位从 0 置为 1。`;
+    }
+
+    return `已将第 ${aoueTargetBitIndex.value + 1} 位设为 1，得到 one-hot 编码 ${formatAoueVectorDisplay(aoueDisplayOriginalVector.value, '0')}。`;
+  }
+
+  if (aoueAnimationStage.value === 'done' && aoueSimulationResult.value) {
+    return `最终上报向量为 ${aoueSimulationResult.value.reportValueDisplay}，结果解释：${aoueSimulationResult.value.perturbedLabel}。`;
+  }
+
+  const step = aoueCurrentDisplayStep.value;
+  if (!step) {
+    return '下一步将继续执行 AOUE 的逐位扰动判断。';
+  }
+  return `第 ${step.index} 位：原始 bit = ${step.originalBit}，使用 ${step.originalBit === 1 ? 'p' : 'q'} = ${step.usedProbability.toFixed(4)}，随机数 = ${step.sampledRandom.toFixed(4)}，因此输出 ${step.resultBit}`;
+});
+
+const aoueVectorColumns = computed(() => (
+  aoueOriginalVector.value.map((originalBit, index) => {
+    const displayedOriginalBit = aoueDisplayOriginalVector.value[index] ?? null;
+    const resultBit = aoueResolvedResultVector.value[index] ?? null;
+    const isEncodingTarget = aoueAnimationStage.value === 'encoding'
+      && aoueTargetBitIndex.value === index
+      && aoueEncodingStepIndex.value >= 1;
+    const isEncodingDone = aoueAnimationStage.value === 'encoding'
+      && aoueTargetBitIndex.value === index
+      && aoueEncodingStepIndex.value === 2;
+    const isProcessing = aoueAnimationStage.value === 'perturbing' && aoueCurrentBitIndex.value === index;
+    const isCompleted = resultBit != null;
+    const state = isProcessing
+      ? 'active'
+      : isCompleted || isEncodingDone
+        ? 'done'
+        : isEncodingTarget
+          ? 'encoding'
+          : 'pending';
+    const transitionKey = resultBit == null ? 'pending' : `${originalBit}${resultBit}`;
+
+    return {
+      index,
+      bucketLabel: STEP_BUCKET_ORDER[index] || `第 ${index + 1} 桶`,
+      originalBit,
+      displayedOriginalBit,
+      resultBit,
+      state,
+      isEncodingTarget,
+      isEncodingDone,
+      isProcessing,
+      transitionKey,
+      transitionLabel: resultBit == null ? '待处理' : `${originalBit}→${resultBit}`,
+      transitionHint: resultBit == null
+        ? '等待随机采样'
+        : (
+          transitionKey === '10' ? '真实位被翻转为 0'
+            : transitionKey === '01' ? '非真实位被翻转为 1'
+              : transitionKey === '11' ? '真实位保留为 1'
+                : '非真实位保持为 0'
+        ),
+      hasChanged: resultBit != null && originalBit !== resultBit
+    };
+  })
+));
+
+const aoueStepLogRows = computed(() => (
+  aoueBitSteps.value.map((step, index) => ({
+    ...step,
+    stageState: aoueAnimatedResultVector.value[index] == null
+      ? (aoueCurrentBitIndex.value === index ? 'active' : 'pending')
+      : (aoueCurrentBitIndex.value === index && aoueAnimationStage.value !== 'done' ? 'active' : 'done')
+  }))
+));
+
+const aoueVisibleLogRows = computed(() => (
+  aoueLogExpanded.value ? aoueStepLogRows.value : aoueStepLogRows.value.slice(-4)
+));
+
+const aoueLogToggleText = computed(() => (
+  aoueLogExpanded.value ? '收起 bit 日志' : '查看全部 bit 日志'
+));
+
+const aoueAutoButtonText = computed(() => {
+  return aoueAnimationPaused.value ? '继续自动播放' : '暂停自动播放';
+});
+
+const aoueCanStartAuto = computed(() => (
+  aoueAnimationReady.value && aouePlayMode.value === 'idle'
+));
+
+const aoueCanStartManual = computed(() => (
+  aoueAnimationReady.value && aouePlayMode.value === 'idle'
+));
+
+const aoueCanPauseAuto = computed(() => (
+  aoueAnimationReady.value
+  && aouePlayMode.value === 'auto'
+  && !aoueAnimationPaused.value
+  && !['idle', 'done'].includes(aoueAnimationStage.value)
+));
+
+const aoueCanResumeAuto = computed(() => (
+  aoueAnimationReady.value
+  && (
+    (aouePlayMode.value === 'auto' && aoueAnimationPaused.value && aoueAnimationStage.value !== 'done')
+    || (aouePlayMode.value === 'manual' && aoueAnimationStage.value !== 'done')
+  )
+));
+
+const aoueCanStepManually = computed(() => (
+  aoueAnimationReady.value
+  && aouePlayMode.value === 'manual'
+  && aoueAnimationStage.value !== 'done'
+));
+
+const aoueCanResetDemo = computed(() => aoueAnimationReady.value);
+
+function openAoueExpandedDialog() {
+  aoueExpandedVisible.value = true;
+}
+
+function openAoueBatchExpandedDialog() {
+  aoueBatchExpandedVisible.value = true;
+}
+
+const aoueDemoViewModel = computed(() => ({
+  metaCards: aoueMetaCards.value,
+  currentPerturbationStatus: currentPerturbationStatus.value,
+  parametersReady: aoueParametersReady.value,
+  finalResultAnalysis: aoueFinalResultAnalysis.value,
+  playMode: aouePlayMode.value,
+  playModeText: aouePlayModeText.value,
+  animationStatus: aoueAnimationStage.value,
+  overviewTypeText: aoueOverviewTypeText.value,
+  overviewVectorText: aoueOverviewVectorText.value,
+  overviewHitText: aoueOverviewHitText.value,
+  stepperItems: aoueStepperItems.value,
+  animationReady: aoueAnimationReady.value,
+  vectorColumns: aoueVectorColumns.value,
+  animationStatusText: aoueAnimationStatusText.value,
+  completedBitsCount: aoueCompletedBitsCount.value,
+  bitStepsLength: aoueBitSteps.value.length,
+  stepDelayMs: aoueStepDelayMs.value,
+  currentDisplayStep: aoueCurrentDisplayStep.value,
+  currentDetailTitle: aoueCurrentDetailTitle.value,
+  vectorDetailText: aoueVectorDetailText.value,
+  canGenerateSample: canRunSingleSimulation.value,
+  canRunSingleSimulation: canRunSingleSimulation.value,
+  canStartAuto: aoueCanStartAuto.value,
+  canStartManual: aoueCanStartManual.value,
+  canPauseAuto: aoueCanPauseAuto.value,
+  canResumeAuto: aoueCanResumeAuto.value,
+  autoButtonText: aoueAutoButtonText.value,
+  canStepManually: aoueCanStepManually.value,
+  canResetDemo: aoueCanResetDemo.value,
+  canSubmitCurrentTask: canSubmitCurrentTask.value,
+  submitting: submitting.value,
+  logToggleText: aoueLogToggleText.value,
+  visibleLogRows: aoueVisibleLogRows.value,
+  onGenerate: replayAoueAnimation,
+  onStartAuto: startAoueAutoMode,
+  onStartManual: startAoueManualMode,
+  onPause: pauseAoueAutoPlayback,
+  onResumeAuto: resumeAoueAutoMode,
+  onNext: handleAoueNextBit,
+  onReset: resetPreparedAoueDemo,
+  onSubmit: submitData,
+  onToggleLog: toggleAoueLogPanel,
+  onExpand: openAoueExpandedDialog
+}));
+
 const currentSimulationResult = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrSimulationResult.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspSimulationResult.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueSimulationResult.value;
   }
   return arrSimulationResult.value;
 });
@@ -799,12 +1549,31 @@ const singleRawCards = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrRawCards.value;
   }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspRawCards.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueRawCards.value;
+  }
   return arrRawCards.value;
 });
 
 const parameterCards = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrParameterCards.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return [
+      { label: 'TSP 版本', value: tspVersionMeta.value?.label || '--' },
+      { label: '总隐私预算 ε', value: tspParametersReady.value ? String(tspConfigParams.value.epsilon) : '--' },
+      { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
+      { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' },
+      { label: '参数 p2', value: tspParametersReady.value ? tspConfigParams.value.p2.toFixed(4) : '--' },
+      { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' }
+    ];
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueParameterCards.value;
   }
   return arrParameterCards.value;
 });
@@ -813,12 +1582,24 @@ const resultCards = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrResultCards.value;
   }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspFinalReportCards.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueResultCards.value;
+  }
   return arrResultCards.value;
 });
 
 const currentBatchResult = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrBatchResult.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspBatchResult.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueBatchResult.value;
   }
   return arrBatchResult.value;
 });
@@ -845,9 +1626,36 @@ const agrrBatchSummaryCards = computed(() => {
   ];
 });
 
+const aoueBatchSummaryCards = computed(() => {
+  if (!aoueBatchResult.value) return [];
+  return [
+    { label: '样本总数', value: String(aoueBatchResult.value.totalRuns) },
+    { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
+    { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' }
+  ];
+});
+
+const tspBatchSummaryCards = computed(() => {
+  if (!tspBatchResult.value) return [];
+  return [
+    { label: '本次连续采集次数', value: String(tspBatchResult.value.totalRuns) },
+    { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
+    { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' },
+    { label: '隐私预算 ε', value: tspConfigParams.value ? String(tspConfigParams.value.epsilon) : '--' },
+    { label: 'TSP 版本', value: tspConfigParams.value ? tspVersionMeta.value?.label || '--' : '--' },
+    { label: 'α / β', value: tspConfigParams.value ? `${tspConfigParams.value.alpha.toFixed(4)} / ${tspConfigParams.value.beta.toFixed(4)}` : '--' }
+  ];
+});
+
 const currentBatchSummaryCards = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrBatchSummaryCards.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspBatchSummaryCards.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueBatchSummaryCards.value;
   }
   return arrBatchSummaryCards.value;
 });
@@ -901,30 +1709,244 @@ const agrrDistributionComparisonRows = computed(() => {
   });
 });
 
+const aoueDistributionComparisonRows = computed(() => {
+  if (!aoueBatchResult.value) return [];
+
+  const total = aoueBatchResult.value.totalRuns || 1;
+  return STEP_BUCKET_ORDER.map(bucket => {
+    const rawCount = Number(aoueBatchResult.value.rawBucketCounts?.[bucket] ?? 0);
+    const reportCount = Number(aoueBatchResult.value.reportBucketCounts?.[bucket] ?? 0);
+    const delta = reportCount - rawCount;
+
+    return {
+      status: bucket,
+      rawCount,
+      reportCount,
+      delta,
+      deltaDisplay: delta > 0 ? `+${delta}` : `${delta}`,
+      rawPercent: Number(((rawCount / total) * 100).toFixed(1)),
+      reportPercent: Number(((reportCount / total) * 100).toFixed(1))
+    };
+  });
+});
+
 const currentDistributionComparisonRows = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrDistributionComparisonRows.value;
   }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueDistributionComparisonRows.value;
+  }
   return arrDistributionComparisonRows.value;
+});
+
+const tspDistributionGroups = computed(() => {
+  if (!tspBatchResult.value) return [];
+
+  const total = tspBatchResult.value.totalRuns || 1;
+  const buildRows = (items, rawSource, reportSource) => items.map(item => {
+    const rawCount = Number(rawSource[item.key] ?? 0);
+    const reportCount = Number(reportSource[item.key] ?? 0);
+    const delta = reportCount - rawCount;
+
+    return {
+      status: item.label,
+      rawCount,
+      reportCount,
+      delta,
+      deltaDisplay: delta > 0 ? `+${delta}` : `${delta}`,
+      rawPercent: Number(((rawCount / total) * 100).toFixed(1)),
+      reportPercent: Number(((reportCount / total) * 100).toFixed(1))
+    };
+  });
+
+  return [
+    {
+      title: '缺失状态分布对比',
+      rows: buildRows(
+        [
+          { key: 'missing', label: '缺失' },
+          { key: 'nonMissing', label: '非缺失' }
+        ],
+        tspBatchResult.value.rawMissingCounts,
+        tspBatchResult.value.reportMissingCounts
+      )
+    },
+    {
+      title: '评分分布对比（1~5）',
+      rows: buildRows(
+        [1, 2, 3, 4, 5].map(value => ({ key: String(value), label: `${value} 分` })),
+        tspBatchResult.value.rawScoreCounts,
+        tspBatchResult.value.reportScoreCounts
+      )
+    }
+  ];
+});
+
+const currentDistributionGroups = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspDistributionGroups.value;
+  }
+
+  return [
+    {
+      title: '扰动前后分布对比',
+      rows: currentDistributionComparisonRows.value
+    }
+  ];
 });
 
 const arrBatchPreviewRows = computed(() => arrBatchResult.value?.samples?.slice(0, 10) || []);
 const agrrBatchPreviewRows = computed(() => agrrBatchResult.value?.samples?.slice(0, 10) || []);
+const tspBatchPreviewRows = computed(() => tspBatchResult.value?.samples?.slice(0, 10) || []);
+const aoueBatchPreviewRows = computed(() => aoueBatchResult.value?.samples?.slice(0, 10) || []);
 const currentBatchPreviewRows = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrBatchPreviewRows.value;
   }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspBatchPreviewRows.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return aoueBatchPreviewRows.value;
+  }
   return arrBatchPreviewRows.value;
 });
 
+const aoueBatchOriginalBitSums = computed(() => cloneBitArray(aoueBatchResult.value?.originalBitSums));
+const aoueBatchPerturbedBitSums = computed(() => cloneBitArray(aoueBatchResult.value?.perturbedBitSums));
+
+const aoueBatchEstimatedCounts = computed(() => {
+  if (!aoueBatchResult.value?.samples?.length || !aoueParametersReady.value) {
+    return [];
+  }
+
+  return aggregateAOUE(
+    aoueBatchResult.value.samples.map(sample => sample.reportValue),
+    aoueConfigParams.value.epsilon,
+    STEP_BUCKET_ORDER.length,
+    aoueConfigParams.value.p,
+    aoueConfigParams.value.q
+  ).map(value => Number(value));
+});
+
+const aoueBatchBitCompareItems = computed(() => {
+  if (!aoueBatchOriginalBitSums.value.length || !aoueBatchPerturbedBitSums.value.length) {
+    return [];
+  }
+
+  const maxOriginal = Math.max(...aoueBatchOriginalBitSums.value, 1);
+  const maxPerturbed = Math.max(...aoueBatchPerturbedBitSums.value, 1);
+  const rawPeak = Math.max(...aoueBatchOriginalBitSums.value);
+  const reportPeak = Math.max(...aoueBatchPerturbedBitSums.value);
+
+  return STEP_BUCKET_ORDER.map((bucketLabel, index) => {
+    const originalCount = Number(aoueBatchOriginalBitSums.value[index] ?? 0);
+    const perturbedCount = Number(aoueBatchPerturbedBitSums.value[index] ?? 0);
+    const estimatedCount = Number(aoueBatchEstimatedCounts.value[index] ?? 0);
+
+    return {
+      index,
+      bucketLabel,
+      originalCount,
+      perturbedCount,
+      estimatedCount: estimatedCount.toFixed(2),
+      originalPercent: Number(((originalCount / maxOriginal) * 100).toFixed(1)),
+      perturbedPercent: Number(((perturbedCount / maxPerturbed) * 100).toFixed(1)),
+      isRawPeak: rawPeak > 0 && originalCount === rawPeak,
+      isReportedPeak: reportPeak > 0 && perturbedCount === reportPeak
+    };
+  });
+});
+
+const aoueBatchTopEstimatedBucket = computed(() => {
+  if (!aoueBatchEstimatedCounts.value.length) {
+    return null;
+  }
+
+  let maxIndex = 0;
+  let maxValue = Number.NEGATIVE_INFINITY;
+  aoueBatchEstimatedCounts.value.forEach((value, index) => {
+    if (value > maxValue) {
+      maxValue = value;
+      maxIndex = index;
+    }
+  });
+
+  return {
+    index: maxIndex,
+    label: STEP_BUCKET_ORDER[maxIndex] || `第 ${maxIndex + 1} 桶`,
+    value: maxValue
+  };
+});
+
+const aoueBatchEstimatedDistributionItems = computed(() => (
+  STEP_BUCKET_ORDER.map((bucketLabel, index) => ({
+    index,
+    bucketLabel,
+    estimatedCount: Number(aoueBatchEstimatedCounts.value[index] ?? 0).toFixed(2)
+  }))
+));
+
+const aoueBatchVisiblePreviewRows = computed(() => {
+  const rows = aoueBatchResult.value?.samples || [];
+  const visibleCount = aoueBatchLogExpanded.value ? 10 : 4;
+  return rows.slice(-visibleCount).reverse();
+});
+
+const aoueBatchLogToggleText = computed(() => (
+  aoueBatchLogExpanded.value ? '收起最近样本明细' : '查看更多最近样本'
+));
+
+const aoueBatchViewModel = computed(() => ({
+  progressText: aoueBatchResult.value
+    ? `已完成 ${aoueBatchResult.value.completedRuns ?? aoueBatchResult.value.totalRuns} / ${aoueBatchResult.value.totalRuns} 轮`
+    : '等待连续采集',
+  completedRuns: Number(aoueBatchResult.value?.completedRuns ?? 0),
+  totalRuns: Number(aoueBatchResult.value?.totalRuns ?? 0),
+  domainSize: STEP_BUCKET_ORDER.length,
+  latestRawLabel: aoueBatchResult.value?.latestRawLabel || '--',
+  topEstimatedBucketText: aoueBatchTopEstimatedBucket.value
+    ? `第 ${aoueBatchTopEstimatedBucket.value.index + 1} 桶`
+    : '--',
+  topEstimatedBucketDescription: aoueBatchTopEstimatedBucket.value
+    ? `当前估计最高的桶为第 ${aoueBatchTopEstimatedBucket.value.index + 1} 桶（${aoueBatchTopEstimatedBucket.value.label}），估计值约为 ${aoueBatchTopEstimatedBucket.value.value.toFixed(2)}。`
+    : '等待累计足够多的扰动样本后，再观察按位聚合得到的估计结果。',
+  originalBitSumsDisplay: formatAoueVectorDisplay(aoueBatchOriginalBitSums.value, '0'),
+  perturbedBitSumsDisplay: formatAoueVectorDisplay(aoueBatchPerturbedBitSums.value, '0'),
+  bitCompareItems: aoueBatchBitCompareItems.value,
+  latestOriginalVectorDisplay: formatAoueVectorDisplay(aoueBatchResult.value?.latestOriginalVector || [], '0'),
+  latestReportedVectorDisplay: formatAoueVectorDisplay(aoueBatchResult.value?.latestReportedVector || [], '0'),
+  estimatedDistributionItems: aoueBatchEstimatedDistributionItems.value,
+  logToggleText: aoueBatchLogToggleText.value,
+  visiblePreviewRows: aoueBatchVisiblePreviewRows.value,
+  onToggleLog: toggleAoueBatchLogPanel
+}));
+
 const currentBatchResultTip = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return '当前结果为手环端连续生成缺失/非缺失样本；非缺失样本先执行第一阶段评分扰动，随后所有样本统一进入 {0,1,2,3,4,5} 的第二阶段扰动并生成最终上报值。';
+  }
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始分钟数样本、映射到 4 档后，再执行 AGRR 本地扰动得到的统计结果。'} 原始分钟数仅用于映射分档，真正执行扰动与上报的是分档后的档位编码。`;
+  }
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始步数样本并执行 AOUE 本地扰动。'} 原始步数映射为分桶向量上报，下表展示了原始分布与扰动后上报分布的对比。`;
   }
   return currentPerturbationStatus.value?.description || '当前结果为手环端连续执行本地扰动后的统计结果，用于演示设备持续采集并立即本地上报的过程。';
 });
 
 const batchPreviewColumns = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return [
+      { key: 'index', label: '#' },
+      { key: 'rawMissingLabel', label: '原始缺失状态' },
+      { key: 'rawScoreDisplay', label: '原始评分' },
+      { key: 'stageOneLabel', label: '第一阶段结果' },
+      { key: 'stageTwoInputDisplay', label: '第二阶段输入' },
+      { key: 'reportValueDisplay', label: '最终上报值' }
+    ];
+  }
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return [
       { key: 'index', label: '#' },
@@ -932,6 +1954,16 @@ const batchPreviewColumns = computed(() => {
       { key: 'rawLabel', label: '原始档位' },
       { key: 'perturbedLabel', label: '扰动后档位' },
       { key: 'reportValue', label: '上报值' }
+    ];
+  }
+
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    return [
+      { key: 'index', label: '#' },
+      { key: 'rawSteps', label: '原始步数' },
+      { key: 'rawLabel', label: '原始分桶' },
+      { key: 'perturbedLabel', label: '扰动后向量解释' },
+      { key: 'reportValueDisplay', label: '上报向量' }
     ];
   }
 
@@ -960,7 +1992,7 @@ const processPreviewCards = computed(() => {
       ];
     case 'aoue':
       return [
-        { label: '处理链路', value: '原始步数 -> 分桶 -> one-hot 编码 -> 扰动上报（下一步接入）' },
+        { label: '处理链路', value: '原始步数 -> 分桶 -> one-hot 编码 -> AOUE 逐位扰动 -> 上报向量' },
         { label: '当前分桶', value: derivedStepsBucket.value || '--' }
       ];
     case 'tsp':
@@ -979,6 +2011,10 @@ const processPreviewTip = computed(() => {
     return '当前 AGRR 已接入单次扰动、连续采集和上报链路，扰动对象为分档后的档位，而不是原始分钟数。';
   }
 
+  if (currentTaskDetail.value.scenario === 'aoue') {
+    return '当前 AOUE 已按 one-hot 向量逐位独立扰动接入单次演示、连续采集与上报链路，展示结果与最终上报向量保持一致。';
+  }
+
   return '当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。';
 });
 
@@ -986,6 +2022,8 @@ watch(currentTaskDetail, detail => {
   resetDynamicForm();
   clearSimulationState();
   batchUploadState.value = null;
+  aoueExpandedVisible.value = false;
+  aoueBatchExpandedVisible.value = false;
   if (detail) {
     systemStatus.value = 0;
     formTouched.value = false;
@@ -1016,6 +2054,23 @@ watch(
       return;
     }
 
+    if (currentTaskDetail.value.scenario === 'aoue') {
+      aoueSimulationResult.value = null;
+      aoueBatchResult.value = null;
+      batchUploadState.value = null;
+      systemStatus.value = 0;
+      resetAoueAnimation();
+      return;
+    }
+
+    if (currentTaskDetail.value.scenario === 'tsp') {
+      tspSimulationResult.value = null;
+      tspBatchResult.value = null;
+      batchUploadState.value = null;
+      systemStatus.value = 0;
+      return;
+    }
+
     systemStatus.value = 0;
   },
   { deep: true }
@@ -1034,13 +2089,34 @@ function clearSimulationState() {
   arrBatchResult.value = null;
   agrrSimulationResult.value = null;
   agrrBatchResult.value = null;
+  tspSimulationResult.value = null;
+  tspBatchResult.value = null;
+  aoueSimulationResult.value = null;
+  aoueBatchResult.value = null;
+  aoueLogExpanded.value = false;
+  aoueBatchLogExpanded.value = false;
+  resetAoueAnimation();
 }
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateRandomExampleInput(scenario) {
+function createEmptyBitArray(length) {
+  return Array.from({ length }, () => 0);
+}
+
+function cloneBitArray(values = []) {
+  return Array.isArray(values) ? values.map(value => Number(value) || 0) : [];
+}
+
+function waitForUiFrame(ms = 12) {
+  return new Promise(resolve => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function generateRandomExampleInput(scenario) {
   switch (scenario) {
     case 'arr':
       return {
@@ -1055,10 +2131,10 @@ function generateRandomExampleInput(scenario) {
         dailySteps: randomInt(1000, 16000)
       };
     case 'tsp': {
-      const sleepMissing = Math.random() < 0.35 ? 1 : 0;
+      const sample = await sampleTspRawRecordByDistribution();
       return {
-        sleepMissing,
-        sleepScore: sleepMissing === 1 ? null : randomInt(1, 5)
+        sleepMissing: sample.rawMissing,
+        sleepScore: sample.rawScore
       };
     }
     default:
@@ -1066,10 +2142,18 @@ function generateRandomExampleInput(scenario) {
   }
 }
 
-function refreshData() {
+async function refreshData() {
   if (!currentTaskDetail.value) return;
 
-  const exampleInput = generateRandomExampleInput(currentTaskDetail.value.scenario);
+  let exampleInput = null;
+
+  try {
+    exampleInput = await generateRandomExampleInput(currentTaskDetail.value.scenario);
+  } catch (error) {
+    console.error('生成示例输入失败:', error);
+    ElMessage.error('生成示例输入失败，请检查 TSP 基础样本数据');
+    return;
+  }
 
   switch (currentTaskDetail.value.scenario) {
     case 'arr':
@@ -1099,6 +2183,9 @@ function refreshData() {
   if (currentTaskDetail.value.scenario === 'agrr' && agrrParametersReady.value) {
     simulateAgrrPerturbation(false);
   }
+  if (currentTaskDetail.value.scenario === 'aoue' && aoueParametersReady.value) {
+    simulateAouePerturbation(false);
+  }
   ElMessage.success('已生成当前任务的随机示例输入');
 }
 
@@ -1106,6 +2193,10 @@ function markFormTouched() {
   formTouched.value = true;
   if (currentTaskDetail.value?.scenario !== 'arr') {
     systemStatus.value = 0;
+  }
+
+  if (currentTaskDetail.value?.scenario === 'aoue') {
+    resetAoueAnimation();
   }
 }
 
@@ -1211,7 +2302,275 @@ function simulateAgrrPerturbation(showMessage = true) {
   }
 }
 
+function performAouePerturbation(rawSteps) {
+  if (!aoueParametersReady.value) {
+    return null;
+  }
+
+  const rawLabel = getStepsBucket(rawSteps);
+  const rawValue = getStepsBucketCode(rawLabel);
+  const domainSize = STEP_BUCKET_ORDER.length;
+  if (!rawLabel || !rawValue || rawValue < 1 || rawValue > domainSize) {
+    return null;
+  }
+
+  const { originalVector, reportValue, bitSteps } = perturbAOUEWithDetails(
+    rawValue,
+    domainSize,
+    aoueConfigParams.value.q,
+    aoueConfigParams.value.p
+  );
+  const perturbedLabel = explainPerturbedVector(reportValue, STEP_BUCKET_ORDER);
+
+  return {
+    rawSteps,
+    rawLabel,
+    rawValue,
+    encodedValue: originalVector,
+    encodedValueDisplay: `[${originalVector.join(', ')}]`,
+    reportValue,
+    reportValueDisplay: `[${reportValue.join(', ')}]`,
+    perturbedLabel,
+    perturbedValue: reportValue,
+    bitSteps
+  };
+}
+
+function prepareAoueDemo(showMessage = true) {
+  if (!canSimulateAoue.value) {
+    if (showMessage) {
+      ElMessage.warning('请先填写每日步数，并确保管理端已保存当前 AOUE 参数');
+    }
+    return null;
+  }
+
+  const result = performAouePerturbation(dynamicForm.dailySteps);
+  if (!result) {
+    if (showMessage) {
+      ElMessage.warning('当前步数无法映射到有效分桶，请先检查输入');
+    }
+    return null;
+  }
+
+  aoueSimulationResult.value = result;
+  prepareAoueAnimation(result);
+  systemStatus.value = 0;
+  return result;
+}
+
+async function startAoueAutoMode() {
+  if (!aoueAnimationReady.value) {
+    const prepared = prepareAoueDemo(true);
+    if (!prepared) {
+      return;
+    }
+  }
+
+  activeDemoTab.value = 'single';
+  const finished = await startAoueAutoPlayback();
+  if (finished) {
+    systemStatus.value = 1;
+  }
+}
+
+function startAoueManualMode() {
+  if (!aoueAnimationReady.value) {
+    const prepared = prepareAoueDemo(true);
+    if (!prepared) {
+      return;
+    }
+  }
+
+  activeDemoTab.value = 'single';
+  startAoueManualPlayback();
+}
+
+function resetPreparedAoueDemo(showMessage = false) {
+  if (!aoueAnimationReady.value) {
+    return;
+  }
+
+  resetAoueDemoProgress();
+  systemStatus.value = 0;
+  if (showMessage) {
+    ElMessage.info('已重置本次 AOUE 演示，可重新选择自动播放或手动模式');
+  }
+}
+
+async function resumeAoueAutoMode() {
+  if (!aoueAnimationReady.value || aoueAnimationStage.value === 'done') {
+    return;
+  }
+
+  const finished = await resumeAoueAutoPlayback();
+  if (finished) {
+    systemStatus.value = 1;
+  }
+}
+
+function pauseAoueAutoPlayback() {
+  if (pauseAouePlayback()) {
+    systemStatus.value = 0;
+  }
+}
+
+function simulateAouePerturbation(showMessage = true) {
+  const result = prepareAoueDemo(showMessage);
+  if (!result) {
+    return;
+  }
+
+  if (showMessage) {
+    ElMessage.success('已生成 AOUE 单次演示样例，请选择自动播放或手动模式开始');
+  }
+}
+
+function replayAoueAnimation() {
+  if (!canSimulateAoue.value) {
+    ElMessage.warning('请先填写每日步数，并确保管理端已保存当前 AOUE 参数');
+    return;
+  }
+
+  activeDemoTab.value = 'single';
+  simulateAouePerturbation(true);
+}
+
+function handleAoueNextBit() {
+  if (!aoueAnimationReady.value) {
+    return;
+  }
+
+  if (aouePlayMode.value !== 'manual') {
+    startAoueManualMode();
+  }
+
+  if (aoueAnimationStage.value === 'done') {
+    ElMessage.info('当前 AOUE 逐位扰动已经完成');
+    return;
+  }
+
+  const executed = advanceAoueDemo();
+  if (!executed) {
+    return;
+  }
+
+  if (aoueAnimationStage.value === 'done') {
+    systemStatus.value = 1;
+  }
+}
+
+function toggleAoueLogPanel() {
+  aoueLogExpanded.value = !aoueLogExpanded.value;
+}
+
+function toggleAoueBatchLogPanel() {
+  aoueBatchLogExpanded.value = !aoueBatchLogExpanded.value;
+}
+
+function buildTspReportParams() {
+  if (!tspConfigParams.value) {
+    return null;
+  }
+
+  return {
+    tspVersion: tspConfigParams.value.version,
+    epsilon: Number(tspConfigParams.value.epsilon).toFixed(4),
+    p1: tspConfigParams.value.p1.toFixed(4),
+    q1: tspConfigParams.value.q1.toFixed(4),
+    p2: tspConfigParams.value.p2.toFixed(4),
+    q2: tspConfigParams.value.q2.toFixed(4),
+    pStar: tspConfigParams.value.pStar != null ? tspConfigParams.value.pStar.toFixed(4) : null,
+    qStar: tspConfigParams.value.qStar != null ? tspConfigParams.value.qStar.toFixed(4) : null,
+    alpha: tspConfigParams.value.alpha.toFixed(4),
+    beta: tspConfigParams.value.beta.toFixed(4)
+  };
+}
+
+function performTspPerturbation(rawMissingInput, rawScoreInput) {
+  if (!tspParametersReady.value) {
+    return null;
+  }
+
+  const rawMissing = Number(rawMissingInput) === 1 ? 1 : 0;
+  const rawMissingLabel = rawMissing === 1 ? '缺失（M=1）' : '非缺失（M=0）';
+  const rawScore = rawMissing === 1 ? null : Number(rawScoreInput);
+  const rawValue = rawMissing === 1 ? 0 : rawScore;
+  const {
+    stageOneSkipped,
+    stageOneValue: tspStageOneValue,
+    stageTwoInput,
+    stageTwoValue
+  } = applyTSP(rawValue, tspConfigParams.value);
+
+  let stageOneValue = null;
+  let stageOneLabel = '已跳过';
+  let stageOneInputDisplay = '缺失样本不进入第一阶段';
+  if (!stageOneSkipped) {
+    stageOneValue = tspStageOneValue;
+    stageOneLabel = `${stageOneValue} 分`;
+    stageOneInputDisplay = `${rawScore} 分`;
+  }
+
+  const stageTwoLabel = stageTwoValue === 0 ? '缺失值 0' : `${stageTwoValue} 分`;
+  const reportMissingLabel = stageTwoValue === 0 ? '缺失（M=1）' : '非缺失（M=0）';
+  const reportScoreDisplay = stageTwoValue === 0 ? '--' : `${stageTwoValue} 分`;
+
+  return {
+    rawMissing,
+    rawMissingLabel,
+    rawScore,
+    rawScoreDisplay: rawMissing === 1 ? '--' : String(rawScore),
+    stageOneSkipped,
+    stageOneInputDisplay,
+    stageOneValue,
+    stageOneLabel,
+    stageOneSkipReason: stageOneSkipped ? '当前样本为缺失记录，第一阶段仅对非缺失样本执行，因此本阶段跳过。' : '',
+    stageTwoInput,
+    stageTwoInputDisplay: stageTwoInput === 0 ? '缺失值 0' : `${stageTwoInput} 分`,
+    stageTwoSkipped: false,
+    stageTwoValue,
+    stageTwoLabel,
+    stageTwoSkipReason: '',
+    reportValue: stageTwoValue,
+    reportValueDisplay: stageTwoValue === 0 ? '0（缺失值）' : `${stageTwoValue}（有效评分）`,
+    reportMissing: stageTwoValue === 0 ? 1 : 0,
+    reportMissingLabel,
+    reportScore: stageTwoValue === 0 ? null : stageTwoValue,
+    reportScoreDisplay
+  };
+}
+
+function simulateTspPerturbation(showMessage = true) {
+  if (!canSimulateTsp.value) {
+    if (showMessage) {
+      ElMessage.warning('请先完成 TSP 输入，并确保管理端已保存当前 TSP 参数');
+    }
+    return;
+  }
+
+  const result = performTspPerturbation(dynamicForm.sleepMissing, dynamicForm.sleepScore);
+  if (!result) {
+    if (showMessage) {
+      ElMessage.warning('当前 TSP 输入无效，请先检查缺失状态与评分');
+    }
+    return;
+  }
+
+  tspSimulationResult.value = result;
+  systemStatus.value = 1;
+
+  if (showMessage) {
+    ElMessage.success('已完成一次 TSP 两阶段扰动演示');
+  }
+}
+
 function simulateCurrentTaskOnce() {
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    activeDemoTab.value = 'single';
+    simulateTspPerturbation(true);
+    return;
+  }
+
   if (!currentTaskDetail.value) {
     ElMessage.warning('请先选择任务');
     return;
@@ -1226,6 +2585,12 @@ function simulateCurrentTaskOnce() {
   if (currentTaskDetail.value.scenario === 'agrr') {
     activeDemoTab.value = 'single';
     simulateAgrrPerturbation(true);
+    return;
+  }
+
+  if (currentTaskDetail.value.scenario === 'aoue') {
+    activeDemoTab.value = 'single';
+    simulateAouePerturbation(true);
     return;
   }
 
@@ -1253,7 +2618,48 @@ function generateAgrrRawSample() {
   return Math.floor(Math.random() * (selectedBucket.max - selectedBucket.min + 1)) + selectedBucket.min;
 }
 
-function runBatchSimulation() {
+function generateAoueRawSample() {
+  const bucketWeights = [
+    { label: '0-1999', weight: 0.1, min: 0, max: 1999 },
+    { label: '2000-3999', weight: 0.15, min: 2000, max: 3999 },
+    { label: '4000-5999', weight: 0.2, min: 4000, max: 5999 },
+    { label: '6000-7999', weight: 0.2, min: 6000, max: 7999 },
+    { label: '8000-9999', weight: 0.15, min: 8000, max: 9999 },
+    { label: '10000-11999', weight: 0.1, min: 10000, max: 11999 },
+    { label: '12000-13999', weight: 0.05, min: 12000, max: 13999 },
+    { label: '14000+', weight: 0.05, min: 14000, max: 20000 }
+  ];
+  const randomValue = Math.random();
+  let cumulative = 0;
+  const selectedBucket = bucketWeights.find(bucket => {
+    cumulative += bucket.weight;
+    return randomValue <= cumulative;
+  }) || bucketWeights[bucketWeights.length - 1];
+
+  return Math.floor(Math.random() * (selectedBucket.max - selectedBucket.min + 1)) + selectedBucket.min;
+}
+
+async function generateTspRawSample(distribution = null) {
+  if (distribution) {
+    return sampleTspRawRecordFromDistribution(distribution);
+  }
+
+  return sampleTspRawRecordByDistribution();
+}
+
+async function runBatchSimulation() {
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    let distribution = null;
+
+    try {
+      distribution = await getTspEmpiricalDistribution();
+    } catch (error) {
+      console.error('加载 TSP 基础分布失败:', error);
+      ElMessage.error('无法加载 TSP 基础样本分布，请检查基础数据文件');
+      return;
+    }
+  }
+
   if (!currentTaskDetail.value) {
     ElMessage.warning('请先选择任务');
     return;
@@ -1266,8 +2672,76 @@ function runBatchSimulation() {
 
   activeDemoTab.value = 'batch';
   batchUploadState.value = null;
+  batchSimulationRunning.value = true;
 
   const totalRuns = Number(batchSimulationCount.value);
+
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    let distribution = null;
+
+    try {
+      distribution = await getTspEmpiricalDistribution();
+    } catch (error) {
+      console.error('加载 TSP 基础分布失败:', error);
+      ElMessage.error('无法加载 TSP 基础样本分布，请检查基础数据文件');
+      batchSimulationRunning.value = false;
+      return;
+    }
+
+    const samples = [];
+    const rawMissingCounts = { missing: 0, nonMissing: 0 };
+    const reportMissingCounts = { missing: 0, nonMissing: 0 };
+    const rawScoreCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    const reportScoreCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+    for (let i = 0; i < totalRuns; i += 1) {
+      const sampleInput = await generateTspRawSample(distribution);
+      const sampleResult = performTspPerturbation(sampleInput.rawMissing, sampleInput.rawScore);
+      if (!sampleResult) {
+        continue;
+      }
+
+      if (sampleResult.rawMissing === 1) {
+        rawMissingCounts.missing += 1;
+      } else {
+        rawMissingCounts.nonMissing += 1;
+        rawScoreCounts[String(sampleResult.rawScore)] += 1;
+      }
+
+      if (sampleResult.reportValue === 0) {
+        reportMissingCounts.missing += 1;
+      } else {
+        reportMissingCounts.nonMissing += 1;
+        reportScoreCounts[String(sampleResult.reportValue)] += 1;
+      }
+
+      samples.push({
+        index: i + 1,
+        ...sampleResult
+      });
+    }
+
+    tspBatchResult.value = {
+      batchId: `${currentTaskDetail.value.taskId}-${Date.now()}`,
+      totalRuns,
+      rawMissingCounts,
+      reportMissingCounts,
+      rawScoreCounts,
+      reportScoreCounts,
+      samples
+    };
+
+    if (samples.length > 0) {
+      tspSimulationResult.value = {
+        ...samples[0]
+      };
+    }
+
+    systemStatus.value = 1;
+    batchSimulationRunning.value = false;
+    ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
+    return;
+  }
 
   if (currentTaskDetail.value.scenario === 'agrr') {
     const samples = [];
@@ -1306,6 +2780,102 @@ function runBatchSimulation() {
 
     batchUploadState.value = null;
     systemStatus.value = 1;
+    batchSimulationRunning.value = false;
+    ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
+    return;
+  }
+
+  if (currentTaskDetail.value.scenario === 'aoue') {
+    const samples = [];
+    const rawBucketCounts = createEmptyStepsBucketCounts();
+    const reportBucketCounts = createEmptyStepsBucketCounts();
+    const originalBitSums = createEmptyBitArray(STEP_BUCKET_ORDER.length);
+    const perturbedBitSums = createEmptyBitArray(STEP_BUCKET_ORDER.length);
+    const batchId = `${currentTaskDetail.value.taskId}-${Date.now()}`;
+
+    aoueBatchLogExpanded.value = false;
+    aoueBatchResult.value = {
+      batchId,
+      totalRuns,
+      completedRuns: 0,
+      rawBucketCounts: { ...rawBucketCounts },
+      reportBucketCounts: { ...reportBucketCounts },
+      originalBitSums: [...originalBitSums],
+      perturbedBitSums: [...perturbedBitSums],
+      latestOriginalVector: [],
+      latestReportedVector: [],
+      latestRawLabel: '',
+      samples: []
+    };
+
+    for (let i = 0; i < totalRuns; i += 1) {
+      const rawSteps = generateAoueRawSample();
+      const sampleResult = performAouePerturbation(rawSteps);
+      if (!sampleResult) {
+        continue;
+      }
+
+      rawBucketCounts[sampleResult.rawLabel] += 1;
+      sampleResult.encodedValue.forEach((bit, index) => {
+        originalBitSums[index] += Number(bit) || 0;
+      });
+      // 对于 AOUE，我们需要统计每个分桶被击中的次数（即 bit 为 1 的位）。
+      // 注意：AOUE 上报的是一个向量，统计时应该按位累加。
+      sampleResult.reportValue.forEach((bit, index) => {
+        perturbedBitSums[index] += Number(bit) || 0;
+        if (bit === 1) {
+          const label = getStepsBucketLabelByCode(index + 1);
+          reportBucketCounts[label] += 1;
+        }
+      });
+
+      samples.push({
+        index: i + 1,
+        ...sampleResult
+      });
+
+      aoueBatchResult.value = {
+        batchId,
+        totalRuns,
+        completedRuns: i + 1,
+        rawBucketCounts: { ...rawBucketCounts },
+        reportBucketCounts: { ...reportBucketCounts },
+        originalBitSums: [...originalBitSums],
+        perturbedBitSums: [...perturbedBitSums],
+        latestOriginalVector: [...sampleResult.encodedValue],
+        latestReportedVector: [...sampleResult.reportValue],
+        latestRawLabel: sampleResult.rawLabel,
+        samples: [...samples]
+      };
+
+      if ((i + 1) % 10 === 0 || i === totalRuns - 1) {
+        await waitForUiFrame(10);
+      }
+    }
+
+    aoueBatchResult.value = {
+      batchId,
+      totalRuns,
+      completedRuns: samples.length,
+      rawBucketCounts: { ...rawBucketCounts },
+      reportBucketCounts: { ...reportBucketCounts },
+      originalBitSums: [...originalBitSums],
+      perturbedBitSums: [...perturbedBitSums],
+      latestOriginalVector: samples.length ? [...samples[samples.length - 1].encodedValue] : [],
+      latestReportedVector: samples.length ? [...samples[samples.length - 1].reportValue] : [],
+      latestRawLabel: samples.length ? samples[samples.length - 1].rawLabel : '',
+      samples: [...samples]
+    };
+
+    if (samples.length > 0) {
+      aoueSimulationResult.value = {
+        ...samples[samples.length - 1]
+      };
+    }
+
+    batchUploadState.value = null;
+    systemStatus.value = 1;
+    batchSimulationRunning.value = false;
     ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
     return;
   }
@@ -1363,6 +2933,7 @@ function runBatchSimulation() {
   }
 
   systemStatus.value = 1;
+  batchSimulationRunning.value = false;
   ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
 }
 
@@ -1427,6 +2998,107 @@ function uploadCurrentBatchResult() {
             sampleCount: currentBatchResult.value.samples.length,
             rawBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.rawBucketCounts),
             reportBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.reportBucketCounts)
+          },
+          sampleMeta: {
+            source: 'continuous-collection',
+            batchId: currentBatchResult.value.batchId,
+            sampleIndex: sample.index
+          }
+        };
+      }
+
+      if (currentTaskDetail.value.scenario === 'aoue') {
+        return {
+          userId,
+          user_id: userId,
+          taskId: currentTaskDetail.value.taskId,
+          task_id: currentTaskDetail.value.taskId,
+          batch_id: currentBatchResult.value.batchId,
+          protocol: currentTaskDetail.value.protocol,
+          uploadTime,
+          upload_time: uploadTime,
+          report_value: sample.reportValue,
+          original_steps: sample.rawSteps,
+          original_bucket: sample.rawLabel,
+          original_bucket_code: sample.rawValue,
+          perturbed_bucket: sample.perturbedLabel,
+          perturbed_bucket_code: sample.reportValue,
+          rawData: {
+            scenario: 'aoue',
+            dailySteps: sample.rawSteps,
+            stepsBucket: sample.rawLabel,
+            stepsBucketCode: sample.rawValue
+          },
+          reportData: {
+            protocol: currentTaskDetail.value.protocol,
+            perturbedValue: sample.reportValue,
+            perturbedLabel: sample.perturbedLabel,
+            reportValue: sample.reportValue,
+            rawBucket: sample.rawLabel,
+            rawBucketCode: sample.rawValue,
+            perturbedBucket: sample.perturbedLabel,
+            perturbedBucketCode: sample.reportValue,
+            params: {
+              p: 0.5,
+              q: aoueConfigParams.value.q.toFixed(4)
+            }
+          },
+          batchSummary: {
+            sampleCount: currentBatchResult.value.samples.length,
+            rawBucketCounts: normalizeStepsBucketCounts(currentBatchResult.value.rawBucketCounts),
+            reportBucketCounts: normalizeStepsBucketCounts(currentBatchResult.value.reportBucketCounts)
+          },
+          sampleMeta: {
+            source: 'continuous-collection',
+            batchId: currentBatchResult.value.batchId,
+            sampleIndex: sample.index
+          }
+        };
+      }
+
+      if (currentTaskDetail.value.scenario === 'tsp') {
+        return {
+          userId,
+          user_id: userId,
+          taskId: currentTaskDetail.value.taskId,
+          task_id: currentTaskDetail.value.taskId,
+          batch_id: currentBatchResult.value.batchId,
+          protocol: currentTaskDetail.value.protocol,
+          uploadTime,
+          upload_time: uploadTime,
+          original_missing: sample.rawMissing,
+          original_score: sample.rawScore,
+          stage1_result: sample.stageOneSkipped ? 'skipped' : sample.stageOneValue,
+          stage2_input: sample.stageTwoInput,
+          report_value: sample.reportValue,
+          rawData: {
+            scenario: 'tsp',
+            sleepMissing: sample.rawMissing,
+            sleepScore: sample.rawScore
+          },
+          reportData: {
+            protocol: currentTaskDetail.value.protocol,
+            reportValue: sample.reportValue,
+            perturbedValue: sample.reportValue,
+            perturbedLabel: sample.reportValueDisplay,
+            stageOneResult: sample.stageOneValue,
+            stageOneLabel: sample.stageOneLabel,
+            stageOneSkipped: sample.stageOneSkipped,
+            stageTwoInput: sample.stageTwoInput,
+            stageTwoResult: sample.stageTwoValue,
+            stageTwoLabel: sample.stageTwoLabel,
+            reportMissing: sample.reportMissing,
+            reportMissingLabel: sample.reportMissingLabel,
+            reportScore: sample.reportScore,
+            reportScoreDisplay: sample.reportScoreDisplay,
+            params: buildTspReportParams()
+          },
+          batchSummary: {
+            sampleCount: currentBatchResult.value.samples.length,
+            rawMissingCounts: currentBatchResult.value.rawMissingCounts,
+            reportMissingCounts: currentBatchResult.value.reportMissingCounts,
+            rawScoreCounts: currentBatchResult.value.rawScoreCounts,
+            reportScoreCounts: currentBatchResult.value.reportScoreCounts
           },
           sampleMeta: {
             source: 'continuous-collection',
@@ -1502,6 +3174,16 @@ function submitData() {
     return;
   }
 
+  if (currentTaskDetail.value.scenario === 'aoue' && !aoueSimulationResult.value) {
+    ElMessage.warning('请先完成一次 AOUE 本地扰动');
+    return;
+  }
+
+  if (currentTaskDetail.value.scenario === 'tsp' && !tspSimulationResult.value) {
+    ElMessage.warning('请先完成一次 TSP 两阶段扰动演示');
+    return;
+  }
+
   submitting.value = true;
 
   setTimeout(() => {
@@ -1524,18 +3206,40 @@ function submitData() {
           ? arrSimulationResult.value?.reportValue ?? null
           : currentTaskDetail.value.scenario === 'agrr'
             ? agrrSimulationResult.value?.reportValue ?? null
-            : null,
+            : currentTaskDetail.value.scenario === 'aoue'
+              ? aoueSimulationResult.value?.reportValue ?? null
+              : currentTaskDetail.value.scenario === 'tsp'
+                ? tspSimulationResult.value?.reportValue ?? null
+              : null,
         original_minutes: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawMinutes ?? null : null,
-        original_bucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawLabel ?? null : null,
-        original_bucket_code: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawValue ?? null : null,
-        perturbed_bucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.perturbedLabel ?? null : null,
-        perturbed_bucket_code: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.reportValue ?? null : null,
+        original_steps: currentTaskDetail.value.scenario === 'aoue' ? aoueSimulationResult.value?.rawSteps ?? null : null,
+        original_bucket: currentTaskDetail.value.scenario === 'agrr'
+          ? agrrSimulationResult.value?.rawLabel ?? null
+          : currentTaskDetail.value.scenario === 'aoue'
+            ? aoueSimulationResult.value?.rawLabel ?? null
+            : null,
+        original_bucket_code: currentTaskDetail.value.scenario === 'agrr'
+          ? agrrSimulationResult.value?.rawValue ?? null
+          : currentTaskDetail.value.scenario === 'aoue'
+            ? aoueSimulationResult.value?.rawValue ?? null
+            : null,
+        perturbed_bucket: currentTaskDetail.value.scenario === 'agrr'
+          ? agrrSimulationResult.value?.perturbedLabel ?? null
+          : currentTaskDetail.value.scenario === 'aoue'
+            ? aoueSimulationResult.value?.perturbedLabel ?? null
+            : null,
+        perturbed_bucket_code: currentTaskDetail.value.scenario === 'agrr'
+          ? agrrSimulationResult.value?.reportValue ?? null
+          : currentTaskDetail.value.scenario === 'aoue'
+            ? aoueSimulationResult.value?.reportValue ?? null
+            : null,
         rawData: {
           scenario: currentTaskDetail.value.scenario,
           ...JSON.parse(JSON.stringify(dynamicForm)),
           standBucket: derivedStandBucket.value || null,
           standBucketCode: derivedStandBucketCode.value || null,
-          stepsBucket: derivedStepsBucket.value || null
+          stepsBucket: derivedStepsBucket.value || null,
+          stepsBucketCode: derivedStepsBucketCode.value || null
         },
         reportData: {
           protocol: currentTaskDetail.value.protocol,
@@ -1543,21 +3247,49 @@ function submitData() {
             ? arrSimulationResult.value?.reportValue ?? null
             : currentTaskDetail.value.scenario === 'agrr'
               ? agrrSimulationResult.value?.reportValue ?? null
-              : null,
+              : currentTaskDetail.value.scenario === 'aoue'
+                ? aoueSimulationResult.value?.reportValue ?? null
+                : currentTaskDetail.value.scenario === 'tsp'
+                  ? tspSimulationResult.value?.reportValue ?? null
+                : null,
           perturbedLabel: currentTaskDetail.value.scenario === 'arr'
             ? arrSimulationResult.value?.perturbedLabel ?? null
             : currentTaskDetail.value.scenario === 'agrr'
               ? agrrSimulationResult.value?.perturbedLabel ?? null
-              : null,
+              : currentTaskDetail.value.scenario === 'aoue'
+                ? aoueSimulationResult.value?.perturbedLabel ?? null
+                : currentTaskDetail.value.scenario === 'tsp'
+                  ? tspSimulationResult.value?.reportValueDisplay ?? null
+                : null,
           reportValue: currentTaskDetail.value.scenario === 'agrr'
             ? agrrSimulationResult.value?.reportValue ?? null
             : currentTaskDetail.value.scenario === 'arr'
               ? arrSimulationResult.value?.reportValue ?? null
+              : currentTaskDetail.value.scenario === 'aoue'
+                ? aoueSimulationResult.value?.reportValue ?? null
+                : currentTaskDetail.value.scenario === 'tsp'
+                  ? tspSimulationResult.value?.reportValue ?? null
+                : null,
+          rawBucket: currentTaskDetail.value.scenario === 'agrr'
+            ? agrrSimulationResult.value?.rawLabel ?? null
+            : currentTaskDetail.value.scenario === 'aoue'
+              ? aoueSimulationResult.value?.rawLabel ?? null
               : null,
-          rawBucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawLabel ?? null : null,
-          rawBucketCode: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawValue ?? null : null,
-          perturbedBucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.perturbedLabel ?? null : null,
-          perturbedBucketCode: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.reportValue ?? null : null,
+          rawBucketCode: currentTaskDetail.value.scenario === 'agrr'
+            ? agrrSimulationResult.value?.rawValue ?? null
+            : currentTaskDetail.value.scenario === 'aoue'
+              ? aoueSimulationResult.value?.rawValue ?? null
+              : null,
+          perturbedBucket: currentTaskDetail.value.scenario === 'agrr'
+            ? agrrSimulationResult.value?.perturbedLabel ?? null
+            : currentTaskDetail.value.scenario === 'aoue'
+              ? aoueSimulationResult.value?.perturbedLabel ?? null
+              : null,
+          perturbedBucketCode: currentTaskDetail.value.scenario === 'agrr'
+            ? agrrSimulationResult.value?.reportValue ?? null
+            : currentTaskDetail.value.scenario === 'aoue'
+              ? aoueSimulationResult.value?.reportValue ?? null
+              : null,
           params: currentTaskDetail.value.scenario === 'arr' && arrConfigParams.value
             ? {
                 p: arrConfigParams.value.p.toFixed(4),
@@ -1568,7 +3300,26 @@ function submitData() {
                   p: agrrConfigParams.value.p.toFixed(4),
                   q: agrrConfigParams.value.q.toFixed(4)
                 }
-              : null
+              : currentTaskDetail.value.scenario === 'aoue' && aoueConfigParams.value
+                ? {
+                    p: 0.5,
+                    q: aoueConfigParams.value.q.toFixed(4)
+                  }
+                : currentTaskDetail.value.scenario === 'tsp' && tspConfigParams.value
+                  ? buildTspReportParams()
+                : null
+          ,
+          stageOneResult: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageOneValue ?? null : null,
+          stageOneLabel: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageOneLabel ?? null : null,
+          stageOneSkipped: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageOneSkipped ?? null : null,
+          stageTwoInput: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageTwoInput ?? null : null,
+          stageTwoResult: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageTwoValue ?? null : null,
+          stageTwoLabel: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageTwoLabel ?? null : null,
+          reportValueDisplay: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportValueDisplay ?? null : null,
+          reportMissing: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportMissing ?? null : null,
+          reportMissingLabel: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportMissingLabel ?? null : null,
+          reportScore: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportScore ?? null : null,
+          reportScoreDisplay: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportScoreDisplay ?? null : null
         }
       });
       localStorage.setItem('submittedData', JSON.stringify(storedData));
@@ -1592,6 +3343,9 @@ function handleLogout() {
 onMounted(() => {
   taskStore.loadFromLocalStorage();
   attributeConfigStore.loadFromLocalStorage();
+  getTspEmpiricalDistribution().catch(error => {
+    console.error('预加载 TSP 基础样本分布失败:', error);
+  });
   if (taskStore.taskList.length > 0) {
     currentTaskId.value = taskStore.taskList[0].id;
   }
@@ -1690,6 +3444,21 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.summary-heading--with-action {
+  align-items: flex-start;
+}
+
+.summary-heading__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.aoue-expand-trigger {
+  flex-shrink: 0;
 }
 
 .meta-card,
@@ -1992,7 +3761,8 @@ onMounted(() => {
 }
 
 .compare-bar-label {
-  min-width: 54px;
+  width: 100px;
+  flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
   color: #425466;
@@ -2111,10 +3881,530 @@ onMounted(() => {
   background: #f5f7fa;
 }
 
+.aoue-compact-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.aoue-meta-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e6edf5;
+  background: #fafcff;
+}
+
+.aoue-meta-label {
+  font-size: 11px;
+  color: #7b8794;
+}
+
+.aoue-meta-value {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.aoue-soft-note {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fbff;
+  border: 1px solid #dbe7f5;
+}
+
+.aoue-soft-note__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #46627f;
+}
+
+.aoue-soft-note__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #718096;
+}
+
+.aoue-hero-card {
+  margin-bottom: 16px;
+  padding: 20px 22px;
+  border-radius: 18px;
+  border: 1px solid #d9e8fb;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 100%);
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.08);
+}
+
+.aoue-hero-card.is-none {
+  border-color: #d8e1eb;
+  background: linear-gradient(135deg, #fbfcfd 0%, #f3f6f9 100%);
+}
+
+.aoue-hero-card.is-running {
+  border-color: #f3c969;
+  background: linear-gradient(135deg, #fffdf7 0%, #fff7e8 100%);
+}
+
+.aoue-hero-card.is-single {
+  border-color: #b9d7ff;
+}
+
+.aoue-hero-card.is-multi {
+  border-color: #9fd8b3;
+  background: linear-gradient(135deg, #f7fff9 0%, #eefbf2 100%);
+}
+
+.aoue-hero-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.aoue-hero-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+  letter-spacing: 0.04em;
+}
+
+.aoue-hero-title {
+  margin: 6px 0 0;
+  font-size: 18px;
+  color: #1e293b;
+}
+
+.aoue-hero-status {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+  white-space: nowrap;
+}
+
+.aoue-hero-vector {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  font-size: 28px;
+  line-height: 1.35;
+  font-weight: 800;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.aoue-hero-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+}
+
+.aoue-hero-metric {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(219, 234, 254, 0.95);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aoue-hero-metric__label {
+  font-size: 12px;
+  color: #6b7785;
+}
+
+.aoue-hero-metric__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2d3d;
+  line-height: 1.6;
+}
+
+.aoue-stepper {
+  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.aoue-stepper-item {
+  position: relative;
+  padding: 10px 14px 10px 42px;
+  border-radius: 12px;
+  border: 1px solid #e3ebf3;
+  background: #f8fbff;
+}
+
+.aoue-stepper-item.is-active {
+  border-color: #f3c969;
+  background: #fff8ea;
+}
+
+.aoue-stepper-item.is-done {
+  border-color: #bfdcff;
+  background: #f3f9ff;
+}
+
+.aoue-stepper-node {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aoue-stepper-item.is-active .aoue-stepper-node {
+  background: #fde7b0;
+  color: #b45309;
+}
+
+.aoue-stepper-item.is-done .aoue-stepper-node {
+  background: #93c5fd;
+  color: #fff;
+}
+
+.aoue-stepper-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #425466;
+}
+
+.aoue-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.aoue-visual-panel,
+.aoue-detail-card,
+.aoue-control-card,
+.aoue-submit-card,
+.aoue-log-panel {
+  border: 1px solid #dfe6ee;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.aoue-visual-panel,
+.aoue-log-panel {
+  padding: 18px;
+}
+
+.aoue-side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.aoue-detail-card,
+.aoue-control-card,
+.aoue-submit-card {
+  padding: 16px;
+}
+
+.aoue-side-card__eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.aoue-side-card__title {
+  margin-top: 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.aoue-side-card__body {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #5f6b7a;
+}
+
+.aoue-control-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aoue-control-actions :deep(.el-button) {
+  justify-content: center;
+}
+
+.aoue-vector-board {
+  padding: 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
+  border: 1px solid #e3edf8;
+  overflow-x: auto;
+}
+
+.aoue-vector-caption-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #425466;
+}
+
+.aoue-vector-caption-row--bottom {
+  margin-top: 6px;
+}
+
+.aoue-vector-caption-row__hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: #7b8794;
+}
+
+.aoue-vector-columns,
+.aoue-transition-row {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 640px;
+}
+
+.aoue-transition-row {
+  margin: 12px 0;
+}
+
+.aoue-grid-bit {
+  min-height: 88px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  border: 1px solid #d8e3ef;
+  background: #f7fbff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.aoue-grid-bit.is-true {
+  border-color: #7ab4ff;
+  background: #eaf4ff;
+}
+
+.aoue-grid-bit.is-active {
+  border-color: #f59e0b;
+  background: #fff7e8;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
+  animation: aoue-pulse 1.05s ease-in-out infinite;
+}
+
+.aoue-grid-bit--result.is-one {
+  border-color: #68c18c;
+  background: #edf9f1;
+}
+
+.aoue-grid-bit--result.is-flipped {
+  border-width: 2px;
+}
+
+.aoue-grid-bit--result.is-pending {
+  border-style: dashed;
+  background: #f8fafc;
+  color: #9aa6b2;
+}
+
+.aoue-grid-bit__index {
+  font-size: 11px;
+  color: #6b7785;
+}
+
+.aoue-grid-bit__value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.aoue-grid-bit__bucket {
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: center;
+  color: #64748b;
+}
+
+.aoue-transition-badge {
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px solid #dbe6f1;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.aoue-transition-badge.is-10 {
+  color: #d97706;
+  background: #fff7e8;
+  border-color: #f3c969;
+}
+
+.aoue-transition-badge.is-01 {
+  color: #15803d;
+  background: #eefbf2;
+  border-color: #a7e0bc;
+}
+
+.aoue-transition-badge.is-11 {
+  color: #2563eb;
+  background: #eef5ff;
+  border-color: #bfdcff;
+}
+
+.aoue-transition-badge.is-00,
+.aoue-transition-badge.is-pending {
+  background: #f8fafc;
+}
+
+.aoue-transition-badge.is-active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.aoue-board-footer {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.aoue-board-footer span,
+.aoue-log-panel__hint {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.aoue-log-panel {
+  margin-top: 16px;
+}
+
+.aoue-log-panel__hint {
+  display: inline-flex;
+  margin-bottom: 12px;
+}
+
+.aoue-log-scroll {
+  max-height: 260px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aoue-log-item {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5ecf4;
+  background: #fcfdff;
+  font-size: 12px;
+  color: #5f6b7a;
+}
+
+.aoue-log-item.is-active {
+  border-color: #f3c969;
+  background: #fff7e8;
+}
+
+.aoue-log-item.is-done {
+  border-color: #cfe1ff;
+  background: #f7fbff;
+}
+
+.aoue-log-item.is-pending {
+  color: #98a4b3;
+  border-style: dashed;
+}
+
+.aoue-log-index {
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+@keyframes aoue-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+  }
+
+  50% {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.12);
+  }
+}
+
 .empty-box {
   padding: 18px;
   color: #8b97a7;
   line-height: 1.6;
+}
+
+:deep(.aoue-expanded-dialog .el-dialog__header) {
+  margin-right: 0;
+  padding: 16px 22px 10px;
+  border-bottom: 1px solid #e6edf5;
+  background: #ffffff;
+}
+
+:deep(.aoue-expanded-dialog .el-dialog__title) {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+:deep(.aoue-expanded-dialog .el-dialog__body) {
+  padding: 0;
+  background: linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%);
+}
+
+.aoue-expanded-dialog__body {
+  min-height: calc(100vh - 72px);
+  padding: 20px 24px 28px;
+  box-sizing: border-box;
+}
+
+.aoue-batch-expanded-dialog .aoue-expanded-dialog__body {
+  padding: 24px 28px 32px;
 }
 
 @media (max-width: 960px) {
@@ -2124,7 +4414,9 @@ onMounted(() => {
 
   .task-meta-grid,
   .card-grid,
-  .batch-summary-strip {
+  .batch-summary-strip,
+  .aoue-hero-grid,
+  .aoue-main-grid {
     grid-template-columns: 1fr;
   }
   
@@ -2143,8 +4435,39 @@ onMounted(() => {
   }
 
   .compare-bar-label {
-    min-width: auto;
+    width: auto;
     padding-top: 0;
+  }
+
+  .aoue-compact-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-heading--with-action {
+    align-items: stretch;
+  }
+
+  .aoue-expand-trigger {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .aoue-stepper {
+    grid-template-columns: 1fr;
+  }
+
+  .aoue-hero-head,
+  .aoue-vector-caption-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aoue-hero-vector {
+    font-size: 22px;
+  }
+
+  .aoue-log-item {
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

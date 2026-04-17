@@ -119,30 +119,44 @@ export function calculateARRParameters(alpha, beta, epsilon, domainSize) {
 // AOUE 算法 - 编码
 export function Encode(value, domainSize) {
   const array = new Array(domainSize).fill(0);
-  array[value - 1] = 1;
+  const index = Number(value) - 1;
+  if (Number.isInteger(index) && index >= 0 && index < domainSize) {
+    array[index] = 1;
+  }
   return array;
+}
+
+export function createAOUEBitStep(originalBit, p = 0.5, q = 0, randomValue = Math.random()) {
+  const normalizedOriginalBit = Number(originalBit) === 1 ? 1 : 0;
+  const usedProbability = normalizedOriginalBit === 1 ? Number(p) : Number(q);
+  const sampledRandom = Number(randomValue);
+  const resultBit = sampledRandom < usedProbability ? 1 : 0;
+
+  return {
+    originalBit: normalizedOriginalBit,
+    usedProbability,
+    sampledRandom,
+    resultBit
+  };
+}
+
+export function perturbAOUEWithDetails(rawValue, domainSize, q, p = 0.5, randomFn = Math.random) {
+  const originalVector = Encode(rawValue, domainSize);
+  const bitSteps = originalVector.map((bit, index) => ({
+    index,
+    ...createAOUEBitStep(bit, p, q, randomFn())
+  }));
+
+  return {
+    originalVector,
+    reportValue: bitSteps.map(step => step.resultBit),
+    bitSteps
+  };
 }
 
 // AOUE 算法 - 客户端扰动
 export function AOUE(rawValue, epsilon, domainSize, q) {
-  const enValue = Encode(rawValue, domainSize);
-  
-  // 逐位扰动
-  for (let i = 0; i < domainSize; i++) {
-    if (enValue[i] === 1) {
-      // 对于1位，以1/2的概率翻转
-      if (Math.random() >= 0.5) {
-        enValue[i] = 0;
-      }
-    } else {
-      // 对于0位，以q的概率翻转
-      if (Math.random() < q) {
-        enValue[i] = 1;
-      }
-    }
-  }
-  
-  return enValue;
+  return perturbAOUEWithDetails(rawValue, domainSize, q, 0.5).reportValue;
 }
 
 // AOUE 算法 - 服务器端聚合
@@ -172,22 +186,124 @@ export function calculateAOUEParameters(alpha, beta, epsilon) {
   return { p, q, rawQ, clamped: q !== rawQ };
 }
 
+export function generalizedRandomizedResponse(rawValue, domainValues, p, q) {
+  const normalizedDomain = Array.from(domainValues || []);
+  if (!normalizedDomain.length || !normalizedDomain.includes(rawValue)) {
+    return rawValue;
+  }
+
+  if (Math.random() < p) {
+    return rawValue;
+  }
+
+  const fallbackValues = normalizedDomain.filter(value => value !== rawValue);
+  if (!fallbackValues.length) {
+    return rawValue;
+  }
+
+  return fallbackValues[Math.floor(Math.random() * fallbackValues.length)];
+}
+
+function clampProbability(value, fallback = 0) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function sampleAlternativeValue(domainValues, currentValue) {
+  const fallbackValues = Array.from(domainValues || []).filter(value => value !== currentValue);
+  if (!fallbackValues.length) {
+    return currentValue;
+  }
+  return fallbackValues[Math.floor(Math.random() * fallbackValues.length)];
+}
+
 export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
-  const epsilonStage1 = epsilon / 2;
-  const epsilonStage2 = epsilon - epsilonStage1;
-  const stage1 = calculateARRParameters(alpha, beta, epsilonStage1, 2);
-  const expStage2 = Math.exp(epsilonStage2);
-  const p2 = expStage2 / (expStage2 + scoreDomainSize - 1);
-  const q2 = 1 / (expStage2 + scoreDomainSize - 1);
+  const unifiedDomainSize = scoreDomainSize + 1;
+  const exp_eps = Math.exp(epsilon);
+  const stageTwo = calculateAGRParameters(alpha, beta, epsilon, unifiedDomainSize);
+  const p2 = clampProbability(stageTwo.p, 1);
+  const q2 = clampProbability((1 - p2) / scoreDomainSize, 0);
+  const delta = p2 - q2;
+  const stageOneDenominator = delta * ((scoreDomainSize - 1) + exp_eps);
+
+  let p1 = 1;
+  if (scoreDomainSize > 1 && stageOneDenominator > 0) {
+    const stageOneNumerator = (
+      (scoreDomainSize - 1) * q2 * (exp_eps - 1)
+      + exp_eps * delta
+    );
+    p1 = clampProbability(stageOneNumerator / stageOneDenominator, 1);
+  }
+  const q1 = scoreDomainSize > 1
+    ? clampProbability((1 - p1) / (scoreDomainSize - 1), 0)
+    : 0;
+
+  const pStar = p1 * p2 + (1 - p1) * q2;
+  const qStar = q1 * p2 + (1 - q1) * q2;
 
   return {
-    epsilonStage1,
-    epsilonStage2,
-    p1: stage1.p,
-    q1: stage1.q,
+    version: 'paper_unified_budget',
+    epsilon,
+    p1,
+    q1,
     p2,
     q2,
-    scoreDomainSize
+    pStar,
+    qStar,
+    scoreDomainSize,
+    unifiedDomainSize
+  };
+}
+
+export function tspFirstPerturb(value, scoreDomainSize, p1) {
+  const normalizedValue = Number(value);
+  if (normalizedValue === 0) {
+    return 0;
+  }
+
+  const scoreDomain = Array.from({ length: scoreDomainSize }, (_, index) => index + 1);
+  if (!scoreDomain.includes(normalizedValue)) {
+    return normalizedValue;
+  }
+
+  if (Math.random() < p1) {
+    return normalizedValue;
+  }
+
+  return sampleAlternativeValue(scoreDomain, normalizedValue);
+}
+
+export function tspSecondPerturb(value, scoreDomainSize, p2) {
+  const normalizedValue = Number(value);
+  const unifiedDomain = Array.from({ length: scoreDomainSize + 1 }, (_, index) => index);
+  if (!unifiedDomain.includes(normalizedValue)) {
+    return normalizedValue;
+  }
+
+  if (Math.random() < p2) {
+    return normalizedValue;
+  }
+
+  return sampleAlternativeValue(unifiedDomain, normalizedValue);
+}
+
+export function applyTSP(rawValue, params) {
+  const scoreDomainSize = Number(params?.scoreDomainSize ?? 5);
+  const normalizedRawValue = Number(rawValue);
+  const stageOneSkipped = normalizedRawValue === 0;
+  const stageOneValue = stageOneSkipped
+    ? 0
+    : tspFirstPerturb(normalizedRawValue, scoreDomainSize, Number(params?.p1 ?? 1));
+  const stageTwoInput = stageOneSkipped ? 0 : stageOneValue;
+  const stageTwoValue = tspSecondPerturb(stageTwoInput, scoreDomainSize, Number(params?.p2 ?? 1));
+
+  return {
+    stageOneSkipped,
+    stageOneValue,
+    stageTwoInput,
+    stageTwoValue
   };
 }
 
@@ -223,6 +339,10 @@ export function calculateAlphaBeta(conditionalProbs, epsilon) {
   }
   
   return { alpha, beta };
+}
+
+export function calculateTSPAlphaBetaFromMissingProbs(conditionalProbs, epsilon) {
+  return calculateAlphaBeta(conditionalProbs, epsilon);
 }
 
 // 生成模拟的条件概率表（用于测试）

@@ -1,15 +1,23 @@
-import { STAND_BUCKET_ORDER } from '../utils/constants';
+import { STAND_BUCKET_ORDER, STEP_BUCKET_ORDER } from '../utils/constants';
 import {
   aggregateAGRR,
   aggregateARR,
+  aggregateAOUE,
   calculateAGRParameters,
-  calculateARRParameters
+  calculateARRParameters,
+  calculateAOUEParameters
 } from '../utils/ldpAlgorithms';
 import {
   createEmptyStandBucketCounts,
   getStandBucketLabelByCode,
   normalizeStandBucketCounts
 } from '../utils/standDurationBuckets';
+import {
+  createEmptyStepsBucketCounts,
+  getStepsBucketLabelByCode,
+  normalizeStepsBucketCounts
+} from '../utils/stepsBuckets';
+import { aggregateTspDomainCounts, resolveTspTaskConfig } from '../utils/tspProtocol.js';
 import { buildAggregateMetrics } from '../utils/aggregate/aggregateMetrics';
 import { getPerturbationStatus } from '../utils/perturbationStatus';
 
@@ -48,6 +56,14 @@ function normalizeAgrrCode(value) {
   return numericValue;
 }
 
+function normalizeTspCode(value, domainSize = 5) {
+  const numericValue = Number(value);
+  if (!Number.isInteger(numericValue) || numericValue < 0 || numericValue > domainSize) {
+    return null;
+  }
+  return numericValue;
+}
+
 function getTaskConfig(task, protocol, domainSize) {
   const snapshot = task?.configSnapshot || {};
   const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
@@ -60,7 +76,9 @@ function getTaskConfig(task, protocol, domainSize) {
   if (!Number.isFinite(p) || !Number.isFinite(q)) {
     const calculated = protocol === 'AGRR'
       ? calculateAGRParameters(alpha, beta, epsilon, domainSize)
-      : calculateARRParameters(alpha, beta, epsilon, domainSize);
+      : protocol === 'AOUE'
+        ? calculateAOUEParameters(alpha, beta, epsilon)
+        : calculateARRParameters(alpha, beta, epsilon, domainSize);
     p = calculated.p;
     q = calculated.q;
   }
@@ -181,6 +199,105 @@ function buildAgrrSummary(agrrRecords) {
     rawCounts: STAND_BUCKET_ORDER.map(bucket => Number(rawBucketCounts[bucket] ?? 0)),
     reportCounts: STAND_BUCKET_ORDER.map(bucket => Number(reportBucketCounts[bucket] ?? 0)),
     hasRawSummary
+  };
+}
+
+function buildAoueSummary(aoueRecords) {
+  const sampleCount = aoueRecords.length;
+  const reportBucketCounts = createEmptyStepsBucketCounts();
+  const rawBucketCounts = createEmptyStepsBucketCounts();
+  let hasRawSummary = false;
+  const batchSummaryMap = new Map();
+
+  aoueRecords.forEach(item => {
+    const batchId = item.batch_id ?? item.sampleMeta?.batchId;
+    const summary = item.batchSummary;
+
+    if (batchId && summary) {
+      if (!batchSummaryMap.has(batchId)) {
+        batchSummaryMap.set(batchId, summary);
+      }
+      return;
+    }
+
+    const rawBucket = item.original_bucket || item.rawData?.stepsBucket || item.reportData?.rawBucket;
+    // 对于 AOUE，如果是单条上报，perturbed_bucket 可能存在。
+    // 如果是向量，我们需要处理向量统计。
+    const reportBucket = item.perturbed_bucket
+      || item.reportData?.perturbedBucket
+      || item.reportData?.perturbedLabel;
+
+    if (rawBucket && Object.prototype.hasOwnProperty.call(rawBucketCounts, rawBucket)) {
+      rawBucketCounts[rawBucket] += 1;
+      hasRawSummary = true;
+    }
+    // 只有在单条非批次上报且有明确扰动后标签时才计入 reportBucketCounts。
+    // 注意：真正的 AOUE 聚合是基于向量位的，这里的 reportCounts 仅用于 UI 的“上报分布”展示。
+    if (reportBucket && Object.prototype.hasOwnProperty.call(reportBucketCounts, reportBucket)) {
+      reportBucketCounts[reportBucket] += 1;
+    } else if (Array.isArray(item.report_value)) {
+      // 如果是向量，按位统计击中情况作为 UI 展示的上报分布
+      item.report_value.forEach((bit, index) => {
+        if (bit === 1) {
+          const label = getStepsBucketLabelByCode(index + 1);
+          if (label) reportBucketCounts[label] += 1;
+        }
+      });
+    }
+  });
+
+  if (batchSummaryMap.size > 0) {
+    hasRawSummary = true;
+    batchSummaryMap.forEach(summary => {
+      const normalizedRaw = normalizeStepsBucketCounts(summary?.rawBucketCounts);
+      const normalizedReport = normalizeStepsBucketCounts(summary?.reportBucketCounts);
+      STEP_BUCKET_ORDER.forEach(bucket => {
+        rawBucketCounts[bucket] += Number(normalizedRaw[bucket] ?? 0);
+        reportBucketCounts[bucket] += Number(normalizedReport[bucket] ?? 0);
+      });
+    });
+  }
+
+  return {
+    sampleCount,
+    rawCounts: STEP_BUCKET_ORDER.map(bucket => Number(rawBucketCounts[bucket] ?? 0)),
+    reportCounts: STEP_BUCKET_ORDER.map(bucket => Number(reportBucketCounts[bucket] ?? 0)),
+    hasRawSummary
+  };
+}
+
+function buildTspSummary(tspRecords, scoreDomainSize = 5) {
+  const labels = ['缺失值 0', ...Array.from({ length: scoreDomainSize }, (_, index) => `${index + 1} 分`)];
+  const rawCounts = new Array(scoreDomainSize + 1).fill(0);
+  const reportCounts = new Array(scoreDomainSize + 1).fill(0);
+  let hasRawSummary = false;
+
+  tspRecords.forEach(item => {
+    const rawMissing = Number(item.original_missing ?? item.rawData?.sleepMissing);
+    const rawScore = Number(item.original_score ?? item.rawData?.sleepScore);
+    const rawValue = rawMissing === 1 ? 0 : normalizeTspCode(rawScore, scoreDomainSize);
+    const reportValue = normalizeTspCode(
+      item.report_value
+        ?? item.reportData?.reportValue
+        ?? item.reportData?.perturbedValue,
+      scoreDomainSize
+    );
+
+    if (rawValue != null) {
+      rawCounts[rawValue] += 1;
+      hasRawSummary = true;
+    }
+    if (reportValue != null) {
+      reportCounts[reportValue] += 1;
+    }
+  });
+
+  return {
+    sampleCount: tspRecords.length,
+    rawCounts,
+    reportCounts,
+    hasRawSummary,
+    labels
   };
 }
 
@@ -365,6 +482,73 @@ function getAgrrAggregateResults(records, task, taskId) {
   })];
 }
 
+function getAoueAggregateResults(records, task, taskId) {
+  const aoueRecords = collectProtocolRecords(records, 'AOUE');
+  if (!aoueRecords.length) {
+    return [];
+  }
+
+  const config = getTaskConfig(task, 'AOUE', STEP_BUCKET_ORDER.length);
+  const summary = buildAoueSummary(aoueRecords);
+  
+  // 对于 AOUE，我们需要提取向量形式的上报数据
+  const perturbedData = aoueRecords.map(item => {
+    const val = item.report_value ?? item.reportData?.reportValue ?? item.reportData?.perturbedValue;
+    if (Array.isArray(val)) return val;
+    // 如果不是数组（可能是单条记录且某种原因没存成数组），尝试构造一个
+    const code = item.perturbed_bucket_code || item.reportData?.perturbedBucketCode;
+    if (code) {
+      const arr = new Array(STEP_BUCKET_ORDER.length).fill(0);
+      arr[code - 1] = 1;
+      return arr;
+    }
+    return new Array(STEP_BUCKET_ORDER.length).fill(0);
+  });
+
+  const estimatedCounts = aggregateAOUE(perturbedData, config.epsilon, STEP_BUCKET_ORDER.length, 0.5, config.q)
+    .map(value => Number(value.toFixed(4)));
+
+  return [createAggregateViewModel({
+    id: 1,
+    attributeName: '每日步数分桶',
+    taskId,
+    protectionMode: getProtectionMode(task),
+    algorithm: 'AOUE',
+    labels: STEP_BUCKET_ORDER,
+    config,
+    summary,
+    estimatedCounts,
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部批次摘要与单条样本向量统一恢复' : '基于上报向量分布近似',
+    sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 AOUE 样本（向量形式）统一统计与估计。`
+  })];
+}
+
+function getTspAggregateResults(records, task, taskId) {
+  const tspRecords = collectProtocolRecords(records, 'TSP');
+  if (!tspRecords.length) {
+    return [];
+  }
+
+  const config = resolveTspTaskConfig(task, 5);
+  const summary = buildTspSummary(tspRecords, config.scoreDomainSize);
+  const estimatedCounts = aggregateTspDomainCounts(summary.reportCounts, summary.sampleCount, config)
+    .map(value => Number(value.toFixed(4)));
+
+  return [createAggregateViewModel({
+    id: 1,
+    attributeName: '睡眠质量评分',
+    taskId,
+    protectionMode: getProtectionMode(task),
+    algorithm: 'TSP',
+    labels: summary.labels,
+    config,
+    summary,
+    estimatedCounts,
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复' : '基于最终上报分布近似',
+    sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`
+  })];
+}
+
 export function getAggregateResults(taskId) {
   try {
     const records = loadSubmissions(taskId);
@@ -378,6 +562,12 @@ export function getAggregateResults(taskId) {
 
     if (protocol === 'AGRR') {
       return getAgrrAggregateResults(records, task, resolvedTaskId);
+    }
+    if (protocol === 'AOUE') {
+      return getAoueAggregateResults(records, task, resolvedTaskId);
+    }
+    if (protocol === 'TSP') {
+      return getTspAggregateResults(records, task, resolvedTaskId);
     }
 
     return getArrAggregateResults(records, task, resolvedTaskId);

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "generate:sa": "node scripts/generateSAFile.mjs"
+    "generate:sa": "node scripts/generateSAFile.mjs",
+    "test:tsp": "node scripts/testTspUnifiedBudget.mjs"
   },
   "dependencies": {
     "echarts": "^6.0.0",
