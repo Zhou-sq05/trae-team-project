@@ -195,7 +195,7 @@
 
       <div class="right-section">
         <h3>演示调试区域</h3>
-        <template v-if="['arr', 'agrr'].includes(currentTaskDetail?.scenario)">
+        <template v-if="['arr', 'agrr', 'tsp'].includes(currentTaskDetail?.scenario)">
           <div class="demo-tab-bar">
             <button
               type="button"
@@ -216,6 +216,91 @@
           </div>
 
           <template v-if="activeDemoTab === 'single'">
+            <template v-if="currentTaskDetail?.scenario === 'tsp'">
+              <div class="summary-block">
+                <h4>任务摘要</h4>
+                <div class="demo-top-card">
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">任务 ID</span>
+                    <span class="demo-top-value">{{ currentTaskDetail?.taskId || '--' }}</span>
+                  </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">协议</span>
+                    <span class="demo-top-value">{{ currentTaskDetail?.protocol || '--' }}</span>
+                  </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">隐私预算 ε</span>
+                    <span class="demo-top-value">{{ displayEpsilon }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <h4>原始输入</h4>
+                <div class="card-grid">
+                  <div v-for="item in tspRawCards" :key="item.label" class="summary-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>第一阶段：有效评分值扰动</h4>
+                  <span class="section-tip">仅当原始样本为非缺失时执行，用于向有效评分注入与缺失状态等量的不确定性</span>
+                </div>
+                <div v-if="tspSimulationResult?.stageOneSkipped" class="tsp-skip-panel">
+                  <div class="tsp-skip-title">第一阶段已跳过</div>
+                  <div class="tsp-skip-desc">{{ tspSimulationResult.stageOneSkipReason }}</div>
+                </div>
+                <div v-else class="card-grid">
+                  <div v-for="item in tspStageOneCards" :key="item.label" class="summary-card preview-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>第二阶段：统一域扰动</h4>
+                  <span class="section-tip">对缺失值 0 或第一阶段后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动</span>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in tspStageTwoCards" :key="item.label" class="summary-card preview-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>最终上报结果</h4>
+                  <span class="section-tip">汇总两阶段输出后的最终上报内容</span>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in tspFinalReportCards" :key="item.label" class="summary-card preview-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+                <div class="preview-tip">{{ processPreviewTip }}</div>
+                <div v-if="!tspParametersReady" class="preview-tip">
+                  当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段扰动演示。
+                </div>
+                <div class="action-row">
+                  <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
+                    {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
+                  </el-button>
+                  <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
+                    提交上报
+                  </el-button>
+                </div>
+              </div>
+            </template>
+            <template v-else>
             <div class="summary-block">
               <h4>任务摘要</h4>
               <div class="demo-top-card">
@@ -293,6 +378,7 @@
                 </el-button>
               </div>
             </div>
+            </template>
           </template>
 
           <template v-else>
@@ -305,23 +391,15 @@
                 <p>点击左侧“手环连续采集”后，这里会展示本次连续采集的统计结果和前 10 条样本明细。</p>
               </div>
               <template v-else>
-                <div class="batch-summary-strip">
-                  <div class="batch-summary-item">
-                    <div class="card-label">{{ currentBatchSummaryCards[0]?.label || '样本总数' }}</div>
-                    <div class="batch-summary-value">{{ currentBatchSummaryCards[0]?.value }}</div>
-                  </div>
-                  <div class="batch-summary-item">
-                    <div class="card-label">{{ currentBatchSummaryCards[1]?.label || '当前任务名称' }}</div>
-                    <div class="batch-summary-value">{{ currentBatchSummaryCards[1]?.value }}</div>
-                  </div>
-                  <div class="batch-summary-item">
-                    <div class="card-label">{{ currentBatchSummaryCards[2]?.label || '当前协议' }}</div>
-                    <div class="batch-summary-value">{{ currentBatchSummaryCards[2]?.value }}</div>
+                <div class="batch-summary-strip" :class="{ 'batch-summary-strip--wide': currentTaskDetail?.scenario === 'tsp' }">
+                  <div v-for="item in currentBatchSummaryCards" :key="item.label" class="batch-summary-item">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="batch-summary-value">{{ item.value }}</div>
                   </div>
                 </div>
 
-                <div class="compare-panel">
-                  <div class="compare-title">扰动前后分布对比</div>
+                <div v-for="group in currentDistributionGroups" :key="group.title" class="compare-panel">
+                  <div class="compare-title">{{ group.title }}</div>
                   <table class="compare-table">
                     <thead>
                       <tr>
@@ -332,7 +410,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="row in currentDistributionComparisonRows" :key="row.status">
+                      <tr v-for="row in group.rows" :key="row.status">
                         <td>{{ row.status }}</td>
                         <td>{{ row.rawCount }}</td>
                         <td>{{ row.reportCount }}</td>
@@ -344,7 +422,7 @@
                   </table>
 
                   <div class="compare-bars">
-                    <div v-for="row in currentDistributionComparisonRows" :key="`${row.status}-bars`" class="compare-bar-row">
+                    <div v-for="row in group.rows" :key="`${group.title}-${row.status}-bars`" class="compare-bar-row">
                       <div class="compare-bar-label">{{ row.status }}</div>
                       <div class="compare-bar-track">
                         <div class="compare-bar-group">
@@ -479,7 +557,7 @@ import { ElMessage } from 'element-plus';
 import { useUserStore } from '../../store/user';
 import { useTaskStore } from '../../store/task';
 import { useAttributeConfigStore } from '../../store/attributeConfig';
-import { ARR, AGRR } from '../../utils/ldpAlgorithms';
+import { ARR, AGRR, generalizedRandomizedResponse } from '../../utils/ldpAlgorithms';
 import { STAND_BUCKET_ORDER } from '../../utils/constants';
 import {
   STAND_DURATION_BUCKET_RULES,
@@ -506,6 +584,8 @@ const arrSimulationResult = ref(null);
 const arrBatchResult = ref(null);
 const agrrSimulationResult = ref(null);
 const agrrBatchResult = ref(null);
+const tspSimulationResult = ref(null);
+const tspBatchResult = ref(null);
 const batchSimulationCount = ref(100);
 const activeDemoTab = ref('single');
 const batchUploadState = ref(null);
@@ -613,8 +693,43 @@ const agrrConfigParams = computed(() => {
   };
 });
 
+const tspConfigParams = computed(() => {
+  if (currentTaskDetail.value?.scenario !== 'tsp') return null;
+  const calibratedParams = currentAttributeConfig.value?.calibratedParams;
+  if (!calibratedParams) return null;
+
+  const p1 = Number(calibratedParams.p1);
+  const q1 = Number(calibratedParams.q1);
+  const p2 = Number(calibratedParams.p2);
+  const q2 = Number(calibratedParams.q2);
+  const pStar = Number(calibratedParams.pStar);
+  const qStar = Number(calibratedParams.qStar);
+  const epsilonStage1 = Number(calibratedParams.epsilonStage1);
+  const epsilonStage2 = Number(calibratedParams.epsilonStage2);
+  const unifiedDomainSize = Number(calibratedParams.unifiedDomainSize ?? 6);
+
+  if (![p1, q1, p2, q2, epsilonStage1, epsilonStage2, unifiedDomainSize].every(Number.isFinite)) {
+    return null;
+  }
+
+  return {
+    p1,
+    q1,
+    p2,
+    q2,
+    pStar: Number.isFinite(pStar) ? pStar : null,
+    qStar: Number.isFinite(qStar) ? qStar : null,
+    epsilonStage1,
+    epsilonStage2,
+    epsilon: currentAttributeConfig.value?.epsilon ?? currentTaskDetail.value?.epsilon ?? '--',
+    scoreDomainSize: Number(calibratedParams.d ?? 5),
+    unifiedDomainSize
+  };
+});
+
 const arrParametersReady = computed(() => Boolean(arrConfigParams.value));
 const agrrParametersReady = computed(() => Boolean(agrrConfigParams.value));
+const tspParametersReady = computed(() => Boolean(tspConfigParams.value));
 const arrPerturbationStatus = computed(() => getPerturbationStatus('ARR', arrConfigParams.value));
 const agrrPerturbationStatus = computed(() => getPerturbationStatus('AGRR', agrrConfigParams.value));
 const currentPerturbationStatus = computed(() => {
@@ -633,6 +748,12 @@ const canSimulateAgrr = computed(() => (
   && agrrParametersReady.value
   && Boolean(derivedStandBucket.value)
 ));
+const canSimulateTsp = computed(() => (
+  currentTaskDetail.value?.scenario === 'tsp'
+  && formTouched.value
+  && tspParametersReady.value
+  && (dynamicForm.sleepMissing === 1 || Number.isFinite(Number(dynamicForm.sleepScore)))
+));
 const canRunSingleSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
   if (currentTaskDetail.value.scenario === 'arr') {
@@ -640,6 +761,9 @@ const canRunSingleSimulation = computed(() => {
   }
   if (currentTaskDetail.value.scenario === 'agrr') {
     return canSimulateAgrr.value;
+  }
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return canSimulateTsp.value;
   }
   return formTouched.value;
 });
@@ -651,6 +775,9 @@ const canRunBatchSimulation = computed(() => {
   if (currentTaskDetail.value.scenario === 'agrr') {
     return agrrParametersReady.value && Number(batchSimulationCount.value) > 0;
   }
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return tspParametersReady.value && Number(batchSimulationCount.value) > 0;
+  }
   return false;
 });
 const displayEpsilon = computed(() => {
@@ -659,6 +786,9 @@ const displayEpsilon = computed(() => {
   }
   if (currentTaskDetail.value?.scenario === 'agrr' && agrrConfigParams.value) {
     return agrrConfigParams.value.epsilon;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp' && tspConfigParams.value) {
+    return tspConfigParams.value.epsilon;
   }
   return currentTaskDetail.value?.epsilon ?? '--';
 });
@@ -669,6 +799,9 @@ const canSubmitCurrentTask = computed(() => {
   }
   if (currentTaskDetail.value.scenario === 'agrr') {
     return Boolean(agrrSimulationResult.value);
+  }
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return Boolean(tspSimulationResult.value);
   }
   return formTouched.value;
 });
@@ -788,9 +921,39 @@ const agrrResultCards = computed(() => [
   }
 ]);
 
+const tspRawCards = computed(() => [
+  { label: '缺失状态', value: dynamicForm.sleepMissing === 1 ? '缺失（M=1）' : '非缺失（M=0）' },
+  { label: '睡眠质量评分', value: dynamicForm.sleepMissing === 1 ? '--' : dynamicForm.sleepScore ?? '--' }
+]);
+
+const tspStageOneCards = computed(() => [
+  { label: '第一阶段输入', value: tspSimulationResult.value?.stageOneInputDisplay || '--' },
+  { label: '使用预算 ε1', value: tspParametersReady.value ? tspConfigParams.value.epsilonStage1.toFixed(4) : '--' },
+  { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
+  { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' },
+  { label: '第一阶段扰动结果', value: tspSimulationResult.value?.stageOneLabel || '--' }
+]);
+
+const tspStageTwoCards = computed(() => [
+  { label: '第二阶段输入', value: tspSimulationResult.value?.stageTwoInputDisplay ?? '--' },
+  { label: '使用预算 ε2', value: tspParametersReady.value ? tspConfigParams.value.epsilonStage2.toFixed(4) : '--' },
+  { label: '参数 p2', value: tspParametersReady.value ? tspConfigParams.value.p2.toFixed(4) : '--' },
+  { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' },
+  { label: '第二阶段扰动结果', value: tspSimulationResult.value?.stageTwoLabel || '--' }
+]);
+
+const tspFinalReportCards = computed(() => [
+  { label: '最终上报值', value: tspSimulationResult.value?.reportValueDisplay || '--' },
+  { label: '上报缺失状态', value: tspSimulationResult.value?.reportMissingLabel || '--' },
+  { label: '上报评分', value: tspSimulationResult.value?.reportScoreDisplay ?? '--' }
+]);
+
 const currentSimulationResult = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrSimulationResult.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspSimulationResult.value;
   }
   return arrSimulationResult.value;
 });
@@ -820,6 +983,9 @@ const currentBatchResult = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrBatchResult.value;
   }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspBatchResult.value;
+  }
   return arrBatchResult.value;
 });
 
@@ -845,9 +1011,24 @@ const agrrBatchSummaryCards = computed(() => {
   ];
 });
 
+const tspBatchSummaryCards = computed(() => {
+  if (!tspBatchResult.value) return [];
+  return [
+    { label: '本次连续采集次数', value: String(tspBatchResult.value.totalRuns) },
+    { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
+    { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' },
+    { label: '隐私预算 ε', value: tspConfigParams.value ? String(tspConfigParams.value.epsilon) : '--' },
+    { label: '第一阶段预算 ε1', value: tspConfigParams.value ? tspConfigParams.value.epsilonStage1.toFixed(4) : '--' },
+    { label: '第二阶段预算 ε2', value: tspConfigParams.value ? tspConfigParams.value.epsilonStage2.toFixed(4) : '--' }
+  ];
+});
+
 const currentBatchSummaryCards = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrBatchSummaryCards.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspBatchSummaryCards.value;
   }
   return arrBatchSummaryCards.value;
 });
@@ -901,6 +1082,49 @@ const agrrDistributionComparisonRows = computed(() => {
   });
 });
 
+const tspDistributionGroups = computed(() => {
+  if (!tspBatchResult.value) return [];
+
+  const total = tspBatchResult.value.totalRuns || 1;
+  const buildRows = (items, rawSource, reportSource) => items.map(item => {
+    const rawCount = Number(rawSource[item.key] ?? 0);
+    const reportCount = Number(reportSource[item.key] ?? 0);
+    const delta = reportCount - rawCount;
+
+    return {
+      status: item.label,
+      rawCount,
+      reportCount,
+      delta,
+      deltaDisplay: delta > 0 ? `+${delta}` : `${delta}`,
+      rawPercent: Number(((rawCount / total) * 100).toFixed(1)),
+      reportPercent: Number(((reportCount / total) * 100).toFixed(1))
+    };
+  });
+
+  return [
+    {
+      title: '缺失状态分布对比',
+      rows: buildRows(
+        [
+          { key: 'missing', label: '缺失' },
+          { key: 'nonMissing', label: '非缺失' }
+        ],
+        tspBatchResult.value.rawMissingCounts,
+        tspBatchResult.value.reportMissingCounts
+      )
+    },
+    {
+      title: '评分分布对比（1~5）',
+      rows: buildRows(
+        [1, 2, 3, 4, 5].map(value => ({ key: String(value), label: `${value} 分` })),
+        tspBatchResult.value.rawScoreCounts,
+        tspBatchResult.value.reportScoreCounts
+      )
+    }
+  ];
+});
+
 const currentDistributionComparisonRows = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrDistributionComparisonRows.value;
@@ -908,11 +1132,28 @@ const currentDistributionComparisonRows = computed(() => {
   return arrDistributionComparisonRows.value;
 });
 
+const currentDistributionGroups = computed(() => {
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspDistributionGroups.value;
+  }
+
+  return [
+    {
+      title: '扰动前后分布对比',
+      rows: currentDistributionComparisonRows.value
+    }
+  ];
+});
+
 const arrBatchPreviewRows = computed(() => arrBatchResult.value?.samples?.slice(0, 10) || []);
 const agrrBatchPreviewRows = computed(() => agrrBatchResult.value?.samples?.slice(0, 10) || []);
+const tspBatchPreviewRows = computed(() => tspBatchResult.value?.samples?.slice(0, 10) || []);
 const currentBatchPreviewRows = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrBatchPreviewRows.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return tspBatchPreviewRows.value;
   }
   return arrBatchPreviewRows.value;
 });
@@ -920,6 +1161,9 @@ const currentBatchPreviewRows = computed(() => {
 const currentBatchResultTip = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始分钟数样本、映射到 4 档后，再执行 AGRR 本地扰动得到的统计结果。'} 原始分钟数仅用于映射分档，真正执行扰动与上报的是分档后的档位编码。`;
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return '当前结果为手环端连续生成缺失/非缺失样本；非缺失样本先执行第一阶段评分扰动，随后所有样本统一进入 {0,1,2,3,4,5} 的第二阶段扰动并生成最终上报值。';
   }
   return currentPerturbationStatus.value?.description || '当前结果为手环端连续执行本地扰动后的统计结果，用于演示设备持续采集并立即本地上报的过程。';
 });
@@ -932,6 +1176,16 @@ const batchPreviewColumns = computed(() => {
       { key: 'rawLabel', label: '原始档位' },
       { key: 'perturbedLabel', label: '扰动后档位' },
       { key: 'reportValue', label: '上报值' }
+    ];
+  }
+  if (currentTaskDetail.value?.scenario === 'tsp') {
+    return [
+      { key: 'index', label: '#' },
+      { key: 'rawMissingLabel', label: '原始缺失状态' },
+      { key: 'rawScoreDisplay', label: '原始评分' },
+      { key: 'stageOneLabel', label: '第一阶段结果' },
+      { key: 'stageTwoInputDisplay', label: '第二阶段输入' },
+      { key: 'reportValueDisplay', label: '最终上报值' }
     ];
   }
 
@@ -965,8 +1219,8 @@ const processPreviewCards = computed(() => {
       ];
     case 'tsp':
       return [
-        { label: '处理链路', value: '缺失状态/评分 -> 第一阶段 -> 第二阶段 -> 上报值（下一步接入）' },
-        { label: '当前状态', value: dynamicForm.sleepMissing === 1 ? '仅上报缺失状态' : `评分 ${dynamicForm.sleepScore ?? '--'}` }
+        { label: '处理链路', value: '非缺失样本评分 -> 第一阶段扰动 -> 与缺失值 0 统一进入第二阶段 -> 上报值' },
+        { label: '当前状态', value: dynamicForm.sleepMissing === 1 ? '缺失样本：第一阶段跳过，第二阶段以 0 进入统一扰动' : `非缺失样本：评分 ${dynamicForm.sleepScore ?? '--'} 先进入第一阶段` }
       ];
     default:
       return [];
@@ -977,6 +1231,10 @@ const processPreviewTip = computed(() => {
   if (!currentTaskDetail.value) return '';
   if (currentTaskDetail.value.scenario === 'agrr') {
     return '当前 AGRR 已接入单次扰动、连续采集和上报链路，扰动对象为分档后的档位，而不是原始分钟数。';
+  }
+
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return '当前 TSP 单次演示会先基于缺失状态 M 的内在不确定性，对非缺失样本的有效评分执行第一阶段扰动；随后再将缺失值 0 与第一阶段后的有效值统一执行第二阶段扰动并上报。';
   }
 
   return '当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。';
@@ -1016,6 +1274,14 @@ watch(
       return;
     }
 
+    if (currentTaskDetail.value.scenario === 'tsp') {
+      tspSimulationResult.value = null;
+      tspBatchResult.value = null;
+      batchUploadState.value = null;
+      systemStatus.value = 0;
+      return;
+    }
+
     systemStatus.value = 0;
   },
   { deep: true }
@@ -1034,6 +1300,8 @@ function clearSimulationState() {
   arrBatchResult.value = null;
   agrrSimulationResult.value = null;
   agrrBatchResult.value = null;
+  tspSimulationResult.value = null;
+  tspBatchResult.value = null;
 }
 
 function randomInt(min, max) {
@@ -1099,6 +1367,9 @@ function refreshData() {
   if (currentTaskDetail.value.scenario === 'agrr' && agrrParametersReady.value) {
     simulateAgrrPerturbation(false);
   }
+  if (currentTaskDetail.value.scenario === 'tsp' && tspParametersReady.value) {
+    simulateTspPerturbation(false);
+  }
   ElMessage.success('已生成当前任务的随机示例输入');
 }
 
@@ -1131,6 +1402,8 @@ function handleAgrrMinutesChange() {
 
 function handleSleepMissingChange(value) {
   markFormTouched();
+  tspSimulationResult.value = null;
+  tspBatchResult.value = null;
   if (value === 1) {
     dynamicForm.sleepScore = null;
     return;
@@ -1211,6 +1484,83 @@ function simulateAgrrPerturbation(showMessage = true) {
   }
 }
 
+function performTspPerturbation(rawMissingInput, rawScoreInput) {
+  if (!tspParametersReady.value) {
+    return null;
+  }
+
+  const rawMissing = Number(rawMissingInput) === 1 ? 1 : 0;
+  const rawMissingLabel = rawMissing === 1 ? '缺失（M=1）' : '非缺失（M=0）';
+  const rawScore = rawMissing === 1 ? null : Number(rawScoreInput);
+  const scoreDomain = [1, 2, 3, 4, 5];
+  const unifiedDomain = [0, 1, 2, 3, 4, 5];
+  const stageOneSkipped = rawMissing === 1;
+
+  let stageOneValue = null;
+  let stageOneLabel = '已跳过';
+  let stageOneInputDisplay = '缺失样本不进入第一阶段';
+  if (!stageOneSkipped) {
+    stageOneValue = generalizedRandomizedResponse(rawScore, scoreDomain, tspConfigParams.value.p1, tspConfigParams.value.q1);
+    stageOneLabel = `${stageOneValue} 分`;
+    stageOneInputDisplay = `${rawScore} 分`;
+  }
+
+  const stageTwoInput = stageOneSkipped ? 0 : stageOneValue;
+  const stageTwoValue = generalizedRandomizedResponse(stageTwoInput, unifiedDomain, tspConfigParams.value.p2, tspConfigParams.value.q2);
+  const stageTwoLabel = stageTwoValue === 0 ? '缺失值 0' : `${stageTwoValue} 分`;
+  const reportMissingLabel = stageTwoValue === 0 ? '缺失（M=1）' : '非缺失（M=0）';
+  const reportScoreDisplay = stageTwoValue === 0 ? '--' : `${stageTwoValue} 分`;
+
+  return {
+    rawMissing,
+    rawMissingLabel,
+    rawScore,
+    rawScoreDisplay: rawMissing === 1 ? '--' : String(rawScore),
+    stageOneSkipped,
+    stageOneInputDisplay,
+    stageOneValue,
+    stageOneLabel,
+    stageOneSkipReason: stageOneSkipped ? '当前样本为缺失记录，第一阶段仅对非缺失样本执行，因此本阶段跳过。' : '',
+    stageTwoInput,
+    stageTwoInputDisplay: stageTwoInput === 0 ? '缺失值 0' : `${stageTwoInput} 分`,
+    stageTwoSkipped: false,
+    stageTwoValue,
+    stageTwoLabel,
+    stageTwoSkipReason: '',
+    reportValue: stageTwoValue,
+    reportValueDisplay: stageTwoValue === 0 ? '0（缺失值）' : `${stageTwoValue}（有效评分）`,
+    reportMissing: stageTwoValue === 0 ? 1 : 0,
+    reportMissingLabel,
+    reportScore: stageTwoValue === 0 ? null : stageTwoValue,
+    reportScoreDisplay
+  };
+}
+
+function simulateTspPerturbation(showMessage = true) {
+  if (!canSimulateTsp.value) {
+    if (showMessage) {
+      ElMessage.warning('请先完成 TSP 输入，并确保管理端已保存当前 TSP 参数');
+    }
+    return;
+  }
+
+  const result = performTspPerturbation(dynamicForm.sleepMissing, dynamicForm.sleepScore);
+  if (!result) {
+    if (showMessage) {
+      ElMessage.warning('当前 TSP 输入无效，请先检查缺失状态与评分');
+    }
+    return;
+  }
+
+  tspSimulationResult.value = result;
+
+  systemStatus.value = 1;
+
+  if (showMessage) {
+    ElMessage.success('已完成一次 TSP 两阶段扰动演示');
+  }
+}
+
 function simulateCurrentTaskOnce() {
   if (!currentTaskDetail.value) {
     ElMessage.warning('请先选择任务');
@@ -1226,6 +1576,12 @@ function simulateCurrentTaskOnce() {
   if (currentTaskDetail.value.scenario === 'agrr') {
     activeDemoTab.value = 'single';
     simulateAgrrPerturbation(true);
+    return;
+  }
+
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    activeDemoTab.value = 'single';
+    simulateTspPerturbation(true);
     return;
   }
 
@@ -1251,6 +1607,14 @@ function generateAgrrRawSample() {
   }) || bucketWeights[bucketWeights.length - 1];
 
   return Math.floor(Math.random() * (selectedBucket.max - selectedBucket.min + 1)) + selectedBucket.min;
+}
+
+function generateTspRawSample() {
+  const rawMissing = Math.random() < 0.35 ? 1 : 0;
+  return {
+    rawMissing,
+    rawScore: rawMissing === 1 ? null : randomInt(1, 5)
+  };
 }
 
 function runBatchSimulation() {
@@ -1305,6 +1669,61 @@ function runBatchSimulation() {
     }
 
     batchUploadState.value = null;
+    systemStatus.value = 1;
+    ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
+    return;
+  }
+
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    const samples = [];
+    const rawMissingCounts = { missing: 0, nonMissing: 0 };
+    const reportMissingCounts = { missing: 0, nonMissing: 0 };
+    const rawScoreCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    const reportScoreCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+    for (let i = 0; i < totalRuns; i += 1) {
+      const sampleInput = generateTspRawSample();
+      const sampleResult = performTspPerturbation(sampleInput.rawMissing, sampleInput.rawScore);
+      if (!sampleResult) {
+        continue;
+      }
+
+      if (sampleResult.rawMissing === 1) {
+        rawMissingCounts.missing += 1;
+      } else {
+        rawMissingCounts.nonMissing += 1;
+        rawScoreCounts[String(sampleResult.rawScore)] += 1;
+      }
+
+      if (sampleResult.reportValue === 0) {
+        reportMissingCounts.missing += 1;
+      } else {
+        reportMissingCounts.nonMissing += 1;
+        reportScoreCounts[String(sampleResult.reportValue)] += 1;
+      }
+
+      samples.push({
+        index: i + 1,
+        ...sampleResult
+      });
+    }
+
+    tspBatchResult.value = {
+      batchId: `${currentTaskDetail.value.taskId}-${Date.now()}`,
+      totalRuns,
+      rawMissingCounts,
+      reportMissingCounts,
+      rawScoreCounts,
+      reportScoreCounts,
+      samples
+    };
+
+    if (samples.length > 0) {
+      tspSimulationResult.value = {
+        ...samples[0]
+      };
+    }
+
     systemStatus.value = 1;
     ElMessage.success(`已完成 ${totalRuns} 次手环端连续采集`);
     return;
@@ -1436,6 +1855,65 @@ function uploadCurrentBatchResult() {
         };
       }
 
+      if (currentTaskDetail.value.scenario === 'tsp') {
+        return {
+          userId,
+          user_id: userId,
+          taskId: currentTaskDetail.value.taskId,
+          task_id: currentTaskDetail.value.taskId,
+          batch_id: currentBatchResult.value.batchId,
+          protocol: currentTaskDetail.value.protocol,
+          uploadTime,
+          upload_time: uploadTime,
+          original_missing: sample.rawMissing,
+          original_score: sample.rawScore,
+          stage1_result: sample.stageOneSkipped ? 'skipped' : sample.stageOneValue,
+          stage2_input: sample.stageTwoInput,
+          report_value: sample.reportValue,
+          rawData: {
+            scenario: 'tsp',
+            sleepMissing: sample.rawMissing,
+            sleepScore: sample.rawScore
+          },
+          reportData: {
+            protocol: currentTaskDetail.value.protocol,
+            reportValue: sample.reportValue,
+            perturbedValue: sample.reportValue,
+            perturbedLabel: sample.reportValueDisplay,
+            stageOneResult: sample.stageOneValue,
+            stageOneLabel: sample.stageOneLabel,
+            stageOneSkipped: sample.stageOneSkipped,
+            stageTwoInput: sample.stageTwoInput,
+            stageTwoResult: sample.stageTwoValue,
+            stageTwoLabel: sample.stageTwoLabel,
+            reportMissing: sample.reportMissing,
+            reportMissingLabel: sample.reportMissingLabel,
+            reportScore: sample.reportScore,
+            reportScoreDisplay: sample.reportScoreDisplay,
+            params: {
+              epsilonStage1: tspConfigParams.value.epsilonStage1.toFixed(4),
+              epsilonStage2: tspConfigParams.value.epsilonStage2.toFixed(4),
+              p1: tspConfigParams.value.p1.toFixed(4),
+              q1: tspConfigParams.value.q1.toFixed(4),
+              p2: tspConfigParams.value.p2.toFixed(4),
+              q2: tspConfigParams.value.q2.toFixed(4)
+            }
+          },
+          batchSummary: {
+            sampleCount: currentBatchResult.value.samples.length,
+            rawMissingCounts: currentBatchResult.value.rawMissingCounts,
+            reportMissingCounts: currentBatchResult.value.reportMissingCounts,
+            rawScoreCounts: currentBatchResult.value.rawScoreCounts,
+            reportScoreCounts: currentBatchResult.value.reportScoreCounts
+          },
+          sampleMeta: {
+            source: 'continuous-collection',
+            batchId: currentBatchResult.value.batchId,
+            sampleIndex: sample.index
+          }
+        };
+      }
+
       return {
         userId,
         user_id: userId,
@@ -1502,6 +1980,11 @@ function submitData() {
     return;
   }
 
+  if (currentTaskDetail.value.scenario === 'tsp' && !tspSimulationResult.value) {
+    ElMessage.warning('请先完成一次 TSP 两阶段扰动演示');
+    return;
+  }
+
   submitting.value = true;
 
   setTimeout(() => {
@@ -1524,6 +2007,8 @@ function submitData() {
           ? arrSimulationResult.value?.reportValue ?? null
           : currentTaskDetail.value.scenario === 'agrr'
             ? agrrSimulationResult.value?.reportValue ?? null
+            : currentTaskDetail.value.scenario === 'tsp'
+              ? tspSimulationResult.value?.reportValue ?? null
             : null,
         original_minutes: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawMinutes ?? null : null,
         original_bucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawLabel ?? null : null,
@@ -1543,16 +2028,22 @@ function submitData() {
             ? arrSimulationResult.value?.reportValue ?? null
             : currentTaskDetail.value.scenario === 'agrr'
               ? agrrSimulationResult.value?.reportValue ?? null
+              : currentTaskDetail.value.scenario === 'tsp'
+                ? tspSimulationResult.value?.reportValue ?? null
               : null,
           perturbedLabel: currentTaskDetail.value.scenario === 'arr'
             ? arrSimulationResult.value?.perturbedLabel ?? null
             : currentTaskDetail.value.scenario === 'agrr'
               ? agrrSimulationResult.value?.perturbedLabel ?? null
+              : currentTaskDetail.value.scenario === 'tsp'
+                ? tspSimulationResult.value?.reportValueDisplay ?? null
               : null,
           reportValue: currentTaskDetail.value.scenario === 'agrr'
             ? agrrSimulationResult.value?.reportValue ?? null
             : currentTaskDetail.value.scenario === 'arr'
               ? arrSimulationResult.value?.reportValue ?? null
+              : currentTaskDetail.value.scenario === 'tsp'
+                ? tspSimulationResult.value?.reportValue ?? null
               : null,
           rawBucket: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawLabel ?? null : null,
           rawBucketCode: currentTaskDetail.value.scenario === 'agrr' ? agrrSimulationResult.value?.rawValue ?? null : null,
@@ -1568,7 +2059,30 @@ function submitData() {
                   p: agrrConfigParams.value.p.toFixed(4),
                   q: agrrConfigParams.value.q.toFixed(4)
                 }
+              : currentTaskDetail.value.scenario === 'tsp' && tspConfigParams.value
+                ? {
+                    epsilonStage1: tspConfigParams.value.epsilonStage1.toFixed(4),
+                    epsilonStage2: tspConfigParams.value.epsilonStage2.toFixed(4),
+                    p1: tspConfigParams.value.p1.toFixed(4),
+                    q1: tspConfigParams.value.q1.toFixed(4),
+                    p2: tspConfigParams.value.p2.toFixed(4),
+                    q2: tspConfigParams.value.q2.toFixed(4),
+                    pStar: tspConfigParams.value.pStar != null ? tspConfigParams.value.pStar.toFixed(4) : null,
+                    qStar: tspConfigParams.value.qStar != null ? tspConfigParams.value.qStar.toFixed(4) : null
+                  }
               : null
+          ,
+          stageOneResult: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageOneValue ?? null : null,
+          stageOneLabel: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageOneLabel ?? null : null,
+          stageOneSkipped: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageOneSkipped ?? null : null,
+          stageTwoInput: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageTwoInput ?? null : null,
+          stageTwoResult: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageTwoValue ?? null : null,
+          stageTwoLabel: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.stageTwoLabel ?? null : null,
+          reportValueDisplay: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportValueDisplay ?? null : null,
+          reportMissing: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportMissing ?? null : null,
+          reportMissingLabel: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportMissingLabel ?? null : null,
+          reportScore: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportScore ?? null : null,
+          reportScoreDisplay: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportScoreDisplay ?? null : null
         }
       });
       localStorage.setItem('submittedData', JSON.stringify(storedData));
@@ -2109,6 +2623,26 @@ onMounted(() => {
 
 .preview-card {
   background: #f5f7fa;
+}
+
+.tsp-skip-panel {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px dashed #d9b96e;
+  background: #fff8e8;
+}
+
+.tsp-skip-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #8a5a00;
+}
+
+.tsp-skip-desc {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #7a6536;
 }
 
 .empty-box {

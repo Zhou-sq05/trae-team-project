@@ -172,13 +172,34 @@ export function calculateAOUEParameters(alpha, beta, epsilon) {
   return { p, q, rawQ, clamped: q !== rawQ };
 }
 
+export function generalizedRandomizedResponse(rawValue, domainValues, p, q) {
+  const normalizedDomain = Array.from(domainValues || []);
+  if (!normalizedDomain.length || !normalizedDomain.includes(rawValue)) {
+    return rawValue;
+  }
+
+  if (Math.random() < p) {
+    return rawValue;
+  }
+
+  const fallbackValues = normalizedDomain.filter(value => value !== rawValue);
+  if (!fallbackValues.length) {
+    return rawValue;
+  }
+
+  return fallbackValues[Math.floor(Math.random() * fallbackValues.length)];
+}
+
 export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
   const epsilonStage1 = epsilon / 2;
   const epsilonStage2 = epsilon - epsilonStage1;
-  const stage1 = calculateARRParameters(alpha, beta, epsilonStage1, 2);
+  const stage1 = calculateAGRParameters(alpha, beta, epsilonStage1, scoreDomainSize);
   const expStage2 = Math.exp(epsilonStage2);
-  const p2 = expStage2 / (expStage2 + scoreDomainSize - 1);
-  const q2 = 1 / (expStage2 + scoreDomainSize - 1);
+  const unifiedDomainSize = scoreDomainSize + 1;
+  const p2 = expStage2 / (expStage2 + unifiedDomainSize - 1);
+  const q2 = 1 / (expStage2 + unifiedDomainSize - 1);
+  const pStar = stage1.p * p2 + (1 - stage1.p) * q2;
+  const qStar = stage1.q * p2 + (1 - stage1.q) * q2;
 
   return {
     epsilonStage1,
@@ -187,7 +208,10 @@ export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5
     q1: stage1.q,
     p2,
     q2,
-    scoreDomainSize
+    pStar,
+    qStar,
+    scoreDomainSize,
+    unifiedDomainSize
   };
 }
 

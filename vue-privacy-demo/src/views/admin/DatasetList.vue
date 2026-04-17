@@ -137,6 +137,18 @@
           </div>
         </div>
 
+        <div v-if="selectedDataset.algorithm === 'TSP' && tspDetailSections.length" class="tsp-detail-sections">
+          <div v-for="section in tspDetailSections" :key="section.title" class="tsp-detail-card">
+            <div class="tsp-detail-card__title">{{ section.title }}</div>
+            <div class="tsp-detail-grid">
+              <div v-for="item in section.items" :key="item.label" class="tsp-detail-item">
+                <span class="tsp-detail-item__label">{{ item.label }}</span>
+                <span class="tsp-detail-item__value">{{ item.value }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <el-table :data="dataDetails" style="width: 100%">
           <el-table-column label="序号" type="index" width="80" />
           <el-table-column prop="userId" label="用户ID" />
@@ -177,6 +189,7 @@ const selectedTaskId = ref('');
 const filterTaskId = ref('');
 const selectedDataset = ref(null);
 const dataDetails = ref([]);
+const tspDetailSections = ref([]);
 const detailDrawerVisible = ref(false);
 const loading = ref(false);
 const rawSubmissions = ref([]);
@@ -294,6 +307,62 @@ function formatAgrrLabel(bucket, code) {
   return `${bucket || '--'}（${code}）`;
 }
 
+function formatTspMissingLabel(value) {
+  return Number(value) === 1 ? '缺失（M=1）' : '非缺失（M=0）';
+}
+
+function formatTspValue(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return '--';
+  }
+  return numericValue === 0 ? '0（缺失值）' : `${numericValue} 分`;
+}
+
+function buildTspDetailSections(submission, dataset) {
+  if (!submission) return [];
+
+  const originalMissing = submission.original_missing ?? submission.rawData?.sleepMissing ?? null;
+  const originalScore = submission.original_score ?? submission.rawData?.sleepScore ?? null;
+  const stage1Result = submission.stage1_result ?? submission.reportData?.stageOneResult ?? null;
+  const stage2Input = submission.stage2_input ?? submission.reportData?.stageTwoInput ?? null;
+  const reportValue = submission.report_value ?? submission.reportData?.reportValue ?? submission.reportData?.perturbedValue ?? null;
+  const stage1Skipped = stage1Result === 'skipped' || stage1Result == null;
+
+  return [
+    {
+      title: '原始输入',
+      items: [
+        { label: '缺失状态', value: formatTspMissingLabel(originalMissing) },
+        { label: '原始评分', value: originalScore == null ? '--' : `${originalScore} 分` }
+      ]
+    },
+    {
+      title: '第一阶段',
+      items: [
+        { label: '是否执行第一阶段', value: stage1Skipped ? '跳过' : '执行' },
+        { label: '第一阶段结果', value: stage1Skipped ? '跳过' : `${stage1Result} 分` }
+      ]
+    },
+    {
+      title: '第二阶段',
+      items: [
+        { label: '第二阶段输入', value: formatTspValue(stage2Input) },
+        { label: '最终上报值', value: formatTspValue(reportValue) }
+      ]
+    },
+    {
+      title: '元信息',
+      items: [
+        { label: 'task_id', value: submission.task_id ?? submission.taskId ?? dataset.taskId ?? '--' },
+        { label: 'protocol', value: submission.protocol ?? submission.reportData?.protocol ?? dataset.algorithm ?? '--' },
+        { label: 'batch_id', value: submission.batch_id ?? submission.sampleMeta?.batchId ?? dataset.batchId ?? '--' },
+        { label: 'upload_time', value: formatDateTime(submission.upload_time ?? submission.uploadTime ?? dataset.uploadTime) }
+      ]
+    }
+  ];
+}
+
 function buildDatasetRows(submissions) {
   const rows = [];
 
@@ -396,6 +465,33 @@ function buildDetailRows(submission, dataset) {
     }];
   }
 
+  if (submission.reportData && (scenario === 'tsp' || submission.reportData?.protocol === 'TSP')) {
+    const originalMissing = submission.original_missing ?? submission.rawData?.sleepMissing ?? '--';
+    const originalScore = submission.original_score ?? submission.rawData?.sleepScore ?? null;
+    const stage1Result = submission.stage1_result ?? submission.reportData?.stageOneResult;
+    const stage2Input = submission.stage2_input ?? submission.reportData?.stageTwoInput;
+    const reportValue = submission.report_value ?? submission.reportData?.reportValue ?? submission.reportData?.perturbedValue;
+
+    const rawParts = [
+      `缺失状态：${formatTspMissingLabel(originalMissing)}`,
+      `原始评分：${originalScore == null ? '--' : `${originalScore} 分`}`,
+      `第一阶段：${stage1Result === 'skipped' || stage1Result == null ? 'skipped' : `${stage1Result} 分`}`,
+      `第二阶段输入：${formatTspValue(stage2Input)}`
+    ];
+
+    return [{
+      userId: dataset.userId,
+      taskId: dataset.taskId,
+      batchId: dataset.batchId,
+      attribute: meta.attributeName,
+      rawValue: rawParts.join(' / '),
+      reportedValue: formatTspValue(reportValue),
+      mode: meta.mode,
+      algorithm: submission.reportData?.protocol || meta.algorithm,
+      uploadTime: dataset.uploadTime
+    }];
+  }
+
   return [{
     userId: dataset.userId,
     taskId: dataset.taskId,
@@ -445,12 +541,27 @@ function viewDataDetail(dataset) {
   selectedDataset.value = dataset;
   const submission = rawSubmissions.value[dataset.sourceIndex] || null;
   dataDetails.value = buildDetailRows(submission, dataset);
+  tspDetailSections.value = dataset.algorithm === 'TSP'
+    ? buildTspDetailSections(submission, dataset)
+    : [];
   detailDrawerVisible.value = true;
 }
 
 function startAggregation() {
   ElMessage.success('开始聚合估计');
-  router.push('/admin/aggregate');
+  const query = {};
+  if (selectedTaskId.value) {
+    query.taskId = selectedTaskId.value;
+  }
+  if (
+    selectedDataset.value?.taskId
+    && String(selectedDataset.value.taskId) === String(selectedTaskId.value)
+    && selectedDataset.value?.batchId
+    && selectedDataset.value.batchId !== '--'
+  ) {
+    query.batchId = selectedDataset.value.batchId;
+  }
+  router.push({ path: '/admin/aggregate', query });
 }
 
 function handleSizeChange(size) {
@@ -491,6 +602,7 @@ function batchDelete() {
     selectedRows.value = [];
     selectedDataset.value = null;
     dataDetails.value = [];
+    tspDetailSections.value = [];
     detailDrawerVisible.value = false;
     if (tableRef.value) {
       tableRef.value.clearSelection();
@@ -612,6 +724,55 @@ onMounted(() => {
   font-weight: 700;
   color: #183153;
   word-break: break-all;
+}
+
+.tsp-detail-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.tsp-detail-card {
+  border: 1px solid #e6edf6;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fbff 0%, #fdfefe 100%);
+  padding: 14px 16px;
+}
+
+.tsp-detail-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #183153;
+  margin-bottom: 10px;
+}
+
+.tsp-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 12px;
+}
+
+.tsp-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #edf2f8;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.tsp-detail-item__label {
+  font-size: 12px;
+  color: #73849b;
+}
+
+.tsp-detail-item__value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #183153;
+  line-height: 1.5;
 }
 
 @media (max-width: 1200px) {

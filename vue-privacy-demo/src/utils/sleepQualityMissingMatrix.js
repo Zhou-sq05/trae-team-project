@@ -91,7 +91,10 @@ export function calculateMissingColumnStats(matrixData) {
 
 export function calculateSleepMissingAlphaBeta(matrixData) {
   const stats = calculateMissingColumnStats(matrixData);
-  const selectedStat = stats[1].ratio > stats[0].ratio ? stats[1] : stats[0];
+  const selectedStat = stats.reduce((best, current) => {
+    if (!best) return current;
+    return current.ratio > best.ratio ? current : best;
+  }, null);
   return {
     selectedLabel: selectedStat.label,
     alpha: selectedStat.max,

@@ -881,39 +881,39 @@
             </div>
             <div class="stage-panel-group">
               <div class="stage-panel">
-                <div class="stage-title">第一阶段：缺失状态扰动参数</div>
-                <div class="stage-desc">针对缺失状态 M 的二值扰动</div>
+                <div class="stage-title">第一阶段：有效评分值扰动参数</div>
+                <div class="stage-desc">仅对非缺失样本的有效评分值 {1,2,3,4,5} 执行多值扰动</div>
                 <div class="result-grid compact-grid">
                   <div class="result-panel stage-result-panel">
                     <div class="result-label">p1</div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.p1 : '--' }}</div>
-                    <div class="result-subtext">保留原始缺失状态的概率</div>
+                    <div class="result-subtext">保留第一阶段原始有效评分值的概率</div>
                   </div>
                   <div class="result-panel stage-result-panel">
                     <div class="result-label">q1</div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.q1 : '--' }}</div>
-                    <div class="result-subtext">翻转为另一缺失状态的概率</div>
+                    <div class="result-subtext">扰动到其他有效评分值的概率</div>
                   </div>
                 </div>
-                <div class="stage-check-line">满足 p1 + q1 = 1</div>
+                <div class="stage-check-line">满足 p1 + 4q1 = 1，对应第一阶段有效值域大小 d = 5</div>
               </div>
 
               <div class="stage-panel">
-                <div class="stage-title">第二阶段：睡眠评分扰动参数</div>
-                <div class="stage-desc">针对非缺失睡眠评分（1-5）的多值扰动</div>
+                <div class="stage-title">第二阶段：统一域扰动参数</div>
+                <div class="stage-desc">对缺失值 0 与第一阶段后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动</div>
                 <div class="result-grid compact-grid">
                   <div class="result-panel stage-result-panel">
                     <div class="result-label">p2</div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.p2 : '--' }}</div>
-                    <div class="result-subtext">保留真实评分值的概率</div>
+                    <div class="result-subtext">保留第二阶段输入值的概率</div>
                   </div>
                   <div class="result-panel stage-result-panel">
                     <div class="result-label">q2</div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.q2 : '--' }}</div>
-                    <div class="result-subtext">扰动到其他评分值的概率</div>
+                    <div class="result-subtext">扰动到统一域其他取值的概率</div>
                   </div>
                 </div>
-                <div class="stage-check-line">满足 p2 + 4q2 = 1</div>
+                <div class="stage-check-line">满足 p2 + 5q2 = 1，对应第二阶段统一域大小 d+1 = 6</div>
               </div>
             </div>
             <div v-if="sleepMissingCalibratedParams" class="calibration-summary-bar">
@@ -923,9 +923,14 @@
               <div class="light-summary-item">隐私预算 ε：{{ sleepMissingCalibratedParams.epsilon }}</div>
               <div class="light-summary-item">第一阶段预算 ε1：{{ sleepMissingCalibratedParams.epsilonStage1 }}</div>
               <div class="light-summary-item">第二阶段预算 ε2：{{ sleepMissingCalibratedParams.epsilonStage2 }}</div>
+              <div class="light-summary-item">第一阶段有效值域：{1,2,3,4,5}</div>
+              <div class="light-summary-item">第二阶段统一域：{0,1,2,3,4,5}</div>
+              <div class="light-summary-item">组合恢复参数 p*：{{ sleepMissingCalibratedParams.pStar }}</div>
+              <div class="light-summary-item">组合恢复参数 q*：{{ sleepMissingCalibratedParams.qStar }}</div>
               <div class="light-summary-item">协议：{{ sleepMissingCalibratedParams.protocol }}</div>
               <div class="light-summary-item">数据源：{{ sleepMissingCalibratedParams.dataSource }}</div>
               <div class="light-summary-item">机制说明：{{ sleepMissingCalibratedParams.description }}</div>
+              <div class="light-summary-item">组合恢复参数：p* = p1 × p2 + (1 - p1) × q2，q* = q1 × p2 + (1 - q1) × q2</div>
             </div>
           </div>
         </div>
@@ -1275,7 +1280,7 @@ const distributeSummary = computed(() => {
     },
     '睡眠质量评分': {
       sensitiveAttribute: '年龄段',
-      userProcessSummary: 'TSP：两阶段扰动',
+      userProcessSummary: 'TSP：先对非缺失有效评分做第一阶段扰动，再对缺失值 0 与处理后有效值统一做第二阶段扰动',
       parameterSummary: [
         `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
         `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
@@ -1794,7 +1799,7 @@ function calibrateParams() {
 
     try {
       const epsilon = Number(savedPrivacyBudget.value) || 1.0;
-      const { epsilonStage1, epsilonStage2, p1, q1, p2, q2, scoreDomainSize } = calculateTSPParameters(
+      const { epsilonStage1, epsilonStage2, p1, q1, p2, q2, pStar, qStar, scoreDomainSize, unifiedDomainSize } = calculateTSPParameters(
         sleepMissingAlphaBetaResult.value.alpha,
         sleepMissingAlphaBetaResult.value.beta,
         epsilon,
@@ -1806,12 +1811,15 @@ function calibrateParams() {
         q1: Number(q1).toFixed(4),
         p2: Number(p2).toFixed(4),
         q2: Number(q2).toFixed(4),
+        pStar: Number(pStar).toFixed(4),
+        qStar: Number(qStar).toFixed(4),
         epsilon,
         epsilonStage1: Number(epsilonStage1).toFixed(4),
         epsilonStage2: Number(epsilonStage2).toFixed(4),
         d: scoreDomainSize,
+        unifiedDomainSize,
         protocol: 'TSP (Two-Stage Perturbation)',
-        description: `第一阶段针对缺失状态 M 进行二值扰动，第二阶段针对非缺失的睡眠评分（1-5）进行评分扰动。`,
+        description: '先基于缺失状态 M 的条件分布 Pr(M|S) 计算内在不确定性；第一阶段仅对非缺失样本的有效评分值 {1,2,3,4,5} 进行扰动，以注入与缺失状态等量的不确定性；第二阶段再将缺失值 0 与第一阶段处理后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动并上报。',
         dataSource: 'temp_sleep_quality_missing_age_200.csv'
       };
 
