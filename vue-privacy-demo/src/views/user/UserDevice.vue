@@ -200,7 +200,7 @@
 
       <div class="right-section">
         <h3>演示调试区域</h3>
-        <template v-if="['arr', 'agrr', 'aoue'].includes(currentTaskDetail?.scenario)">
+        <template v-if="['arr', 'agrr', 'aoue', 'tsp'].includes(currentTaskDetail?.scenario)">
           <div class="demo-tab-bar">
             <button
               type="button"
@@ -241,6 +241,95 @@
                   />
                 </div>
               </el-dialog>
+            </template>
+
+            <template v-else-if="currentTaskDetail?.scenario === 'tsp'">
+              <div class="summary-block">
+                <h4>任务摘要</h4>
+                <div class="demo-top-card">
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">任务 ID</span>
+                    <span class="demo-top-value">{{ currentTaskDetail?.taskId || '--' }}</span>
+                  </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">协议</span>
+                    <span class="demo-top-value">{{ currentTaskDetail?.protocol || '--' }}</span>
+                  </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">隐私预算 ε</span>
+                    <span class="demo-top-value">{{ displayEpsilon }}</span>
+                  </div>
+                  <div class="demo-top-item">
+                    <span class="demo-top-label">TSP 版本</span>
+                    <span class="demo-top-value">{{ tspVersionMeta?.label || '--' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <h4>原始输入</h4>
+                <div class="card-grid">
+                  <div v-for="item in tspRawCards" :key="item.label" class="summary-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>第一阶段</h4>
+                  <span class="section-tip">仅非缺失样本进入评分扰动</span>
+                </div>
+                <div v-if="tspSimulationResult?.stageOneSkipped" class="tsp-skip-panel">
+                  <div class="tsp-skip-title">第一阶段已跳过</div>
+                  <div class="tsp-skip-desc">{{ tspSimulationResult.stageOneSkipReason }}</div>
+                </div>
+                <div v-else class="card-grid">
+                  <div v-for="item in tspStageOneCards" :key="item.label" class="summary-card preview-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>第二阶段</h4>
+                  <span class="section-tip">统一域 {0,1,2,3,4,5} 上报扰动</span>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in tspStageTwoCards" :key="item.label" class="summary-card preview-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <div class="summary-heading">
+                  <h4>最终上报结果</h4>
+                  <span class="section-tip">两阶段输出汇总后的最终值</span>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in tspFinalReportCards" :key="item.label" class="summary-card preview-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+                <div class="preview-tip">{{ processPreviewTip }}</div>
+                <div v-if="!tspParametersReady" class="preview-tip">
+                  当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段扰动演示。
+                </div>
+                <div class="action-row">
+                  <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
+                    {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
+                  </el-button>
+                  <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
+                    提交上报
+                  </el-button>
+                </div>
+              </div>
             </template>
 
             <template v-else>
@@ -393,6 +482,110 @@
                     <div v-else class="preview-tip">
                       请先完成连续采集模拟，再将本次连续采集产生的扰动后样本记录批量上报到管理端。
                     </div>
+                  </div>
+                </template>
+
+                <template v-else-if="currentTaskDetail?.scenario === 'tsp'">
+                  <div class="tsp-batch-layout">
+                    <section class="tsp-batch-card tsp-batch-card--stats">
+                      <div class="summary-heading">
+                        <div class="summary-heading__copy">
+                          <h4>TSP 批量摘要</h4>
+                          <span class="section-tip">连续采集后的总体统计，突出最终上报结果</span>
+                        </div>
+                      </div>
+                      <div class="tsp-stat-grid">
+                        <div class="tsp-stat-card">
+                          <div class="tsp-stat-label">总样本数</div>
+                          <div class="tsp-stat-value">{{ currentBatchResult?.totalRuns ?? 0 }}</div>
+                        </div>
+                        <div class="tsp-stat-card">
+                          <div class="tsp-stat-label">缺失样本数</div>
+                          <div class="tsp-stat-value">{{ currentBatchResult?.rawMissingCounts?.missing ?? 0 }}</div>
+                        </div>
+                        <div class="tsp-stat-card">
+                          <div class="tsp-stat-label">有效样本数</div>
+                          <div class="tsp-stat-value">{{ currentBatchResult?.rawMissingCounts?.nonMissing ?? 0 }}</div>
+                        </div>
+                        <div class="tsp-stat-card tsp-stat-card--accent">
+                          <div class="tsp-stat-label">最终上报数</div>
+                          <div class="tsp-stat-value">{{ currentBatchResult?.samples?.length ?? 0 }}</div>
+                        </div>
+                      </div>
+                      <div class="tsp-batch-note">{{ currentBatchResultTip }}</div>
+                    </section>
+
+                    <section class="tsp-batch-card tsp-batch-card--table">
+                      <div class="summary-heading">
+                        <div class="summary-heading__copy">
+                          <h4>样本预览</h4>
+                          <span class="section-tip">展示前 10 条连续采集样本，重点标记最终上报值</span>
+                        </div>
+                      </div>
+                      <div class="tsp-table-wrap">
+                        <table class="tsp-preview-table">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>缺失状态</th>
+                              <th>原始评分</th>
+                              <th>阶段一结果</th>
+                              <th>阶段二输入</th>
+                              <th>最终上报</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="row in currentBatchPreviewRows" :key="row.index">
+                              <td class="tsp-col-index">{{ row.index }}</td>
+                              <td>
+                                <span :class="['tsp-status-chip', row.rawMissing === 1 ? 'is-muted' : 'is-success']">
+                                  {{ row.rawMissing === 1 ? '缺失' : '非缺失' }}
+                                </span>
+                              </td>
+                              <td>
+                                <span v-if="row.rawMissing === 1" class="tsp-status-chip is-muted">--</span>
+                                <span v-else class="tsp-cell-text">{{ row.rawScoreDisplay }}</span>
+                              </td>
+                              <td>
+                                <span :class="['tsp-status-chip', row.stageOneSkipped ? 'is-warning' : 'is-success']">
+                                  {{ row.stageOneSkipped ? '已跳过' : row.stageOneLabel }}
+                                </span>
+                              </td>
+                              <td>
+                                <span :class="['tsp-status-chip', row.stageTwoInput === 0 ? 'is-muted' : 'is-success']">
+                                  {{ row.stageTwoInputDisplay }}
+                                </span>
+                              </td>
+                              <td class="tsp-col-report">
+                                <span :class="['tsp-report-pill', row.reportValue === 0 ? 'is-muted' : 'is-accent']">
+                                  {{ row.reportValueDisplay }}
+                                </span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+
+                    <section class="tsp-batch-card tsp-batch-card--actions">
+                      <div class="tsp-action-copy">
+                        <div class="tsp-action-title">批量上报</div>
+                        <div class="tsp-action-desc">将当前这批 TSP 连续采集样本写入管理端提交数据，保留现有上报格式与字段。</div>
+                        <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="tsp-action-status">
+                          本次上报状态：{{ batchUploadState.status }}，记录数：{{ batchUploadState.count }}
+                        </div>
+                      </div>
+                      <div class="tsp-action-buttons">
+                        <el-button @click="runBatchSimulation">重新生成样本</el-button>
+                        <el-button
+                          type="primary"
+                          @click="uploadCurrentBatchResult"
+                          :disabled="!currentBatchResult || batchUploadState?.batchId === currentBatchResult.batchId"
+                        >
+                          上报本次连续采集结果
+                        </el-button>
+                      </div>
+                    </section>
                   </div>
                 </template>
 
@@ -3438,6 +3631,26 @@ onMounted(() => {
   margin-top: 14px;
 }
 
+.tsp-skip-panel {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px dashed #d9b96e;
+  background: #fff8e8;
+}
+
+.tsp-skip-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #8a5a00;
+}
+
+.tsp-skip-desc {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #7a6536;
+}
+
 .summary-heading {
   display: flex;
   align-items: center;
@@ -3879,6 +4092,199 @@ onMounted(() => {
 
 .preview-card {
   background: #f5f7fa;
+}
+
+.tsp-batch-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tsp-batch-card {
+  border: 1px solid #e5ecf4;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  padding: 18px 20px;
+}
+
+.tsp-batch-card--stats {
+  background: linear-gradient(180deg, #fbfdff 0%, #f7fbff 100%);
+}
+
+.tsp-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tsp-stat-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e8eef5;
+}
+
+.tsp-stat-card--accent {
+  border-color: #bfd8ff;
+  background: linear-gradient(135deg, #f4f9ff 0%, #eef6ff 100%);
+}
+
+.tsp-stat-label {
+  font-size: 12px;
+  color: #7b8794;
+}
+
+.tsp-stat-value {
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2d3d;
+  line-height: 1.2;
+}
+
+.tsp-batch-note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e8eef5;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #5f6b7a;
+}
+
+.tsp-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e8eef5;
+  border-radius: 12px;
+}
+
+.tsp-preview-table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #ffffff;
+}
+
+.tsp-preview-table th,
+.tsp-preview-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+  font-size: 12px;
+  color: #425466;
+  white-space: nowrap;
+}
+
+.tsp-preview-table th {
+  background: #f5f7fa;
+  color: #6b7785;
+  font-weight: 600;
+}
+
+.tsp-preview-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.tsp-preview-table tbody tr:hover {
+  background: #f9fbfe;
+}
+
+.tsp-preview-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tsp-col-index {
+  width: 56px;
+  color: #7b8794;
+}
+
+.tsp-col-report {
+  font-weight: 600;
+}
+
+.tsp-cell-text {
+  font-size: 12px;
+  color: #334155;
+}
+
+.tsp-status-chip,
+.tsp-report-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.tsp-status-chip.is-success {
+  color: #1f7a45;
+  background: #edf8f1;
+  border-color: #cdebd6;
+}
+
+.tsp-status-chip.is-muted,
+.tsp-report-pill.is-muted {
+  color: #667085;
+  background: #f2f4f7;
+  border-color: #e4e7ec;
+}
+
+.tsp-status-chip.is-warning {
+  color: #b76e00;
+  background: #fff4df;
+  border-color: #f3d19c;
+}
+
+.tsp-report-pill.is-accent {
+  color: #1859c8;
+  background: #eef5ff;
+  border-color: #c9dcff;
+  box-shadow: inset 0 0 0 1px rgba(24, 89, 200, 0.04);
+}
+
+.tsp-batch-card--actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.tsp-action-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.tsp-action-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.tsp-action-desc {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #6b7785;
+}
+
+.tsp-action-status {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #409eff;
+}
+
+.tsp-action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .aoue-compact-strip {
@@ -4415,6 +4821,7 @@ onMounted(() => {
   .task-meta-grid,
   .card-grid,
   .batch-summary-strip,
+  .tsp-stat-grid,
   .aoue-hero-grid,
   .aoue-main-grid {
     grid-template-columns: 1fr;
@@ -4437,6 +4844,19 @@ onMounted(() => {
   .compare-bar-label {
     width: auto;
     padding-top: 0;
+  }
+
+  .tsp-batch-card--actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tsp-action-buttons {
+    justify-content: flex-start;
+  }
+
+  .tsp-preview-table {
+    min-width: 640px;
   }
 
   .aoue-compact-strip {
