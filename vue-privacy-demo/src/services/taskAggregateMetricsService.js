@@ -301,6 +301,76 @@ function buildTspSummary(tspRecords, scoreDomainSize = 5) {
   };
 }
 
+function buildTspResultSections(summary, estimatedCounts, useDisplayConstraint = false) {
+  const trueCounts = summary.hasRawSummary ? summary.rawCounts : summary.reportCounts;
+  const missingTrueCounts = [
+    Number(trueCounts[0] ?? 0),
+    Number(trueCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0))
+  ];
+  const rawMissingEstimatedCounts = [
+    Number(estimatedCounts[0] ?? 0),
+    Number(estimatedCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0).toFixed(4))
+  ];
+  const scoreTrueCounts = trueCounts.slice(1).map(value => Number(value ?? 0));
+  const rawScoreEstimatedCounts = estimatedCounts.slice(1).map(value => Number(value ?? 0));
+  const scoreSampleCount = scoreTrueCounts.reduce((sum, value) => sum + value, 0);
+  
+  return [
+    createSection(
+      ['缺失', '非缺失'],
+      missingTrueCounts,
+      rawMissingEstimatedCounts,
+      summary.sampleCount,
+      'missing',
+      '结果块一：缺失状态聚合',
+      '单独展示缺失 / 非缺失样本的真实分布、聚合估计分布与误差。',
+      '缺失状态真实频率 vs 估计频率'
+    ),
+    createSection(
+      ['1 分', '2 分', '3 分', '4 分', '5 分'],
+      scoreTrueCounts,
+      rawScoreEstimatedCounts,
+      scoreSampleCount,
+      'score',
+      '结果块二：评分分布聚合',
+      '单独展示睡眠质量评分 1~5 的真实分布、聚合估计分布与误差。',
+      '评分分布真实频率 vs 估计频率'
+    )
+  ];
+}
+
+function createSection(labels, trueCounts, estimatedCounts, sampleCount, key, title, description, chartTitle) {
+  const metrics = buildAggregateMetrics({
+    labels,
+    trueCounts,
+    estimatedCounts,
+    sampleCount,
+    consistencyThreshold: 0.05
+  });
+  const compareRows = metrics.comparisonRows.map(row => ({
+    label: row.label,
+    trueCount: row.trueCount,
+    estimatedCount: row.estimatedCount,
+    countError: row.countError,
+    trueFreq: row.trueFreq,
+    estimatedFreq: row.estimatedFreq,
+    freqError: row.freqError
+  }));
+  return {
+    key,
+    title,
+    description,
+    chartTitle,
+    metrics,
+    compareRows,
+    chartData: compareRows.map(row => ({
+      label: row.label,
+      trueFreq: row.trueFreq,
+      estimatedFreq: row.estimatedFreq
+    }))
+  };
+}
+
 function createAggregateViewModel({
   id,
   attributeName,
@@ -311,6 +381,7 @@ function createAggregateViewModel({
   config,
   summary,
   estimatedCounts,
+  resultSections,
   distributionFit,
   sourceDescription
 }) {
@@ -333,6 +404,20 @@ function createAggregateViewModel({
     estimatedFreq: row.estimatedFreq,
     freqError: row.freqError
   }));
+
+  // 如果没有传入 resultSections，创建默认的
+  const finalResultSections = resultSections || [
+    createSection(
+      labels,
+      trueCounts,
+      estimatedCounts,
+      summary.sampleCount,
+      'overall',
+      '真实与聚合估计对照',
+      `对比 ${algorithm} 场景下真实分布与聚合恢复结果。`,
+      '真实频率 vs 估计频率'
+    )
+  ];
 
   return {
     id,
@@ -416,6 +501,7 @@ function createAggregateViewModel({
       estimatedFreq: row.estimatedFreq
     })),
     compareRows,
+    resultSections: finalResultSections,
     perturbationStatus,
     metricDescription: '核心 MSE / MAE 指标按论文中的频率误差定义计算，计数误差仅用于辅助展示。',
     sourceDescription,
@@ -533,6 +619,7 @@ function getTspAggregateResults(records, task, taskId) {
   const summary = buildTspSummary(tspRecords, config.scoreDomainSize);
   const estimatedCounts = aggregateTspDomainCounts(summary.reportCounts, summary.sampleCount, config)
     .map(value => Number(value.toFixed(4)));
+  const resultSections = buildTspResultSections(summary, estimatedCounts, false);
 
   return [createAggregateViewModel({
     id: 1,
@@ -544,6 +631,7 @@ function getTspAggregateResults(records, task, taskId) {
     config,
     summary,
     estimatedCounts,
+    resultSections,
     distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复' : '基于最终上报分布近似',
     sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`
   })];

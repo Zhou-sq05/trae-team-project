@@ -1,4 +1,4 @@
-﻿import { STAND_BUCKET_ORDER } from '../utils/constants';
+import { STAND_BUCKET_ORDER } from '../utils/constants';
 import {
   aggregateAGRR,
   aggregateARR,
@@ -687,6 +687,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
     config,
     summary,
     estimatedCounts,
+    resultSections,
     distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复' : '基于最终上报分布近似',
     sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`,
     summaryCards: [
