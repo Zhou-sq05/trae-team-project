@@ -58,6 +58,16 @@
                         :value="task.id"
                       />
                     </el-select>
+                    <span v-if="usesTspAlignedView" class="task-select-label">批次</span>
+                    <el-select v-if="usesTspAlignedView" v-model="selectedBatchId" placeholder="全部批次" clearable style="width: 220px">
+                      <el-option label="全部批次" value="" />
+                      <el-option
+                        v-for="batch in batchOptions"
+                        :key="batch.batchId"
+                        :label="batch.batchId"
+                        :value="batch.batchId"
+                      />
+                    </el-select>
                   </div>
                 </div>
               </template>
@@ -112,51 +122,82 @@
                   <div class="metric-tip metric-tip--highlight">{{ currentData.metricDescription }}</div>
                 </section>
 
+                <section v-if="currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
+                  <div class="section-heading">
+                    <h3>服务端接收计数</h3>
+                    <p>这里直接展示服务端收到的统一域计数 c0, c1, ..., c5，其中 c0 对应上报值 0，ci 对应上报值 i（i=1..5）。</p>
+                  </div>
+                  <div class="summary-strip">
+                    <div class="summary-card summary-card--adaptive" v-for="item in tspReportedCountCards" :key="item.label">
+                      <div class="summary-label">{{ item.label }}</div>
+                      <div class="summary-value">{{ item.value }}</div>
+                    </div>
+                  </div>
+                  <div class="metric-tip metric-tip--highlight">
+                    当前参与聚合记录数：{{ tspDiagnostics.scope.recordCount }}；
+                    task_id 分布：{{ formatDistributionMap(tspDiagnostics.scope.taskDistribution) }}；
+                    batch_id 分布：{{ formatDistributionMap(tspDiagnostics.scope.batchDistribution) }}
+                  </div>
+                </section>
+
                 <section class="summary-section">
                   <div class="section-heading">
-                    <h3>真实与聚合估计对照</h3>
-                    <p>对比 {{ currentData.algorithm }} 场景下真实分布与聚合恢复结果。</p>
+                    <h3>{{ currentData.algorithm === 'TSP' ? '聚合结果分块' : '真实与聚合估计对照' }}</h3>
+                    <p>
+                      {{ currentData.algorithm === 'TSP'
+                        ? 'TSP 将缺失状态与睡眠评分拆分展示，避免把两类结果混成一张大表。'
+                        : `对比 ${currentData.algorithm} 场景下真实分布与聚合恢复结果。` }}
+                    </p>
                   </div>
-                  <div class="compare-layout">
-                    <div class="compare-panel compare-panel--table">
-                    <table class="compare-table">
-                      <thead>
-                        <tr class="group-header">
-                          <th rowspan="2">状态</th>
-                          <th colspan="3">计数</th>
-                          <th colspan="3">频率</th>
-                        </tr>
-                        <tr>
-                          <th>真实值</th>
-                          <th>聚合估计值</th>
-                          <th>计数误差</th>
-                          <th>真实频率</th>
-                          <th>估计频率</th>
-                          <th>频率误差</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="row in currentData.compareRows" :key="row.label">
-                          <td>{{ row.label }}</td>
-                          <td>{{ formatMetric(row.trueCount) }}</td>
-                          <td>{{ formatMetric(row.estimatedCount) }}</td>
-                          <td :class="['error-text', row.countError > 0 ? 'increase' : row.countError < 0 ? 'decrease' : 'neutral']">
-                            {{ formatArrowDelta(row.countError) }}
-                          </td>
-                          <td>{{ formatFrequency(row.trueFreq) }}</td>
-                          <td>{{ formatFrequency(row.estimatedFreq) }}</td>
-                          <td :class="['error-text', row.freqError > 0 ? 'increase' : row.freqError < 0 ? 'decrease' : 'neutral']">
-                            {{ formatFrequencyArrowDelta(row.freqError) }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    </div>
 
-                    <div class="compare-panel compare-panel--chart">
-                      <div class="mini-chart-title">真实频率 vs 估计频率</div>
-                      <div class="mini-chart-box">
-                        <div class="chart-container" ref="comparisonChart"></div>
+                  <div class="result-blocks">
+                    <div v-for="(section, index) in resultSections" :key="section.key" class="result-block">
+                      <div class="section-heading result-block__heading">
+                        <h4>{{ section.title }}</h4>
+                        <p>{{ section.description }}</p>
+                      </div>
+                      <div class="compare-layout">
+                        <div class="compare-panel compare-panel--table">
+                          <table class="compare-table">
+                            <thead>
+                              <tr class="group-header">
+                                <th rowspan="2">状态</th>
+                                <th colspan="3">计数</th>
+                                <th colspan="3">频率</th>
+                              </tr>
+                              <tr>
+                                <th>真实值</th>
+                                <th>聚合估计值</th>
+                                <th>计数误差</th>
+                                <th>真实频率</th>
+                                <th>估计频率</th>
+                                <th>频率误差</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="row in section.compareRows" :key="`${section.key}-${row.label}`">
+                                <td>{{ row.label }}</td>
+                                <td>{{ formatMetric(row.trueCount) }}</td>
+                                <td>{{ formatMetric(row.estimatedCount) }}</td>
+                                <td :class="['error-text', row.countError > 0 ? 'increase' : row.countError < 0 ? 'decrease' : 'neutral']">
+                                  {{ formatArrowDelta(row.countError) }}
+                                </td>
+                                <td>{{ formatFrequency(row.trueFreq) }}</td>
+                                <td>{{ formatFrequency(row.estimatedFreq) }}</td>
+                                <td :class="['error-text', row.freqError > 0 ? 'increase' : row.freqError < 0 ? 'decrease' : 'neutral']">
+                                  {{ formatFrequencyArrowDelta(row.freqError) }}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div class="compare-panel compare-panel--chart">
+                          <div class="mini-chart-title">{{ section.chartTitle }}</div>
+                          <div class="mini-chart-box">
+                            <div class="chart-container" :ref="el => setComparisonChartRef(el, index)"></div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -207,12 +248,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { House, Setting, Document, DataAnalysis, ArrowDown, QuestionFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
-import { getAggregateResults, getTotalDataCount } from '../../services/taskAggregateMetricsService'
+import { getAggregateResults as getTspAlignedAggregateResults } from '../../services/taskAggregateResultService'
+import { getAvailableBatches, getScopedDataCount, getTspAggregateDiagnostics } from '../../services/aggregateDiagnosticsService'
+import {
+  getAggregateResults as getLegacyAggregateResults,
+  getTotalDataCount as getLegacyTotalDataCount
+} from '../../services/taskAggregateMetricsService'
 
 const route = useRoute()
 const router = useRouter()
@@ -222,13 +268,17 @@ const user = computed(() => userStore.user)
 
 const tasks = ref([])
 const selectedTaskId = ref('')
+const selectedBatchId = ref('')
 const perturbationData = ref([])
 const totalCount = ref(0)
 const selectedData = ref(1)
-const comparisonChart = ref(null)
-let comparisonChartInstance = null
+const comparisonChartRefs = ref([])
+const tspDiagnostics = ref(null)
+let comparisonChartInstances = []
 
 const currentData = computed(() => perturbationData.value.find(item => item.id === selectedData.value) || null)
+const selectedTask = computed(() => tasks.value.find(task => String(task.id) === String(selectedTaskId.value)) || null)
+const usesTspAlignedView = computed(() => String(selectedTask.value?.protocol || '').toUpperCase() === 'TSP')
 
 const compactSummaryCards = computed(() => {
   return currentData.value?.summaryCards || []
@@ -240,6 +290,23 @@ const coreMetricCards = computed(() => {
 
 const detailMetricCards = computed(() => {
   return currentData.value?.detailMetricCards || []
+})
+
+const resultSections = computed(() => {
+  return currentData.value?.resultSections || []
+})
+
+const batchOptions = computed(() => {
+  if (!selectedTaskId.value) return []
+  return getAvailableBatches(selectedTaskId.value)
+})
+
+const tspReportedCountCards = computed(() => {
+  const counts = tspDiagnostics.value?.reportDomainCounts || []
+  return counts.map((value, index) => ({
+    label: `c${index}`,
+    value: String(value ?? 0)
+  }))
 })
 
 const handleLogout = () => {
@@ -262,9 +329,26 @@ function loadTasks() {
 }
 
 function loadAggregateData() {
-  perturbationData.value = getAggregateResults(selectedTaskId.value)
-  totalCount.value = getTotalDataCount(selectedTaskId.value)
+  if (usesTspAlignedView.value) {
+    const scope = {
+      taskId: selectedTaskId.value,
+      batchId: selectedBatchId.value
+    }
+    perturbationData.value = getTspAlignedAggregateResults(scope)
+    totalCount.value = getScopedDataCount(scope)
+    tspDiagnostics.value = getTspAggregateDiagnostics(scope)
+  } else {
+    perturbationData.value = getLegacyAggregateResults(selectedTaskId.value)
+    totalCount.value = getLegacyTotalDataCount(selectedTaskId.value)
+    tspDiagnostics.value = null
+  }
   selectedData.value = perturbationData.value.length > 0 ? perturbationData.value[0].id : null
+}
+
+function formatDistributionMap(distribution) {
+  const entries = Object.entries(distribution || {})
+  if (!entries.length) return '--'
+  return entries.map(([key, value]) => `${key}: ${value}`).join(' | ')
 }
 
 function formatMetric(value) {
@@ -299,81 +383,121 @@ function formatFrequencyArrowDelta(value) {
   return '0.000000'
 }
 
-function initComparisonChart() {
-  if (!comparisonChart.value) return
-  if (comparisonChartInstance) {
-    comparisonChartInstance.dispose()
-  }
-  comparisonChartInstance = echarts.init(comparisonChart.value)
-  updateComparisonChart()
+function setComparisonChartRef(element, index) {
+  comparisonChartRefs.value[index] = element || null
 }
 
-function updateComparisonChart() {
-  if (!comparisonChartInstance || !currentData.value) return
-
-  comparisonChartInstance.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: {
-      data: ['真实分布', '聚合估计分布'],
-      top: 0
-    },
-    grid: {
-      left: '4%',
-      right: '4%',
-      bottom: '6%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: currentData.value.compareRows.map(row => row.label),
-      axisTick: { alignWithLabel: true }
-    },
-    yAxis: {
-      type: 'value',
-      name: '频率'
-    },
-    series: [
-      {
-        name: '真实频率',
-        type: 'bar',
-        barGap: '20%',
-        data: currentData.value.chartData.map(row => row.trueFreq),
-        itemStyle: { color: '#67c23a', borderRadius: [6, 6, 0, 0] }
-      },
-      {
-        name: '估计频率',
-        type: 'bar',
-        data: currentData.value.chartData.map(row => row.estimatedFreq),
-        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
-      }
-    ]
+function disposeComparisonCharts() {
+  comparisonChartInstances.forEach(instance => {
+    if (instance) {
+      instance.dispose()
+    }
   })
+  comparisonChartInstances = []
+}
+
+function updateComparisonCharts() {
+  resultSections.value.forEach((section, index) => {
+    const instance = comparisonChartInstances[index]
+    if (!instance) return
+
+    instance.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: {
+        data: ['真实分布', '聚合估计分布'],
+        top: 0
+      },
+      grid: {
+        left: '4%',
+        right: '4%',
+        bottom: '6%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: section.compareRows.map(row => row.label),
+        axisTick: { alignWithLabel: true }
+      },
+      yAxis: {
+        type: 'value',
+        name: '频率'
+      },
+      series: [
+        {
+          name: '真实频率',
+          type: 'bar',
+          barGap: '20%',
+          data: section.chartData.map(row => row.trueFreq),
+          itemStyle: { color: '#67c23a', borderRadius: [6, 6, 0, 0] }
+        },
+        {
+          name: '估计频率',
+          type: 'bar',
+          data: section.chartData.map(row => row.estimatedFreq),
+          itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
+        }
+      ]
+    })
+  })
+}
+
+function initComparisonCharts() {
+  disposeComparisonCharts()
+  comparisonChartInstances = resultSections.value.map((_, index) => {
+    const element = comparisonChartRefs.value[index]
+    return element ? echarts.init(element) : null
+  })
+  updateComparisonCharts()
 }
 
 onMounted(async () => {
   loadTasks()
-  if (tasks.value.length > 0) {
+  const routeTaskId = String(route.query.taskId || '')
+  const routeBatchId = String(route.query.batchId || '')
+
+  if (routeTaskId) {
+    selectedTaskId.value = routeTaskId
+  } else if (tasks.value.length > 0) {
     selectedTaskId.value = tasks.value[0].id
   }
+  selectedBatchId.value = routeBatchId
   loadAggregateData()
   await nextTick()
-  initComparisonChart()
-  window.addEventListener('resize', () => {
-    if (comparisonChartInstance) {
-      comparisonChartInstance.resize()
-    }
-  })
+  initComparisonCharts()
+  window.addEventListener('resize', handleWindowResize)
 })
 
 watch(selectedTaskId, async () => {
+  if (selectedBatchId.value && !batchOptions.value.some(item => item.batchId === selectedBatchId.value)) {
+    selectedBatchId.value = ''
+  }
   loadAggregateData()
   await nextTick()
-  updateComparisonChart()
+  initComparisonCharts()
+})
+
+watch(selectedBatchId, async () => {
+  loadAggregateData()
+  await nextTick()
+  initComparisonCharts()
 })
 
 watch(selectedData, async () => {
   await nextTick()
-  updateComparisonChart()
+  initComparisonCharts()
+})
+
+function handleWindowResize() {
+  comparisonChartInstances.forEach(instance => {
+    if (instance) {
+      instance.resize()
+    }
+  })
+}
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleWindowResize)
+  disposeComparisonCharts()
 })
 </script>
 
@@ -672,6 +796,29 @@ watch(selectedData, async () => {
   color: #58718f;
 }
 
+.result-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.result-block {
+  border: 1px solid #e6edf7;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fcfdff 0%, #f7fbff 100%);
+  padding: 18px;
+}
+
+.result-block__heading {
+  margin-bottom: 14px;
+}
+
+.result-block__heading h4 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: #1f2d3d;
+}
+
 .compare-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
@@ -869,3 +1016,4 @@ watch(selectedData, async () => {
   }
 }
 </style>
+
