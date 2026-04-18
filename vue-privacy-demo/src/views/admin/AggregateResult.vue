@@ -81,7 +81,6 @@
                 <section class="summary-section summary-section--compact">
                   <div class="section-heading">
                     <h3>任务摘要</h3>
-                    <p>优先保留评委第一眼最需要确认的任务信息、协议信息和样本规模。</p>
                   </div>
                   <div class="summary-strip">
                     <div class="summary-card summary-card--adaptive" v-for="item in compactSummaryCards" :key="item.label">
@@ -94,7 +93,7 @@
                 <section class="summary-section">
                   <div class="section-heading">
                     <h3>核心结果指标</h3>
-                    <p>优先看样本规模和频率恢复误差，快速判断这次估计效果。</p>
+                    <p>{{ coreSectionDescription }}</p>
                   </div>
                   <div class="summary-grid core-grid">
                     <div class="core-card" :class="item.cardClass" v-for="item in coreMetricCards" :key="item.label">
@@ -143,11 +142,6 @@
                 <section class="summary-section">
                   <div class="section-heading">
                     <h3>{{ currentData.algorithm === 'TSP' ? '聚合结果分块' : '真实与聚合估计对照' }}</h3>
-                    <p>
-                      {{ currentData.algorithm === 'TSP'
-                        ? 'TSP 将缺失状态与睡眠评分拆分展示，避免把两类结果混成一张大表。'
-                        : `对比 ${currentData.algorithm} 场景下真实分布与聚合恢复结果。` }}
-                    </p>
                   </div>
 
                   <div class="result-blocks">
@@ -203,21 +197,10 @@
                   </div>
                 </section>
 
-                <section class="summary-section source-section">
+                <section v-if="currentData.algorithm === 'TSP'" class="summary-section compact-section">
                   <div class="section-heading">
-                    <h3>结果说明</h3>
-                    <p>{{ currentData.sourceDescription }}</p>
-                  </div>
-                  <div v-if="currentData.perturbationStatus" class="perturbation-status-panel" :class="`is-${currentData.perturbationStatus.statusKey}`">
-                    <div class="perturbation-status-panel__title">{{ currentData.perturbationStatus.title }}</div>
-                    <div class="perturbation-status-panel__desc">{{ currentData.perturbationStatus.description }}</div>
-                  </div>
-                </section>
-
-                <section class="summary-section compact-section">
-                  <div class="section-heading">
-                    <h3>详细指标</h3>
-                    <p>这些指标用于补充评估和参数说明，不作为页面的第一视觉重点。</p>
+                    <h3>{{ detailSectionTitle }}</h3>
+                    <p>{{ detailSectionDescription }}</p>
                   </div>
                   <div class="detail-table-wrap">
                     <table class="detail-table">
@@ -288,8 +271,26 @@ const coreMetricCards = computed(() => {
   return currentData.value?.coreMetricCards || []
 })
 
+const coreSectionDescription = computed(() => {
+  if (currentData.value?.algorithm === 'TSP') {
+    return '核心指标以频率估计方差衡量协议精度，MSE / MAE 仅用于辅助展示本次实验与真实分布之间的误差。'
+  }
+  return '优先看样本规模和频率恢复误差，快速判断这次估计效果。'
+})
+
 const detailMetricCards = computed(() => {
   return currentData.value?.detailMetricCards || []
+})
+
+const detailSectionTitle = computed(() => {
+  return currentData.value?.algorithm === 'TSP' ? '实验对照指标与参数' : '详细指标'
+})
+
+const detailSectionDescription = computed(() => {
+  if (currentData.value?.algorithm === 'TSP') {
+    return '这里保留 MSE / MAE、计数误差以及参数口径，用于实验对照、答辩补充和公式核查，不作为 TSP 的核心理论主指标。'
+  }
+  return '这些指标用于补充评估和参数说明，不作为页面的第一视觉重点。'
 })
 
 const resultSections = computed(() => {

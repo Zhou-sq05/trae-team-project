@@ -591,7 +591,7 @@ function getAoueAggregateResults(records, task, taskId) {
     return new Array(STEP_BUCKET_ORDER.length).fill(0);
   });
 
-  const estimatedCounts = aggregateAOUE(perturbedData, config.epsilon, STEP_BUCKET_ORDER.length, 0.5, config.q)
+  const estimatedCounts = aggregateAOUE(perturbedData, config.epsilon, STEP_BUCKET_ORDER.length, config.p, config.q)
     .map(value => Number(value.toFixed(4)));
 
   return [createAggregateViewModel({

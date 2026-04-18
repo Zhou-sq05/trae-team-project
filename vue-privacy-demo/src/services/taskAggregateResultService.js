@@ -12,7 +12,11 @@ import {
 } from '../utils/standDurationBuckets';
 import { buildAggregateMetrics } from '../utils/aggregate/aggregateMetrics';
 import { getPerturbationStatus } from '../utils/perturbationStatus';
-import { aggregateTspDomainCounts, resolveTspTaskConfig } from '../utils/tspProtocol.js';
+import {
+  aggregateTspDomainCounts,
+  calculateTspFrequencyVarianceMetrics,
+  resolveTspTaskConfig
+} from '../utils/tspProtocol.js';
 
 function safeParse(key, fallback) {
   try {
@@ -640,17 +644,24 @@ function getTspAggregateResults(records, task, taskId, scope) {
   const config = resolveTspTaskConfig(task, 5);
   const summary = buildTspSummary(tspRecords, config.scoreDomainSize);
   const estimatedCounts = aggregateTspCounts(summary.reportCounts, summary.sampleCount, config);
+  const trueCounts = summary.hasRawSummary ? summary.rawCounts : summary.reportCounts;
   const overallMetrics = buildAggregateMetrics({
     labels: summary.labels,
-    trueCounts: summary.hasRawSummary ? summary.rawCounts : summary.reportCounts,
+    trueCounts,
     estimatedCounts,
     sampleCount: summary.sampleCount,
     consistencyThreshold: 0.05
   });
+  const varianceMetrics = calculateTspFrequencyVarianceMetrics({
+    trueCounts,
+    estimatedCounts,
+    sampleCount: summary.sampleCount,
+    config
+  });
   const displayOverallCounts = constrainCountsForDisplay(estimatedCounts, summary.sampleCount);
   const displayOverallMetrics = buildAggregateMetrics({
     labels: summary.labels,
-    trueCounts: summary.hasRawSummary ? summary.rawCounts : summary.reportCounts,
+    trueCounts,
     estimatedCounts: displayOverallCounts,
     sampleCount: summary.sampleCount,
     consistencyThreshold: 0.05
@@ -701,14 +712,19 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: 'α / β', value: `${config.alpha.toFixed(4)} / ${config.beta.toFixed(4)}` }
     ],
     detailMetricCards: [
-      { label: 'Count-MSE', value: overallMetrics.countMse.toFixed(4), description: '计数均方误差，仅用于辅助观察恢复计数偏差。' },
-      { label: 'Count-MAE', value: overallMetrics.countMae.toFixed(4), description: '计数平均绝对误差，用于补充查看计数层面的整体偏移。' },
-      { label: '顶部频率 MSE 口径', value: '统一域 {0,1,2,3,4,5}', description: '当前页顶核心频率 MSE 基于完整统一域上的 6 类频率误差计算，不是把两个结果块直接混合平均。' },
-      { label: '顶部频率 MAE 口径', value: '统一域 {0,1,2,3,4,5}', description: '当前页顶核心频率 MAE 同样基于完整统一域上的 6 类频率误差计算。' },
+      { label: '统一域频率 MAE', value: overallMetrics.freqMae.toFixed(6), description: '辅助实验指标。基于真实频率与估计频率的绝对误差均值，只用于展示本次实验恢复误差，不作为 TSP 理论主指标。' },
+      { label: '统一域频率 MSE', value: overallMetrics.freqMse.toFixed(6), description: '辅助实验指标。基于真实频率与估计频率的均方误差，只用于展示本次实验恢复误差，不作为 TSP 理论主指标。' },
+      { label: 'Count-MAE', value: overallMetrics.countMae.toFixed(4), description: '辅助实验指标。计数平均绝对误差，用于补充查看恢复计数层面的整体偏移。' },
+      { label: 'Count-MSE', value: overallMetrics.countMse.toFixed(4), description: '辅助实验指标。计数均方误差，用于补充观察恢复计数偏差。' },
+      { label: '统一域平均方差', value: varianceMetrics.avgVariance.toFixed(8), description: '核心理论口径。将统一域 {0,1,2,3,4,5} 中各类别频率估计方差取平均，衡量 TSP 频率估计器的整体波动大小。' },
+      { label: '统一域总方差', value: varianceMetrics.totalVariance.toFixed(8), description: '将每个类别频率估计方差求和得到的总方差，可用于辅助观察整体波动规模。' },
+      { label: '标准误', value: varianceMetrics.stdError.toFixed(8), description: '由平均方差开方得到，用于直观表示典型频率估计波动尺度。' },
+      { label: '95% 置信区间宽度', value: varianceMetrics.ciWidth95.toFixed(8), description: '按 2 × 1.96 × 标准误给出的近似区间宽度，用于辅助展示理论波动范围。' },
+      { label: '每类频率估计方差', value: formatCountSnapshot(summary.labels, summary.labels.map((_, index) => varianceMetrics.varianceByCategory[String(index)] ?? 0), 8), description: '按统一域类别分别给出频率估计方差，变量命名为 varianceByCategory。0 表示缺失值，1~5 表示评分。' },
       { label: '预算逻辑', value: config.versionMeta.label, description: '当前任务按论文定义使用统一的总隐私预算 ε 联合求解两阶段参数，不再拆分预算。' },
       { label: '原始无偏缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], [estimatedCounts[0], estimatedCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0)]), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
       { label: '原始无偏评分块估计值', value: formatCountSnapshot(['1 分', '2 分', '3 分', '4 分', '5 分'], estimatedCounts.slice(1)), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
-      { label: '原始无偏统一域估计方差', value: overallMetrics.estimateVariance.toFixed(4), description: '保留未加展示约束的统一域估计方差。若原始无偏恢复结果处于高方差区间，该值可能失真或不可直接用于答辩展示。' },
+      { label: '原始无偏统一域计数离散度', value: overallMetrics.estimateVariance.toFixed(4), description: '这是对无偏估计计数向量本身做的离散度统计，不等同于论文中更常用的频率估计方差。保留它仅用于辅助观察。' },
       { label: '原始无偏统一域误差上界', value: String(overallMetrics.maxCountError), description: '保留未加展示约束的统一域最大计数误差绝对值，供理论参考。' },
       { label: '约束后缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], displayMissingSection?.metrics?.estimatedCounts || []), description: '表格与图表当前默认展示这一版约束后结果：先做非负截断，再归一化到总样本数 N。' },
       { label: '约束后评分块估计值', value: formatCountSnapshot(['1 分', '2 分', '3 分', '4 分', '5 分'], displayScoreSection?.metrics?.estimatedCounts || []), description: '表格与图表当前默认展示这一版约束后结果：先做非负截断，再归一化到有效评分样本数 N_valid。' },
@@ -729,10 +745,8 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: 'p*', value: config.pStar.toFixed(4), description: '有效值 1~5 的恢复使用组合参数 p* = p1 × p2 + (1 - p1) × q2。' },
       { label: 'q*', value: config.qStar.toFixed(4), description: '有效值 1~5 的恢复使用组合参数 q* = q1 × p2 + (1 - q1) × q2。' },
       { label: 'p* - q*', value: (config.pStar - config.qStar).toFixed(4), description: '有效评分 1~5 的最终恢复分辨率。若该值过小，即使公式正确，评分块恢复方差也会明显放大。' },
-      { label: '统一域频率 MSE', value: overallMetrics.freqMse.toFixed(6), description: '实验视角下，基于统一域 {0,1,2,3,4,5} 的整体频率误差。' },
-      { label: '统一域频率 MAE', value: overallMetrics.freqMae.toFixed(6), description: '实验视角下，基于统一域 {0,1,2,3,4,5} 的整体频率绝对误差。' },
-      { label: '缺失状态块估计方差', value: missingSection?.metrics?.estimateVariance?.toFixed(4) || '0.0000', description: '理论视角下，仅对缺失 / 非缺失二分类结果块的估计计数离散程度进行观察。' },
-      { label: '评分分布块估计方差', value: scoreSection?.metrics?.estimateVariance?.toFixed(4) || '0.0000', description: '理论视角下，仅对有效评分 1~5 结果块的估计计数离散程度进行观察。' }
+      { label: '缺失状态块计数离散度', value: missingSection?.metrics?.estimateVariance?.toFixed(4) || '0.0000', description: '仅对缺失 / 非缺失结果块的估计计数做离散度观察，不作为论文主指标。' },
+      { label: '评分分布块计数离散度', value: scoreSection?.metrics?.estimateVariance?.toFixed(4) || '0.0000', description: '仅对有效评分 1~5 结果块的估计计数做离散度观察，不作为论文主指标。' }
     ],
     resultSections,
     coreMetricCards: [
@@ -743,27 +757,26 @@ function getTspAggregateResults(records, task, taskId, scope) {
         cardClass: ''
       },
       {
-        label: '聚合估计方差',
-        value: overallMetrics.estimateVariance.toFixed(4),
-        helper: '当前顶部展示使用约束后统一域结果的聚合估计计数方差，便于与表格、图表保持一致并保证可读性',
+        label: '平均方差',
+        value: varianceMetrics.avgVariance.toFixed(8),
+        helper: '核心理论指标。表示统一域各类别频率估计方差的平均值，用来衡量 TSP 频率估计器的整体波动大小',
         cardClass: 'core-card--highlight'
       },
       {
-        label: '估计误差上界',
-        value: overallMetrics.maxCountError.toFixed(4),
-        helper: '当前顶部展示使用约束后统一域结果的最大计数误差绝对值，用于快速感知恢复偏移规模',
+        label: '标准误',
+        value: varianceMetrics.stdError.toFixed(8),
+        helper: '标准误 = sqrt(avgVariance)，用于直观表示典型频率估计波动尺度',
         cardClass: 'core-card--highlight core-card--soft'
       },
       {
-        label: '一致性指标',
-        value: overallMetrics.consistencyLevel,
-        helper: '根据整体恢复稳定性给出的一致性判断',
-        cardClass: '',
-        isStatus: true
+        label: '95% 置信区间宽度',
+        value: varianceMetrics.ciWidth95.toFixed(8),
+        helper: '近似按 2 × 1.96 × 标准误计算，用于辅助理解理论波动范围',
+        cardClass: ''
       }
     ],
-    sourceDescription: `${`当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} ${config.versionMeta.description} 当前表格与图表默认展示的是“约束后分布”，用于保证结果可读性与可视化稳定性；原始无偏恢复结果及理论指标保留在详细指标中。`,
-    metricDescription: 'TSP 使用统一的总隐私预算 ε 联合求解两阶段扰动参数。表格、图表以及顶部方差/误差上界卡片现在统一基于约束后展示结果计算，以保证结果可读性与口径一致；原始无偏恢复结果及其理论指标继续保留在详细指标区。'
+    sourceDescription: `${`当前结果基于 task_id = ${taskId}、${scope?.batchId ? `batch_id = ${scope.batchId}` : '全部批次'} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} ${config.versionMeta.description} 当前表格与图表默认展示的是原始无偏恢复结果；辅助实验误差指标和理论方差指标都在同一 task/batch 作用域下计算。`,
+    metricDescription: `核心指标以频率估计方差衡量协议精度。当前平均方差为 ${varianceMetrics.avgVariance.toFixed(8)}，标准误为 ${varianceMetrics.stdError.toFixed(8)}，95% 置信区间宽度约为 ${varianceMetrics.ciWidth95.toFixed(8)}。MSE / MAE 仅用于辅助展示本次实验与真实分布之间的误差，不作为 TSP 协议理论主指标。当前一致性说明：${overallMetrics.consistencyLevel}。`
   })];
 }
 

@@ -115,6 +115,118 @@ export function aggregateTspDomainCounts(reportCounts, sampleCount, config) {
   return estimatedCounts;
 }
 
+function clampFrequency(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  if (value < 0) {
+    return 0;
+  }
+  if (value > 1) {
+    return 1;
+  }
+  return value;
+}
+
+function resolveReferenceFrequencies({
+  trueCounts = [],
+  estimatedCounts = [],
+  sampleCount = 0,
+  unifiedDomainSize = 0
+} = {}) {
+  const total = Number(sampleCount) || 0;
+  const fallbackLength = Number(unifiedDomainSize) || Math.max(trueCounts.length, estimatedCounts.length, 0);
+
+  if (!total || !fallbackLength) {
+    return new Array(fallbackLength).fill(0);
+  }
+
+  const trueTotal = trueCounts.reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const referenceCounts = trueTotal > 0 ? trueCounts : estimatedCounts;
+
+  return Array.from({ length: fallbackLength }, (_, index) => {
+    const count = Number(referenceCounts[index] ?? 0);
+    return clampFrequency(count / total);
+  });
+}
+
+export function calculateTspFrequencyVarianceMetrics({
+  trueCounts = [],
+  estimatedCounts = [],
+  sampleCount = 0,
+  config
+} = {}) {
+  const total = Number(sampleCount) || 0;
+  const unifiedDomainSize = Number(config?.unifiedDomainSize ?? 0);
+  const varianceByCategory = {};
+
+  if (!total || !unifiedDomainSize) {
+    return {
+      varianceByCategory,
+      avgVariance: 0,
+      totalVariance: 0,
+      stdError: 0,
+      ciWidth95: 0
+    };
+  }
+
+  const referenceFreqs = resolveReferenceFrequencies({
+    trueCounts,
+    estimatedCounts,
+    sampleCount: total,
+    unifiedDomainSize
+  });
+
+  const deltaStageTwo = Number(config?.p2) - Number(config?.q2);
+  const deltaScore = Number(config?.pStar) - Number(config?.qStar);
+  const theta0 = clampFrequency(
+    Number(config?.q2) + deltaStageTwo * Number(referenceFreqs[0] ?? 0)
+  );
+
+  const baseVariance0 = deltaStageTwo === 0
+    ? 0
+    : (theta0 * (1 - theta0)) / (total * (deltaStageTwo ** 2));
+
+  varianceByCategory['0'] = Number(baseVariance0.toFixed(8));
+
+  const coupling = deltaStageTwo === 0 ? 0 : (Number(config?.q2) - Number(config?.qStar)) / deltaStageTwo;
+
+  for (let index = 1; index < unifiedDomainSize; index += 1) {
+    const referenceFreq = Number(referenceFreqs[index] ?? 0);
+    const thetaI = clampFrequency(
+      Number(config?.qStar)
+      + Number(referenceFreqs[0] ?? 0) * (Number(config?.q2) - Number(config?.qStar))
+      + referenceFreq * deltaScore
+    );
+
+    if (deltaScore === 0) {
+      varianceByCategory[String(index)] = 0;
+      continue;
+    }
+
+    const varXi = (thetaI * (1 - thetaI)) / total;
+    const varY0 = (theta0 * (1 - theta0)) / total;
+    const covXiY0 = -(thetaI * theta0) / total;
+    const categoryVariance = (varXi + (coupling ** 2) * varY0 - 2 * coupling * covXiY0) / (deltaScore ** 2);
+
+    varianceByCategory[String(index)] = Number(Math.max(0, categoryVariance).toFixed(8));
+  }
+
+  const varianceValues = Object.values(varianceByCategory);
+  const totalVariance = varianceValues.reduce((sum, value) => sum + Number(value || 0), 0);
+  const avgVariance = varianceValues.length ? totalVariance / varianceValues.length : 0;
+  const stdError = Math.sqrt(Math.max(0, avgVariance));
+  const ciWidth95 = 2 * 1.96 * stdError;
+
+  return {
+    varianceByCategory,
+    avgVariance: Number(avgVariance.toFixed(8)),
+    totalVariance: Number(totalVariance.toFixed(8)),
+    stdError: Number(stdError.toFixed(8)),
+    ciWidth95: Number(ciWidth95.toFixed(8))
+  };
+}
+
 export function calculateTspCompositeTarget(alpha, beta, epsilon, scoreDomainSize = 5) {
   return calculateAGRParameters(alpha, beta, epsilon, scoreDomainSize);
 }

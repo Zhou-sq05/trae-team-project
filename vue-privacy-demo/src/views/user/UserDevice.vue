@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="user-device-container">
     <div class="header">
       <div class="header-left">
@@ -462,12 +462,16 @@
                     <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
                   </div>
 
-                  <div class="summary-block batch-upload-block">
-                    <div class="summary-heading">
-                      <h4>批量上报</h4>
-                      <span class="section-tip">将本次连续采集产生的扰动后样本记录批量写入管理端数据源</span>
+                  <section class="tsp-batch-card tsp-batch-card--actions">
+                    <div class="tsp-action-copy">
+                      <div class="tsp-action-title">批量上报</div>
+                      <div class="tsp-action-desc">将当前这批 AOUE 连续采集样本写入管理端提交数据，保留现有上报格式与字段。</div>
+                      <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="tsp-action-status">
+                        本次上报状态：{{ batchUploadState.status }}，记录数：{{ batchUploadState.count }}
+                      </div>
                     </div>
-                    <div class="action-row">
+                    <div class="tsp-action-buttons">
+                      <el-button @click="runBatchSimulation">重新生成样本</el-button>
                       <el-button
                         type="primary"
                         @click="uploadCurrentBatchResult"
@@ -476,13 +480,7 @@
                         上报本次连续采集结果
                       </el-button>
                     </div>
-                    <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="preview-tip">
-                      本次上报状态：{{ batchUploadState.status }}，本次上报记录数：{{ batchUploadState.count }} 条
-                    </div>
-                    <div v-else class="preview-tip">
-                      请先完成连续采集模拟，再将本次连续采集产生的扰动后样本记录批量上报到管理端。
-                    </div>
-                  </div>
+                  </section>
                 </template>
 
                 <template v-else-if="currentTaskDetail?.scenario === 'tsp'">
@@ -659,12 +657,16 @@
                     <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
                   </div>
 
-                  <div class="summary-block batch-upload-block">
-                    <div class="summary-heading">
-                      <h4>批量上报</h4>
-                      <span class="section-tip">将本次连续采集产生的扰动后样本记录批量写入管理端数据源</span>
+                  <section class="tsp-batch-card tsp-batch-card--actions">
+                    <div class="tsp-action-copy">
+                      <div class="tsp-action-title">批量上报</div>
+                      <div class="tsp-action-desc">将当前这批 {{ currentTaskDetail?.protocol || '--' }} 连续采集样本写入管理端提交数据，保留现有上报格式与字段。</div>
+                      <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="tsp-action-status">
+                        本次上报状态：{{ batchUploadState.status }}，记录数：{{ batchUploadState.count }}
+                      </div>
                     </div>
-                    <div class="action-row">
+                    <div class="tsp-action-buttons">
+                      <el-button @click="runBatchSimulation">重新生成样本</el-button>
                       <el-button
                         type="primary"
                         @click="uploadCurrentBatchResult"
@@ -673,13 +675,7 @@
                         上报本次连续采集结果
                       </el-button>
                     </div>
-                    <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="preview-tip">
-                      本次上报状态：{{ batchUploadState.status }}，本次上报记录数：{{ batchUploadState.count }} 条
-                    </div>
-                    <div v-else class="preview-tip">
-                      请先完成连续采集模拟，再将本次连续采集产生的扰动后样本记录批量上报到管理端。
-                    </div>
-                  </div>
+                  </section>
 
                   <div class="batch-detail-table">
                     <div class="batch-table-title">前 {{ currentBatchPreviewRows.length }} 条样本明细</div>
@@ -3585,13 +3581,22 @@ onMounted(() => {
 
 .left-section,
 .right-section {
-  flex: 1;
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
   padding: 28px;
   display: flex;
   flex-direction: column;
+}
+
+.left-section {
+  flex: 0 0 38%;
+  max-width: 560px;
+}
+
+.right-section {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .task-panel,
@@ -4816,6 +4821,12 @@ onMounted(() => {
 @media (max-width: 960px) {
   .content {
     flex-direction: column;
+  }
+
+  .left-section,
+  .right-section {
+    flex: 1 1 auto;
+    max-width: none;
   }
 
   .task-meta-grid,
