@@ -46,7 +46,6 @@
                 <div class="card-header">
                   <div class="header-title-group">
                     <span class="page-title">聚合结果</span>
-                    <span class="total-count">样本总数：{{ totalCount }}</span>
                   </div>
                   <div class="header-actions">
                     <span class="task-select-label">任务 ID</span>
@@ -118,7 +117,6 @@
                       <div class="core-subtext">{{ item.helper }}</div>
                     </div>
                   </div>
-                  <div class="metric-tip metric-tip--highlight">{{ currentData.metricDescription }}</div>
                 </section>
 
                 <section v-if="currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
@@ -275,7 +273,7 @@ const coreSectionDescription = computed(() => {
   if (currentData.value?.algorithm === 'TSP') {
     return '核心指标以频率估计方差衡量协议精度，MSE / MAE 仅用于辅助展示本次实验与真实分布之间的误差。'
   }
-  return '优先看样本规模和频率恢复误差，快速判断这次估计效果。'
+  return ''
 })
 
 const detailMetricCards = computed(() => {

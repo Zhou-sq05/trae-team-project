@@ -176,6 +176,7 @@
                 <el-option label="50 次" :value="50" />
                 <el-option label="100 次" :value="100" />
                 <el-option label="200 次" :value="200" />
+                <el-option label="500 次" :value="500" />
               </el-select>
             </div>
 
@@ -815,7 +816,7 @@ const aoueLogExpanded = ref(false);
 const aoueBatchLogExpanded = ref(false);
 const aoueExpandedVisible = ref(false);
 const aoueBatchExpandedVisible = ref(false);
-const batchSimulationCount = ref(100);
+const batchSimulationCount = ref(200);
 const batchSimulationRunning = ref(false);
 const activeDemoTab = ref('single');
 const batchUploadState = ref(null);
