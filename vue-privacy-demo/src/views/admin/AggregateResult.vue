@@ -92,7 +92,7 @@
                 <section class="summary-section">
                   <div class="section-heading">
                     <h3>核心结果指标</h3>
-                    <p>{{ coreSectionDescription }}</p>
+                    <p v-if="coreSectionDescription">{{ coreSectionDescription }}</p>
                   </div>
                   <div class="summary-grid core-grid">
                     <div class="core-card" :class="item.cardClass" v-for="item in coreMetricCards" :key="item.label">
@@ -235,11 +235,8 @@ import * as echarts from 'echarts'
 import { House, Setting, Document, DataAnalysis, ArrowDown, QuestionFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { getAggregateResults as getTspAlignedAggregateResults } from '../../services/taskAggregateResultService'
-import { getAvailableBatches, getScopedDataCount, getTspAggregateDiagnostics } from '../../services/aggregateDiagnosticsService'
-import {
-  getAggregateResults as getLegacyAggregateResults,
-  getTotalDataCount as getLegacyTotalDataCount
-} from '../../services/taskAggregateMetricsService'
+import { getAvailableBatches, getTspAggregateDiagnostics } from '../../services/aggregateDiagnosticsService'
+import { getAggregateResults as getLegacyAggregateResults } from '../../services/taskAggregateMetricsService'
 
 const route = useRoute()
 const router = useRouter()
@@ -251,7 +248,6 @@ const tasks = ref([])
 const selectedTaskId = ref('')
 const selectedBatchId = ref('')
 const perturbationData = ref([])
-const totalCount = ref(0)
 const selectedData = ref(1)
 const comparisonChartRefs = ref([])
 const tspDiagnostics = ref(null)
@@ -334,11 +330,9 @@ function loadAggregateData() {
       batchId: selectedBatchId.value
     }
     perturbationData.value = getTspAlignedAggregateResults(scope)
-    totalCount.value = getScopedDataCount(scope)
     tspDiagnostics.value = getTspAggregateDiagnostics(scope)
   } else {
     perturbationData.value = getLegacyAggregateResults(selectedTaskId.value)
-    totalCount.value = getLegacyTotalDataCount(selectedTaskId.value)
     tspDiagnostics.value = null
   }
   selectedData.value = perturbationData.value.length > 0 ? perturbationData.value[0].id : null

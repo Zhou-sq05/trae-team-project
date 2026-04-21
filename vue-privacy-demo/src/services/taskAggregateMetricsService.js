@@ -101,6 +101,19 @@ function collectProtocolRecords(records, protocol) {
   return records.filter(item => (item?.reportData?.protocol || item?.protocol) === protocol);
 }
 
+function collectBatchSummaries(records) {
+  const batchSummaryMap = new Map();
+
+  records.forEach(item => {
+    const batchId = item.batch_id ?? item.sampleMeta?.batchId;
+    if (batchId && item.batchSummary && !batchSummaryMap.has(batchId)) {
+      batchSummaryMap.set(batchId, item.batchSummary);
+    }
+  });
+
+  return batchSummaryMap;
+}
+
 function buildArrSummary(arrRecords) {
   const sampleCount = arrRecords.length;
   const reportTriggerCount = arrRecords.filter(item => normalizeBinaryValue(item.reportData?.perturbedValue ?? item.reportData?.reportValue ?? item.report_value) === 1).length;
@@ -109,16 +122,11 @@ function buildArrSummary(arrRecords) {
   let rawTriggerCount = 0;
   let rawNonTriggerCount = 0;
   let hasRawSummary = false;
-  const batchSummaryMap = new Map();
+  const batchSummaryMap = collectBatchSummaries(arrRecords);
 
   arrRecords.forEach(item => {
     const batchId = item.batch_id ?? item.sampleMeta?.batchId;
-    const summary = item.batchSummary;
-
-    if (batchId && summary) {
-      if (!batchSummaryMap.has(batchId)) {
-        batchSummaryMap.set(batchId, summary);
-      }
+    if (batchId && batchSummaryMap.has(batchId)) {
       return;
     }
 
@@ -154,16 +162,11 @@ function buildAgrrSummary(agrrRecords) {
   const reportBucketCounts = createEmptyStandBucketCounts();
   const rawBucketCounts = createEmptyStandBucketCounts();
   let hasRawSummary = false;
-  const batchSummaryMap = new Map();
+  const batchSummaryMap = collectBatchSummaries(agrrRecords);
 
   agrrRecords.forEach(item => {
     const batchId = item.batch_id ?? item.sampleMeta?.batchId;
-    const summary = item.batchSummary;
-
-    if (batchId && summary) {
-      if (!batchSummaryMap.has(batchId)) {
-        batchSummaryMap.set(batchId, summary);
-      }
+    if (batchId && batchSummaryMap.has(batchId)) {
       return;
     }
 
@@ -207,16 +210,11 @@ function buildAoueSummary(aoueRecords) {
   const reportBucketCounts = createEmptyStepsBucketCounts();
   const rawBucketCounts = createEmptyStepsBucketCounts();
   let hasRawSummary = false;
-  const batchSummaryMap = new Map();
+  const batchSummaryMap = collectBatchSummaries(aoueRecords);
 
   aoueRecords.forEach(item => {
     const batchId = item.batch_id ?? item.sampleMeta?.batchId;
-    const summary = item.batchSummary;
-
-    if (batchId && summary) {
-      if (!batchSummaryMap.has(batchId)) {
-        batchSummaryMap.set(batchId, summary);
-      }
+    if (batchId && batchSummaryMap.has(batchId)) {
       return;
     }
 
@@ -503,7 +501,6 @@ function createAggregateViewModel({
     compareRows,
     resultSections: finalResultSections,
     perturbationStatus,
-    metricDescription: '核心 MSE / MAE 指标按论文中的频率误差定义计算，计数误差仅用于辅助展示。',
     sourceDescription,
     distributionFit
   };

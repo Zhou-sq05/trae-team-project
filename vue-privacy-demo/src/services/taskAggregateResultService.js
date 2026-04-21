@@ -115,6 +115,19 @@ function collectProtocolRecords(records, protocol) {
   return records.filter(item => (item?.reportData?.protocol || item?.protocol) === protocol);
 }
 
+function collectBatchSummaries(records) {
+  const batchSummaryMap = new Map();
+
+  records.forEach(item => {
+    const batchId = item.batch_id ?? item.sampleMeta?.batchId;
+    if (batchId && item.batchSummary && !batchSummaryMap.has(batchId)) {
+      batchSummaryMap.set(batchId, item.batchSummary);
+    }
+  });
+
+  return batchSummaryMap;
+}
+
 function buildArrSummary(arrRecords) {
   const sampleCount = arrRecords.length;
   const reportTriggerCount = arrRecords.filter(item => normalizeBinaryValue(item.reportData?.perturbedValue ?? item.reportData?.reportValue ?? item.report_value) === 1).length;
@@ -123,16 +136,11 @@ function buildArrSummary(arrRecords) {
   let rawTriggerCount = 0;
   let rawNonTriggerCount = 0;
   let hasRawSummary = false;
-  const batchSummaryMap = new Map();
+  const batchSummaryMap = collectBatchSummaries(arrRecords);
 
   arrRecords.forEach(item => {
     const batchId = item.batch_id ?? item.sampleMeta?.batchId;
-    const summary = item.batchSummary;
-
-    if (batchId && summary) {
-      if (!batchSummaryMap.has(batchId)) {
-        batchSummaryMap.set(batchId, summary);
-      }
+    if (batchId && batchSummaryMap.has(batchId)) {
       return;
     }
 
@@ -168,16 +176,11 @@ function buildAgrrSummary(agrrRecords) {
   const reportBucketCounts = createEmptyStandBucketCounts();
   const rawBucketCounts = createEmptyStandBucketCounts();
   let hasRawSummary = false;
-  const batchSummaryMap = new Map();
+  const batchSummaryMap = collectBatchSummaries(agrrRecords);
 
   agrrRecords.forEach(item => {
     const batchId = item.batch_id ?? item.sampleMeta?.batchId;
-    const summary = item.batchSummary;
-
-    if (batchId && summary) {
-      if (!batchSummaryMap.has(batchId)) {
-        batchSummaryMap.set(batchId, summary);
-      }
+    if (batchId && batchSummaryMap.has(batchId)) {
       return;
     }
 
@@ -466,7 +469,6 @@ function createAggregateViewModel({
   coreMetricCards,
   detailMetricCards,
   resultSections,
-  metricDescription,
   diagnostics
 }) {
   const trueCounts = summary.hasRawSummary ? summary.rawCounts : summary.reportCounts;
@@ -569,7 +571,6 @@ function createAggregateViewModel({
       }
     ],
     perturbationStatus: protectionStatus,
-    metricDescription: metricDescription || '核心 MSE / MAE 指标按论文中的频率误差定义计算，计数误差仅用于辅助展示。',
     sourceDescription,
     distributionFit,
     diagnostics: diagnostics || null
@@ -776,7 +777,6 @@ function getTspAggregateResults(records, task, taskId, scope) {
       }
     ],
     sourceDescription: `${`当前结果基于 task_id = ${taskId}、${scope?.batchId ? `batch_id = ${scope.batchId}` : '全部批次'} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} ${config.versionMeta.description} 当前表格与图表默认展示的是原始无偏恢复结果；辅助实验误差指标和理论方差指标都在同一 task/batch 作用域下计算。`,
-    metricDescription: `核心指标以频率估计方差衡量协议精度。当前平均方差为 ${varianceMetrics.avgVariance.toFixed(8)}，标准误为 ${varianceMetrics.stdError.toFixed(8)}，95% 置信区间宽度约为 ${varianceMetrics.ciWidth95.toFixed(8)}。MSE / MAE 仅用于辅助展示本次实验与真实分布之间的误差，不作为 TSP 协议理论主指标。当前一致性说明：${overallMetrics.consistencyLevel}。`
   })];
 }
 
@@ -815,4 +815,3 @@ export function getTotalDataCount(taskId) {
     return 0;
   }
 }
-

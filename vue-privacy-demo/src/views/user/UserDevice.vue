@@ -2676,6 +2676,53 @@ function buildTspReportParams() {
   };
 }
 
+function buildBatchSummaryPayload() {
+  if (!currentBatchResult.value || !currentTaskDetail.value) {
+    return null;
+  }
+
+  if (currentTaskDetail.value.scenario === 'agrr') {
+    return {
+      sampleCount: currentBatchResult.value.samples.length,
+      rawBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.rawBucketCounts),
+      reportBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.reportBucketCounts)
+    };
+  }
+
+  if (currentTaskDetail.value.scenario === 'aoue') {
+    return {
+      sampleCount: currentBatchResult.value.samples.length,
+      rawBucketCounts: normalizeStepsBucketCounts(currentBatchResult.value.rawBucketCounts),
+      reportBucketCounts: normalizeStepsBucketCounts(currentBatchResult.value.reportBucketCounts)
+    };
+  }
+
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return {
+      sampleCount: currentBatchResult.value.samples.length,
+      rawMissingCounts: currentBatchResult.value.rawMissingCounts,
+      reportMissingCounts: currentBatchResult.value.reportMissingCounts,
+      rawScoreCounts: currentBatchResult.value.rawScoreCounts,
+      reportScoreCounts: currentBatchResult.value.reportScoreCounts
+    };
+  }
+
+  return {
+    sampleCount: currentBatchResult.value.samples.length,
+    rawTriggerCount: currentBatchResult.value.rawCountOne,
+    rawNonTriggerCount: currentBatchResult.value.rawCountZero,
+    reportTriggerCount: currentBatchResult.value.countOne,
+    reportNonTriggerCount: currentBatchResult.value.countZero
+  };
+}
+
+function isQuotaExceededError(error) {
+  return error?.name === 'QuotaExceededError'
+    || error?.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    || error?.code === 22
+    || error?.code === 1014;
+}
+
 function performTspPerturbation(rawMissingInput, rawScoreInput) {
   if (!tspParametersReady.value) {
     return null;
@@ -3147,17 +3194,27 @@ function uploadCurrentBatchResult() {
     const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
     const uploadTime = new Date().toISOString();
     const userId = user.value?.username || '用户001';
-    const records = currentBatchResult.value.samples.map(sample => {
+    const batchSummary = buildBatchSummaryPayload();
+    const records = currentBatchResult.value.samples.map((sample, index) => {
+      const baseRecord = {
+        userId,
+        user_id: userId,
+        taskId: currentTaskDetail.value.taskId,
+        task_id: currentTaskDetail.value.taskId,
+        batch_id: currentBatchResult.value.batchId,
+        protocol: currentTaskDetail.value.protocol,
+        uploadTime,
+        upload_time: uploadTime,
+        sampleMeta: {
+          batchId: currentBatchResult.value.batchId,
+          sampleIndex: sample.index
+        }
+      };
+      const batchSummaryField = index === 0 && batchSummary ? { batchSummary } : {};
+
       if (currentTaskDetail.value.scenario === 'agrr') {
         return {
-          userId,
-          user_id: userId,
-          taskId: currentTaskDetail.value.taskId,
-          task_id: currentTaskDetail.value.taskId,
-          batch_id: currentBatchResult.value.batchId,
-          protocol: currentTaskDetail.value.protocol,
-          uploadTime,
-          upload_time: uploadTime,
+          ...baseRecord,
           report_value: sample.reportValue,
           original_minutes: sample.rawMinutes,
           original_bucket: sample.rawLabel,
@@ -3178,35 +3235,15 @@ function uploadCurrentBatchResult() {
             rawBucket: sample.rawLabel,
             rawBucketCode: sample.rawValue,
             perturbedBucket: sample.perturbedLabel,
-            perturbedBucketCode: sample.reportValue,
-            params: {
-              p: agrrConfigParams.value.p.toFixed(4),
-              q: agrrConfigParams.value.q.toFixed(4)
-            }
+            perturbedBucketCode: sample.reportValue
           },
-          batchSummary: {
-            sampleCount: currentBatchResult.value.samples.length,
-            rawBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.rawBucketCounts),
-            reportBucketCounts: normalizeStandBucketCounts(currentBatchResult.value.reportBucketCounts)
-          },
-          sampleMeta: {
-            source: 'continuous-collection',
-            batchId: currentBatchResult.value.batchId,
-            sampleIndex: sample.index
-          }
+          ...batchSummaryField
         };
       }
 
       if (currentTaskDetail.value.scenario === 'aoue') {
         return {
-          userId,
-          user_id: userId,
-          taskId: currentTaskDetail.value.taskId,
-          task_id: currentTaskDetail.value.taskId,
-          batch_id: currentBatchResult.value.batchId,
-          protocol: currentTaskDetail.value.protocol,
-          uploadTime,
-          upload_time: uploadTime,
+          ...baseRecord,
           report_value: sample.reportValue,
           original_steps: sample.rawSteps,
           original_bucket: sample.rawLabel,
@@ -3227,35 +3264,15 @@ function uploadCurrentBatchResult() {
             rawBucket: sample.rawLabel,
             rawBucketCode: sample.rawValue,
             perturbedBucket: sample.perturbedLabel,
-            perturbedBucketCode: sample.reportValue,
-            params: {
-              p: 0.5,
-              q: aoueConfigParams.value.q.toFixed(4)
-            }
+            perturbedBucketCode: sample.reportValue
           },
-          batchSummary: {
-            sampleCount: currentBatchResult.value.samples.length,
-            rawBucketCounts: normalizeStepsBucketCounts(currentBatchResult.value.rawBucketCounts),
-            reportBucketCounts: normalizeStepsBucketCounts(currentBatchResult.value.reportBucketCounts)
-          },
-          sampleMeta: {
-            source: 'continuous-collection',
-            batchId: currentBatchResult.value.batchId,
-            sampleIndex: sample.index
-          }
+          ...batchSummaryField
         };
       }
 
       if (currentTaskDetail.value.scenario === 'tsp') {
         return {
-          userId,
-          user_id: userId,
-          taskId: currentTaskDetail.value.taskId,
-          task_id: currentTaskDetail.value.taskId,
-          batch_id: currentBatchResult.value.batchId,
-          protocol: currentTaskDetail.value.protocol,
-          uploadTime,
-          upload_time: uploadTime,
+          ...baseRecord,
           original_missing: sample.rawMissing,
           original_score: sample.rawScore,
           stage1_result: sample.stageOneSkipped ? 'skipped' : sample.stageOneValue,
@@ -3280,33 +3297,14 @@ function uploadCurrentBatchResult() {
             reportMissing: sample.reportMissing,
             reportMissingLabel: sample.reportMissingLabel,
             reportScore: sample.reportScore,
-            reportScoreDisplay: sample.reportScoreDisplay,
-            params: buildTspReportParams()
+            reportScoreDisplay: sample.reportScoreDisplay
           },
-          batchSummary: {
-            sampleCount: currentBatchResult.value.samples.length,
-            rawMissingCounts: currentBatchResult.value.rawMissingCounts,
-            reportMissingCounts: currentBatchResult.value.reportMissingCounts,
-            rawScoreCounts: currentBatchResult.value.rawScoreCounts,
-            reportScoreCounts: currentBatchResult.value.reportScoreCounts
-          },
-          sampleMeta: {
-            source: 'continuous-collection',
-            batchId: currentBatchResult.value.batchId,
-            sampleIndex: sample.index
-          }
+          ...batchSummaryField
         };
       }
 
       return {
-        userId,
-        user_id: userId,
-        taskId: currentTaskDetail.value.taskId,
-        task_id: currentTaskDetail.value.taskId,
-        batch_id: currentBatchResult.value.batchId,
-        protocol: currentTaskDetail.value.protocol,
-        uploadTime,
-        upload_time: uploadTime,
+        ...baseRecord,
         report_value: sample.reportValue,
         reportData: {
           protocol: currentTaskDetail.value.protocol,
@@ -3314,18 +3312,7 @@ function uploadCurrentBatchResult() {
           perturbedLabel: sample.perturbedLabel,
           reportValue: sample.reportValue
         },
-        batchSummary: {
-          sampleCount: currentBatchResult.value.samples.length,
-          rawTriggerCount: currentBatchResult.value.rawCountOne,
-          rawNonTriggerCount: currentBatchResult.value.rawCountZero,
-          reportTriggerCount: currentBatchResult.value.countOne,
-          reportNonTriggerCount: currentBatchResult.value.countZero
-        },
-        sampleMeta: {
-          source: 'continuous-collection',
-          batchId: currentBatchResult.value.batchId,
-          sampleIndex: sample.index
-        }
+        ...batchSummaryField
       };
     });
 
@@ -3339,6 +3326,10 @@ function uploadCurrentBatchResult() {
     ElMessage.success(`已成功上报 ${currentBatchResult.value.samples.length} 条连续采集扰动记录到管理端`);
   } catch (error) {
     console.error('批量上报连续采集结果失败:', error);
+    if (isQuotaExceededError(error)) {
+      ElMessage.error('本地存储空间不足，当前批次未写入。请先清理部分历史上报数据后重试。');
+      return;
+    }
     ElMessage.error('上报失败，请稍后重试');
   }
 }
