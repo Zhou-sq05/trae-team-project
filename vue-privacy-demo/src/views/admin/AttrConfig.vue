@@ -713,7 +713,7 @@
                 <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.q : '--' }}</div>
               </div>
             </div>
-            <div class="calibration-tip">先对 A 做 one-hot 编码，再逐位扰动。</div>
+            <div class="calibration-tip">先对 A 生成初始编码向量，再逐位扰动。</div>
             <div class="calibration-tip">AOUE 中真实位的 p 固定为 0.5，q 由 ε、α、β 自动校准。</div>
             <div v-if="!privacyBudgetSaved" class="calibration-tip">请先设置并保存隐私预算 ε。</div>
             <div v-else-if="!stepsAlphaBetaResult" class="calibration-tip">请先基于当前 ε 计算支持集与内在不确定性参数。</div>
@@ -1271,7 +1271,7 @@ const distributeSummary = computed(() => {
     },
     '每日步数分桶': {
       sensitiveAttribute: '体重状态',
-      userProcessSummary: 'AOUE：分桶 + one-hot 编码 + 逐位扰动',
+      userProcessSummary: 'AOUE：分桶 + 初始编码向量 + 逐位扰动',
       parameterSummary: [
         `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
         `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
@@ -1782,8 +1782,8 @@ function calibrateParams() {
         d: STEP_BUCKET_ORDER.length,
         protocol: 'AOUE (Adaptive Optimized Unary Encoding)',
         description: clamped
-          ? `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}。AOUE 先对每日步数分桶做 one-hot 编码，再逐位扰动；本次原始 q = ${rawQ.toFixed(4)}，已按有效区间裁剪为 ${q.toFixed(4)}。`
-          : `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}，先对每日步数分桶做 one-hot 编码，再按 AOUE 逐位扰动。`,
+          ? `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}。AOUE 先对每日步数分桶生成初始编码向量，再逐位扰动；本次原始 q = ${rawQ.toFixed(4)}，已按有效区间裁剪为 ${q.toFixed(4)}。`
+          : `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}，先对每日步数分桶生成初始编码向量，再按 AOUE 逐位扰动。`,
         dataSource: 'temp_steps_weight_200.csv'
       };
 

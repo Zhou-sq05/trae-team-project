@@ -257,7 +257,7 @@ function buildAoueSummary(aoueRecords) {
     if (reportBucket && Object.prototype.hasOwnProperty.call(reportBucketCounts, reportBucket)) {
       reportBucketCounts[reportBucket] += 1;
     } else if (Array.isArray(item.report_value)) {
-      // 如果是向量，按位统计击中情况作为 UI 展示的上报分布
+      // 如果是向量，按位累计 1 的数量作为 UI 展示的扰动后编码向量分布
       item.report_value.forEach((bit, index) => {
         if (bit === 1) {
           const label = getStepsBucketLabelByCode(index + 1);
@@ -638,7 +638,7 @@ function getAoueAggregateResults(records, task, taskId) {
     summary,
     estimatedCounts,
     resultSections,
-    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部批次摘要与单条样本向量统一恢复，展示值已做非负归一化' : '基于上报向量分布近似，展示值已做非负归一化',
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部批次摘要与单条样本向量统一恢复，展示值已做非负归一化' : '基于扰动后编码向量分布近似，展示值已做非负归一化',
     sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 AOUE 样本（向量形式）统一统计与估计。`
   })];
 }

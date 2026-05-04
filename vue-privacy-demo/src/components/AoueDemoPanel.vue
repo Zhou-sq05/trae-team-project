@@ -31,7 +31,7 @@
       <div class="aoue-hero-head">
         <div>
           <div class="aoue-hero-eyebrow">AOUE 单次扰动结果总览</div>
-          <h4 class="aoue-hero-title">本次上报向量</h4>
+          <h4 class="aoue-hero-title">本次扰动后编码向量</h4>
         </div>
         <div class="aoue-hero-status">{{ demo.overviewTypeText }}</div>
       </div>
@@ -42,8 +42,8 @@
           <span class="aoue-hero-metric__value">{{ demo.playModeText }}</span>
         </div>
         <div class="aoue-hero-metric">
-          <span class="aoue-hero-metric__label">结果解释</span>
-          <span class="aoue-hero-metric__value">{{ demo.overviewHitText }}</span>
+              <span class="aoue-hero-metric__label">向量说明</span>
+          <span class="aoue-hero-metric__value">{{ demo.overviewVectorNoteText }}</span>
         </div>
       </div>
     </div>
@@ -69,7 +69,7 @@
 
         <div v-if="demo.animationReady" class="aoue-vector-board">
           <div class="aoue-vector-caption-row">
-            <span>原始 one-hot 编码向量</span>
+            <span>初始编码向量</span>
             <span class="aoue-vector-caption-row__hint">编码阶段会先出现全 0 向量，再把目标位置为 1</span>
           </div>
           <div class="aoue-vector-columns">
@@ -83,7 +83,7 @@
           </div>
 
           <div v-if="demo.animationStatus === 'encoding'" class="aoue-encoding-banner">
-            <span>one-hot 编码中</span>
+            <span>初始编码向量生成中</span>
             <span>根据当前分桶位置，将目标位从 0 置为 1</span>
           </div>
           <div v-else class="aoue-transition-row">
@@ -95,7 +95,7 @@
           </div>
 
           <div class="aoue-vector-caption-row aoue-vector-caption-row--bottom">
-            <span>扰动后上报向量</span>
+            <span>扰动后编码向量</span>
             <span class="aoue-vector-caption-row__hint">进入扰动阶段后，结果向量会按位从左到右逐步生成</span>
           </div>
           <div class="aoue-vector-columns">

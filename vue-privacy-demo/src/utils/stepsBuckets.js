@@ -55,28 +55,28 @@ export function normalizeStepsBucketCounts(counts = {}) {
 
 export function explainPerturbedVector(vector, bucketLabels = STEP_BUCKET_ORDER) {
   if (!Array.isArray(vector) || !vector.length) {
-    return '向量为空';
+    return '扰动后编码向量为空';
   }
 
-  const hitIndices = [];
+  const oneBitIndices = [];
   vector.forEach((bit, index) => {
     if (Number(bit) === 1) {
-      hitIndices.push(index);
+      oneBitIndices.push(index);
     }
   });
 
-  if (!hitIndices.length) {
-    return '无命中（AOUE 合法输出）';
+  if (!oneBitIndices.length) {
+    return '扰动后编码向量全为 0（AOUE 合法输出）';
   }
 
-  const resolvedLabels = hitIndices.map(index => {
+  const resolvedLabels = oneBitIndices.map(index => {
     const bucketLabel = bucketLabels?.[index];
-    return bucketLabel ? `第 ${index + 1} 桶（${bucketLabel}）` : `第 ${index + 1} 桶`;
+    return bucketLabel ? `b${index} = 1（${bucketLabel}）` : `b${index} = 1`;
   });
 
   if (resolvedLabels.length === 1) {
-    return `命中 ${resolvedLabels[0]}`;
+    return `扰动后编码向量：${resolvedLabels[0]}`;
   }
 
-  return `多重命中：${resolvedLabels.join('、')}`;
+  return `扰动后编码向量多个 bit 为 1：${resolvedLabels.join('、')}`;
 }

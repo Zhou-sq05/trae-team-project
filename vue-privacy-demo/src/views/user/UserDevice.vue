@@ -1216,15 +1216,15 @@ const agrrResultCards = computed(() => [
 
 const aoueResultCards = computed(() => [
   {
-    label: '原始 one-hot 编码',
+    label: '初始编码向量',
     value: aoueSimulationResult.value ? aoueSimulationResult.value.encodedValueDisplay : '--'
   },
   {
-    label: '扰动后向量解释',
+    label: '扰动后编码向量说明',
     value: aoueSimulationResult.value ? aoueSimulationResult.value.perturbedLabel : '--'
   },
   {
-    label: '上报向量',
+    label: '扰动后编码向量',
     value: aoueSimulationResult.value ? aoueSimulationResult.value.reportValueDisplay : '--'
   }
 ]);
@@ -1267,45 +1267,45 @@ const aoueAnimationReady = computed(() => (
 ));
 
 function analyzeAoueVector(vector = []) {
-  const hitIndices = [];
+  const oneBitIndices = [];
   vector.forEach((bit, index) => {
     if (bit === 1) {
-      hitIndices.push(index);
+      oneBitIndices.push(index);
     }
   });
 
-  const hitItems = hitIndices.map(index => ({
+  const oneBitItems = oneBitIndices.map(index => ({
     index,
     bucketIndex: index + 1,
     bucketLabel: STEP_BUCKET_ORDER[index] || `第 ${index + 1} 桶`,
     display: STEP_BUCKET_ORDER[index]
-      ? `第 ${index + 1} 桶（${STEP_BUCKET_ORDER[index]}）`
-      : `第 ${index + 1} 桶`
+      ? `b${index} = 1（${STEP_BUCKET_ORDER[index]}）`
+      : `b${index} = 1`
   }));
 
-  if (!hitItems.length) {
+  if (!oneBitItems.length) {
     return {
       resultType: 'none',
-      resultTypeLabel: '无命中',
-      resultDescription: '无命中（AOUE 合法输出）',
-      hitItems
+      resultTypeLabel: '全 0 向量',
+      resultDescription: '扰动后编码向量全为 0（AOUE 合法输出）',
+      oneBitItems
     };
   }
 
-  if (hitItems.length === 1) {
+  if (oneBitItems.length === 1) {
     return {
       resultType: 'single',
-      resultTypeLabel: '单命中',
-      resultDescription: `命中 ${hitItems[0].display}`,
-      hitItems
+      resultTypeLabel: '单个 bit 为 1',
+      resultDescription: `扰动后编码向量：${oneBitItems[0].display}`,
+      oneBitItems
     };
   }
 
   return {
     resultType: 'multi',
-    resultTypeLabel: '多重命中',
-    resultDescription: `多重命中：${hitItems.map(item => item.display).join('、')}`,
-    hitItems
+    resultTypeLabel: '多个 bit 为 1',
+    resultDescription: `扰动后编码向量多个 bit 为 1：${oneBitItems.map(item => item.display).join('、')}`,
+    oneBitItems
   };
 }
 
@@ -1353,9 +1353,9 @@ const aoueAnimationStatusText = computed(() => {
   const labelMap = {
     idle: '未开始',
     bucketing: '原始值与分桶',
-    encoding: 'one-hot 编码',
+    encoding: '初始编码向量',
     perturbing: '逐位扰动中',
-    done: '生成上报向量'
+    done: '生成扰动后编码向量'
   };
   return labelMap[aoueAnimationStage.value] || '未开始';
 });
@@ -1420,14 +1420,14 @@ const aoueOverviewTypeText = computed(() => {
   if (aoueAnimationStage.value === 'perturbing') {
     const currentStep = Math.min(aoueCompletedBitsCount.value + 1, aoueBitSteps.value.length || 0);
     return currentStep > aoueBitSteps.value.length
-      ? '阶段 4 / 4：生成上报向量'
+      ? '阶段 4 / 4：生成扰动后编码向量'
       : `阶段 3 / 4：第 ${currentStep} / ${aoueBitSteps.value.length} 位`;
   }
 
   return aoueFinalResultAnalysis.value.resultTypeLabel;
 });
 
-const aoueOverviewHitText = computed(() => {
+const aoueOverviewVectorNoteText = computed(() => {
   if (!aoueAnimationReady.value) {
     return '先基于当前输入生成一组 AOUE 示例样本，再选择自动播放或手动模式。';
   }
@@ -1441,11 +1441,11 @@ const aoueOverviewHitText = computed(() => {
   }
 
   if (aoueAnimationStage.value === 'encoding') {
-    return `根据当前分桶位置，将长度为 d 的全 0 向量中第 ${aoueTargetBitIndex.value + 1} 位设为 1，得到 one-hot 编码。`;
+    return `根据当前分桶位置，将长度为 d 的全 0 向量中第 ${aoueTargetBitIndex.value + 1} 位设为 1，得到初始编码向量。`;
   }
 
   if (aoueAnimationStage.value === 'perturbing') {
-    return 'AOUE 会对 one-hot 向量的每一位独立采样，结果可以是全 0、单个 1 或多个 1。';
+    return 'AOUE 会对初始编码向量的每一位独立采样，扰动后编码向量可以是全 0、单个 bit 为 1 或多个 bit 为 1。';
   }
 
   return aoueFinalResultAnalysis.value.resultDescription;
@@ -1457,9 +1457,9 @@ const aoueStepperItems = computed(() => {
   if (!aoueAnimationReady.value) {
     return [
       { label: '原始值与分桶', state: stepStates[0] },
-      { label: 'one-hot 编码', state: stepStates[1] },
+      { label: '初始编码向量', state: stepStates[1] },
       { label: '逐位扰动', state: stepStates[2] },
-      { label: '生成上报向量', state: stepStates[3] }
+      { label: '生成扰动后编码向量', state: stepStates[3] }
     ];
   }
 
@@ -1482,9 +1482,9 @@ const aoueStepperItems = computed(() => {
 
   return [
     { label: '原始值与分桶', state: stepStates[0] },
-    { label: 'one-hot 编码', state: stepStates[1] },
+    { label: '初始编码向量', state: stepStates[1] },
     { label: '逐位扰动', state: stepStates[2] },
-    { label: '生成上报向量', state: stepStates[3] }
+    { label: '生成扰动后编码向量', state: stepStates[3] }
   ];
 });
 
@@ -1515,12 +1515,12 @@ const aoueCurrentDetailTitle = computed(() => {
 
   if (aoueAnimationStage.value === 'encoding') {
     if (aoueEncodingStepIndex.value === 0) {
-      return 'one-hot 编码：初始化';
+      return '初始编码向量：初始化';
     }
     if (aoueEncodingStepIndex.value === 1) {
-      return 'one-hot 编码：定位目标位';
+      return '初始编码向量：定位目标位';
     }
-    return 'one-hot 编码：置位完成';
+    return '初始编码向量：置位完成';
   }
 
   if (aoueAnimationStage.value === 'perturbing' && aoueCurrentDisplayStep.value) {
@@ -1549,18 +1549,18 @@ const aoueVectorDetailText = computed(() => {
 
   if (aoueAnimationStage.value === 'encoding') {
     if (aoueEncodingStepIndex.value === 0) {
-      return `先创建一个长度为 d = ${aoueOriginalVector.value.length} 的全 0 向量，准备生成当前样本的 one-hot 编码。`;
+      return `先创建一个长度为 d = ${aoueOriginalVector.value.length} 的全 0 向量，准备生成当前样本的初始编码向量。`;
     }
 
     if (aoueEncodingStepIndex.value === 1) {
       return `当前样本属于第 ${aoueTargetBitIndex.value + 1} 桶，正在高亮目标位，下一步会把这一位从 0 置为 1。`;
     }
 
-    return `已将第 ${aoueTargetBitIndex.value + 1} 位设为 1，得到 one-hot 编码 ${formatAoueVectorDisplay(aoueDisplayOriginalVector.value, '0')}。`;
+    return `已将第 ${aoueTargetBitIndex.value + 1} 位设为 1，得到初始编码向量 ${formatAoueVectorDisplay(aoueDisplayOriginalVector.value, '0')}。`;
   }
 
   if (aoueAnimationStage.value === 'done' && aoueSimulationResult.value) {
-    return `最终上报向量为 ${aoueSimulationResult.value.reportValueDisplay}，结果解释：${aoueSimulationResult.value.perturbedLabel}。`;
+    return `扰动后编码向量为 ${aoueSimulationResult.value.reportValueDisplay}，向量说明：${aoueSimulationResult.value.perturbedLabel}。`;
   }
 
   const step = aoueCurrentDisplayStep.value;
@@ -1686,7 +1686,7 @@ const aoueDemoViewModel = computed(() => ({
   animationStatus: aoueAnimationStage.value,
   overviewTypeText: aoueOverviewTypeText.value,
   overviewVectorText: aoueOverviewVectorText.value,
-  overviewHitText: aoueOverviewHitText.value,
+  overviewVectorNoteText: aoueOverviewVectorNoteText.value,
   stepperItems: aoueStepperItems.value,
   animationReady: aoueAnimationReady.value,
   vectorColumns: aoueVectorColumns.value,
@@ -2121,7 +2121,7 @@ const currentBatchResultTip = computed(() => {
     return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始分钟数样本、映射到 4 档后，再执行 AGRR 本地扰动得到的统计结果。'} 原始分钟数仅用于映射分档，真正执行扰动与上报的是分档后的档位编码。`;
   }
   if (currentTaskDetail.value?.scenario === 'aoue') {
-    return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始步数样本并执行 AOUE 本地扰动。'} 原始步数映射为分桶向量上报，下表展示了原始分布与扰动后上报分布的对比。`;
+    return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始步数样本并执行 AOUE 本地扰动。'} 原始步数先映射为初始编码向量，再逐位扰动为扰动后编码向量；下表展示了原始分布与扰动后编码向量累计分布的对比。`;
   }
   return currentPerturbationStatus.value?.description || '当前结果为手环端连续执行本地扰动后的统计结果，用于演示设备持续采集并立即本地上报的过程。';
 });
@@ -2152,8 +2152,8 @@ const batchPreviewColumns = computed(() => {
       { key: 'index', label: '#' },
       { key: 'rawSteps', label: '原始步数' },
       { key: 'rawLabel', label: '原始分桶' },
-      { key: 'perturbedLabel', label: '扰动后向量解释' },
-      { key: 'reportValueDisplay', label: '上报向量' }
+      { key: 'perturbedLabel', label: '扰动后编码向量说明' },
+      { key: 'reportValueDisplay', label: '扰动后编码向量' }
     ];
   }
 
@@ -2182,7 +2182,7 @@ const processPreviewCards = computed(() => {
       ];
     case 'aoue':
       return [
-        { label: '处理链路', value: '原始步数 -> 分桶 -> one-hot 编码 -> AOUE 逐位扰动 -> 上报向量' },
+        { label: '处理链路', value: '原始步数 -> 分桶 -> 初始编码向量 -> AOUE 逐位扰动 -> 扰动后编码向量' },
         { label: '当前分桶', value: derivedStepsBucket.value || '--' }
       ];
     case 'tsp':
@@ -2202,7 +2202,7 @@ const processPreviewTip = computed(() => {
   }
 
   if (currentTaskDetail.value.scenario === 'aoue') {
-    return '当前 AOUE 已按 one-hot 向量逐位独立扰动接入单次演示、连续采集与上报链路，展示结果与最终上报向量保持一致。';
+    return '当前 AOUE 已按初始编码向量逐位独立扰动接入单次演示、连续采集与上报链路，展示结果与扰动后编码向量保持一致。';
   }
 
   return '当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。';
@@ -3056,8 +3056,7 @@ async function runBatchSimulation() {
       sampleResult.encodedValue.forEach((bit, index) => {
         originalBitSums[index] += Number(bit) || 0;
       });
-      // 对于 AOUE，我们需要统计每个分桶被击中的次数（即 bit 为 1 的位）。
-      // 注意：AOUE 上报的是一个向量，统计时应该按位累加。
+      // 对于 AOUE，扰动后编码向量可能包含多个 1，也可能全为 0，统计时按位累加。
       sampleResult.reportValue.forEach((bit, index) => {
         perturbedBitSums[index] += Number(bit) || 0;
         if (bit === 1) {

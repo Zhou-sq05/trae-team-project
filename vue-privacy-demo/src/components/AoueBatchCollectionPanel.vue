@@ -16,8 +16,8 @@
         <div class="aoue-batch-hero__progress">{{ batch.progressText }}</div>
       </div>
       <p class="aoue-batch-hero__desc">
-        连续采集展示的是多轮 AOUE 扰动下，原始 one-hot 向量与扰动后上报向量在各 bit 位上的累计总和变化。
-        AOUE 连续采集的聚合核心是按位累计统计，而不是单轮命中某一个唯一桶。
+        连续采集展示的是多轮 AOUE 扰动下，初始编码向量与扰动后编码向量在各 bit 位上的累计总和变化。
+        AOUE 连续采集的聚合核心是按位累计统计，而不是从多个桶中选择一个唯一结果。
       </p>
 
       <div class="aoue-batch-meta">
@@ -90,11 +90,11 @@
           <div class="aoue-batch-side-card__title">最近一次采集</div>
           <div class="aoue-batch-side-card__text">单轮上报是随机的，多轮累计后才形成统计规律。</div>
           <div class="aoue-batch-mini-vector">
-            <span class="aoue-batch-mini-vector__label">最近一次原始 one-hot</span>
+            <span class="aoue-batch-mini-vector__label">最近一次初始编码向量</span>
             <span class="aoue-batch-mini-vector__value">{{ batch.latestOriginalVectorDisplay }}</span>
           </div>
           <div class="aoue-batch-mini-vector">
-            <span class="aoue-batch-mini-vector__label">最近一次上报向量</span>
+            <span class="aoue-batch-mini-vector__label">最近一次扰动后编码向量</span>
             <span class="aoue-batch-mini-vector__value">{{ batch.latestReportedVectorDisplay }}</span>
           </div>
         </div>
@@ -124,7 +124,7 @@
           <span>原始步数</span>
           <span>原始分桶</span>
           <span>扰动后解释</span>
-          <span>上报向量</span>
+          <span>扰动后编码向量</span>
         </div>
         <div v-for="row in batch.visiblePreviewRows" :key="row.index" class="aoue-batch-log-row">
           <span>{{ row.index }}</span>
