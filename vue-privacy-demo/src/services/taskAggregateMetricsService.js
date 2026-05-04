@@ -64,6 +64,29 @@ function normalizeTspCode(value, domainSize = 5) {
   return numericValue;
 }
 
+function normalizeCountsForDisplay(estimatedCounts, targetSum) {
+  const counts = Array.isArray(estimatedCounts)
+    ? estimatedCounts.map(value => Math.max(0, Number(value) || 0))
+    : [];
+  const resolvedTargetSum = Math.max(0, Number(targetSum) || 0);
+  const currentSum = counts.reduce((sum, value) => sum + value, 0);
+
+  if (!counts.length) {
+    return [];
+  }
+
+  if (!resolvedTargetSum) {
+    return counts.map(() => 0);
+  }
+
+  if (currentSum <= 0) {
+    const uniformValue = resolvedTargetSum / counts.length;
+    return counts.map(() => Number(uniformValue.toFixed(4)));
+  }
+
+  return counts.map(value => Number(((value / currentSum) * resolvedTargetSum).toFixed(4)));
+}
+
 function getTaskConfig(task, protocol, domainSize) {
   const snapshot = task?.configSnapshot || {};
   const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
@@ -588,8 +611,21 @@ function getAoueAggregateResults(records, task, taskId) {
     return new Array(STEP_BUCKET_ORDER.length).fill(0);
   });
 
-  const estimatedCounts = aggregateAOUE(perturbedData, config.epsilon, STEP_BUCKET_ORDER.length, config.p, config.q)
+  const rawEstimatedCounts = aggregateAOUE(perturbedData, config.epsilon, STEP_BUCKET_ORDER.length, config.p, config.q)
     .map(value => Number(value.toFixed(4)));
+  const estimatedCounts = normalizeCountsForDisplay(rawEstimatedCounts, summary.sampleCount);
+  const resultSections = [
+    createSection(
+      STEP_BUCKET_ORDER,
+      summary.hasRawSummary ? summary.rawCounts : summary.reportCounts,
+      estimatedCounts,
+      summary.sampleCount,
+      'overall',
+      'AOUE 归一化展示结果',
+      'AOUE 原始无偏估计可能出现负数或总量偏移；此处将估计计数做非负截断，并按样本总数归一化，便于观察分布形态。',
+      '真实频率 vs 归一化估计频率'
+    )
+  ];
 
   return [createAggregateViewModel({
     id: 1,
@@ -601,7 +637,8 @@ function getAoueAggregateResults(records, task, taskId) {
     config,
     summary,
     estimatedCounts,
-    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部批次摘要与单条样本向量统一恢复' : '基于上报向量分布近似',
+    resultSections,
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部批次摘要与单条样本向量统一恢复，展示值已做非负归一化' : '基于上报向量分布近似，展示值已做非负归一化',
     sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 AOUE 样本（向量形式）统一统计与估计。`
   })];
 }
