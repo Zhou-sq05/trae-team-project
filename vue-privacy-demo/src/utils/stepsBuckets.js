@@ -1,14 +1,10 @@
 import { STEP_BUCKET_ORDER } from './constants.js';
 
 export const STEPS_BUCKET_RULES = [
-  { label: STEP_BUCKET_ORDER[0], min: 0, max: 1999, rangeText: '0-1999 步' },
-  { label: STEP_BUCKET_ORDER[1], min: 2000, max: 3999, rangeText: '2000-3999 步' },
-  { label: STEP_BUCKET_ORDER[2], min: 4000, max: 5999, rangeText: '4000-5999 步' },
-  { label: STEP_BUCKET_ORDER[3], min: 6000, max: 7999, rangeText: '6000-7999 步' },
-  { label: STEP_BUCKET_ORDER[4], min: 8000, max: 9999, rangeText: '8000-9999 步' },
-  { label: STEP_BUCKET_ORDER[5], min: 10000, max: 11999, rangeText: '10000-11999 步' },
-  { label: STEP_BUCKET_ORDER[6], min: 12000, max: 13999, rangeText: '12000-13999 步' },
-  { label: STEP_BUCKET_ORDER[7], min: 14000, max: Number.POSITIVE_INFINITY, rangeText: '14000 步及以上' }
+  { label: STEP_BUCKET_ORDER[0], min: 0, max: 3999, rangeText: '0-3999 步' },
+  { label: STEP_BUCKET_ORDER[1], min: 4000, max: 6999, rangeText: '4000-6999 步' },
+  { label: STEP_BUCKET_ORDER[2], min: 7000, max: 9999, rangeText: '7000-9999 步' },
+  { label: STEP_BUCKET_ORDER[3], min: 10000, max: Number.POSITIVE_INFINITY, rangeText: '10000 步及以上' }
 ];
 
 export function getStepsBucket(steps) {
@@ -17,10 +13,9 @@ export function getStepsBucket(steps) {
     return '';
   }
 
-  const rule = STEPS_BUCKET_RULES.find(
-    r => numericSteps >= r.min && numericSteps <= r.max
-  );
-  return rule ? rule.label : '';
+  return STEPS_BUCKET_RULES.find(
+    rule => numericSteps >= rule.min && numericSteps <= rule.max
+  )?.label || '';
 }
 
 export function getStepsBucketCode(bucketLabel) {

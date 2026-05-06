@@ -3,8 +3,7 @@ import { STAND_BUCKET_ORDER } from './constants.js';
 export const STAND_DURATION_BUCKET_RULES = [
   { label: STAND_BUCKET_ORDER[0], min: 0, max: 119, rangeText: '0-119 分钟' },
   { label: STAND_BUCKET_ORDER[1], min: 120, max: 239, rangeText: '120-239 分钟' },
-  { label: STAND_BUCKET_ORDER[2], min: 240, max: 359, rangeText: '240-359 分钟' },
-  { label: STAND_BUCKET_ORDER[3], min: 360, max: Number.POSITIVE_INFINITY, rangeText: '360 分钟及以上' }
+  { label: STAND_BUCKET_ORDER[2], min: 240, max: Number.POSITIVE_INFINITY, rangeText: '240 分钟及以上' }
 ];
 
 export function getStandDurationBucket(minutes) {

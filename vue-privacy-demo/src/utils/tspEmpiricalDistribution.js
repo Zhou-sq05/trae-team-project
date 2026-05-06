@@ -1,7 +1,18 @@
-import { AGE_GROUP_ORDER, loadCSVFile, parseCSV } from './fallAlarmMatrix.js';
-import { normalizeSleepMissingRows, SLEEP_QUALITY_MISSING_DATA_PATH } from './sleepQualityMissingMatrix.js';
+import { AGE_GROUP_ORDER } from './fallAlarmMatrix.js';
+import { SLEEP_QUALITY_MISSING_DATA_PATH } from './sleepQualityMissingMatrix.js';
+import {
+  CONDITION_DISTRIBUTION_KEYS,
+  getConditionDistribution,
+  sampleObservedValue,
+  sampleSensitiveValue
+} from './conditionDistributionPresets.js';
 
 const SCORE_DOMAIN = [1, 2, 3, 4, 5];
+const QUALITY_SCORE_MAP = {
+  低质量: 2,
+  中质量: 3,
+  高质量: 5
+};
 const distributionCache = new Map();
 
 function createEmptyScoreCounts() {
@@ -33,7 +44,31 @@ function toProbabilityMap(counts, total) {
   );
 }
 
-export function buildTspEmpiricalDistribution(rows) {
+function createSyntheticRows(sampleSize = 500) {
+  return Array.from({ length: sampleSize }, (_, index) => {
+    const ageGroup = sampleSensitiveValue(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_AGE);
+    const missingSample = sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_MISSING_AGE, ageGroup);
+    const sleepMissing = missingSample.observedValue === '缺失' ? 1 : 0;
+    const qualitySample = sleepMissing === 1
+      ? { observedValue: null }
+      : sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_AGE, ageGroup);
+    const sleepScore = sleepMissing === 1 ? null : QUALITY_SCORE_MAP[qualitySample.observedValue] ?? 3;
+
+    return {
+      userId: `preset_tsp_${index + 1}`,
+      age: null,
+      ageGroup,
+      sleepMissing,
+      sleepScore,
+      rawMissing: sleepMissing,
+      rawScore: sleepScore,
+      qualityLabel: qualitySample.observedValue,
+      missingLabel: sleepMissing === 1 ? '缺失' : '未缺失'
+    };
+  });
+}
+
+export function buildTspEmpiricalDistribution(rows = createSyntheticRows()) {
   const missingCounts = {
     missing: 0,
     nonMissing: 0
@@ -78,6 +113,9 @@ export function buildTspEmpiricalDistribution(rows) {
 
   return {
     filePath: SLEEP_QUALITY_MISSING_DATA_PATH,
+    dataSourceMode: 'multi_source_calibrated_preset',
+    scorePreset: getConditionDistribution(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_AGE),
+    missingPreset: getConditionDistribution(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_MISSING_AGE),
     sampleSize: rows.length,
     nonMissingSampleSize: missingCounts.nonMissing,
     rows,
@@ -93,37 +131,25 @@ export function buildTspEmpiricalDistribution(rows) {
 
 export async function getTspEmpiricalDistribution(filePath = SLEEP_QUALITY_MISSING_DATA_PATH) {
   if (!distributionCache.has(filePath)) {
-    distributionCache.set(
-      filePath,
-      (async () => {
-        const csvContent = await loadCSVFile(filePath);
-        const parsedRows = parseCSV(csvContent);
-        const normalizedRows = normalizeSleepMissingRows(parsedRows);
-        return buildTspEmpiricalDistribution(normalizedRows);
-      })()
-    );
+    distributionCache.set(filePath, Promise.resolve(buildTspEmpiricalDistribution()));
   }
 
   return distributionCache.get(filePath);
 }
 
 export function sampleTspRawRecordFromDistribution(distribution) {
-  const rows = distribution?.rows ?? [];
-  if (!rows.length) {
-    throw new Error('TSP 基础样本为空，无法采样');
-  }
-
-  const sampledRow = rows[Math.floor(Math.random() * rows.length)];
-
+  const row = createSyntheticRows(1)[0];
   return {
-    userId: sampledRow.userId,
-    age: sampledRow.age,
-    ageGroup: sampledRow.ageGroup,
-    sleepMissing: sampledRow.sleepMissing,
-    sleepScore: sampledRow.sleepScore,
-    rawMissing: sampledRow.sleepMissing,
-    rawScore: sampledRow.sleepScore,
-    missingLabel: sampledRow.missingLabel
+    userId: row.userId,
+    age: row.age,
+    ageGroup: row.ageGroup,
+    sleepMissing: row.sleepMissing,
+    sleepScore: row.sleepScore,
+    rawMissing: row.sleepMissing,
+    rawScore: row.sleepScore,
+    missingLabel: row.missingLabel,
+    qualityLabel: row.qualityLabel,
+    distributionSourceMode: distribution?.dataSourceMode || 'multi_source_calibrated_preset'
   };
 }
 

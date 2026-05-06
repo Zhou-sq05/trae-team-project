@@ -593,11 +593,11 @@ function getArrAggregateResults(records, task, taskId) {
 
   return [createAggregateViewModel({
     id: 1,
-    attributeName: '是否触发异常跌倒告警',
+    attributeName: '是否触发睡眠异常提醒',
     taskId,
     protectionMode: getProtectionMode(task),
     algorithm: 'ARR',
-    labels: ['未触发', '触发'],
+    labels: ['未触发提醒', '触发提醒'],
     config,
     summary,
     estimatedCounts,

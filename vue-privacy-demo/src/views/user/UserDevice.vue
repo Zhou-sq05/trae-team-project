@@ -80,10 +80,10 @@
 
           <div v-else class="dynamic-form">
             <div v-if="currentTaskDetail.scenario === 'arr'" class="form-item">
-              <span>是否触发异常跌倒告警</span>
+              <span>是否触发睡眠异常提醒</span>
               <el-radio-group v-model="dynamicForm.fallAlarm" @change="markFormTouched">
-                <el-radio :label="0" @click="handleArrOptionClick(0)">否</el-radio>
-                <el-radio :label="1" @click="handleArrOptionClick(1)">是</el-radio>
+                <el-radio :label="0" @click="handleArrOptionClick(0)">未触发提醒</el-radio>
+                <el-radio :label="1" @click="handleArrOptionClick(1)">触发提醒</el-radio>
               </el-radio-group>
             </div>
 
@@ -793,6 +793,10 @@ import {
   sampleTspRawRecordFromDistribution
 } from '../../utils/tspEmpiricalDistribution';
 import { getTspVersionMeta, resolveTspTaskConfig } from '../../utils/tspProtocol.js';
+import {
+  CONDITION_DISTRIBUTION_KEYS,
+  sampleObservedValue
+} from '../../utils/conditionDistributionPresets.js';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -862,7 +866,7 @@ const currentTaskAttribute = computed(() => {
   const task = currentTask.value;
   if (!task?.attributes?.length) return null;
 
-  const supportedNames = ['是否触发异常跌倒告警', '日均站立时长分档', '每日步数分桶', '睡眠质量评分'];
+  const supportedNames = ['是否触发睡眠异常提醒', '日均站立时长分档', '每日步数分桶', '睡眠质量评分'];
   return (
     task.attributes.find(attribute => supportedNames.includes(attribute.name) && attribute.isProtected) ||
     task.attributes.find(attribute => supportedNames.includes(attribute.name) && attribute.status === '已配置') ||
@@ -877,9 +881,9 @@ const currentTaskDetail = computed(() => {
   if (!task || !attribute) return null;
 
   const map = {
-    '是否触发异常跌倒告警': {
+    '是否触发睡眠异常提醒': {
       scenario: 'arr',
-      title: '是否触发异常跌倒告警',
+      title: '是否触发睡眠异常提醒',
       protocol: 'ARR',
       mode: '间接隐私风险'
     },
@@ -1138,7 +1142,7 @@ const rawSummaryCards = computed(() => {
   switch (currentTaskDetail.value.scenario) {
     case 'arr':
       return [
-        { label: '原始告警值', value: dynamicForm.fallAlarm === 1 ? '触发' : '未触发' }
+        { label: '原始提醒值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' }
       ];
     case 'agrr':
       return [
@@ -1161,7 +1165,7 @@ const rawSummaryCards = computed(() => {
 });
 
 const arrRawCards = computed(() => [
-  { label: '原始告警值', value: dynamicForm.fallAlarm === 1 ? '触发' : '未触发' },
+  { label: '原始提醒值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' },
   { label: '原始编码值', value: String(dynamicForm.fallAlarm) }
 ]);
 
@@ -1800,10 +1804,10 @@ const arrBatchSummaryCards = computed(() => {
     { label: '本次连续采集次数', value: String(arrBatchResult.value.totalRuns) },
     { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
     { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' },
-    { label: '原始“触发”数量', value: String(arrBatchResult.value.rawCountOne) },
-    { label: '原始“未触发”数量', value: String(arrBatchResult.value.rawCountZero) },
-    { label: '上报“触发”数量', value: String(arrBatchResult.value.countOne) },
-    { label: '上报“未触发”数量', value: String(arrBatchResult.value.countZero) }
+    { label: '原始“触发提醒”数量', value: String(arrBatchResult.value.rawCountOne) },
+    { label: '原始“未触发提醒”数量', value: String(arrBatchResult.value.rawCountZero) },
+    { label: '上报“触发提醒”数量', value: String(arrBatchResult.value.countOne) },
+    { label: '上报“未触发提醒”数量', value: String(arrBatchResult.value.countZero) }
   ];
 });
 
@@ -1855,12 +1859,12 @@ const arrDistributionComparisonRows = computed(() => {
   const total = arrBatchResult.value.totalRuns || 1;
   const rows = [
     {
-      status: '触发',
+      status: '触发提醒',
       rawCount: arrBatchResult.value.rawCountOne,
       reportCount: arrBatchResult.value.countOne
     },
     {
-      status: '未触发',
+      status: '未触发提醒',
       rawCount: arrBatchResult.value.rawCountZero,
       reportCount: arrBatchResult.value.countZero
     }
@@ -2173,7 +2177,7 @@ const processPreviewCards = computed(() => {
     case 'arr':
       return [
         { label: '处理链路', value: '原始值 -> 扰动值（下一步接入）' },
-        { label: '当前输入', value: dynamicForm.fallAlarm === 1 ? '触发' : '未触发' }
+        { label: '当前输入', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' }
       ];
     case 'agrr':
       return [
@@ -2300,6 +2304,31 @@ function cloneBitArray(values = []) {
   return Array.isArray(values) ? values.map(value => Number(value) || 0) : [];
 }
 
+function randomValueInRange(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function standMinutesFromActivityLabel(label) {
+  const ranges = {
+    低活动: [0, 119],
+    中活动: [120, 239],
+    高活动: [240, 480]
+  };
+  const [min, max] = ranges[label] || ranges.中活动;
+  return randomValueInRange(min, max);
+}
+
+function dailyStepsFromBucketLabel(label) {
+  const ranges = {
+    低步数: [0, 3999],
+    中低步数: [4000, 6999],
+    中高步数: [7000, 9999],
+    高步数: [10000, 16000]
+  };
+  const [min, max] = ranges[label] || ranges.中低步数;
+  return randomValueInRange(min, max);
+}
+
 function waitForUiFrame(ms = 12) {
   return new Promise(resolve => {
     window.setTimeout(resolve, ms);
@@ -2310,15 +2339,19 @@ async function generateRandomExampleInput(scenario) {
   switch (scenario) {
     case 'arr':
       return {
-        fallAlarm: Math.random() < 0.5 ? 0 : 1
+        fallAlarm: sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.ARR_SLEEP_ALERT_AGE).observedValue === '触发提醒' ? 1 : 0
       };
     case 'agrr':
       return {
-        standMinutes: randomInt(30, 480)
+        standMinutes: standMinutesFromActivityLabel(
+          sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.AGRR_ACTIVITY_BMI).observedValue
+        )
       };
     case 'aoue':
       return {
-        dailySteps: randomInt(1000, 16000)
+        dailySteps: dailyStepsFromBucketLabel(
+          sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.AOUE_STEPS_BMI).observedValue
+        )
       };
     case 'tsp': {
       const sample = await sampleTspRawRecordByDistribution();
@@ -2433,9 +2466,9 @@ function simulateArrPerturbation(showMessage = true) {
   const reportValue = ARR(dynamicForm.fallAlarm, arrConfigParams.value.epsilon, 2, arrConfigParams.value.p, arrConfigParams.value.q);
   arrSimulationResult.value = {
     reportValue,
-    perturbedLabel: reportValue === 1 ? '触发' : '未触发',
+    perturbedLabel: reportValue === 1 ? '触发提醒' : '未触发提醒',
     rawValue: dynamicForm.fallAlarm,
-    rawLabel: dynamicForm.fallAlarm === 1 ? '触发' : '未触发'
+    rawLabel: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒'
   };
   systemStatus.value = 1;
 
@@ -2835,45 +2868,17 @@ function simulateCurrentTaskOnce() {
 }
 
 function generateArrRawSample() {
-  return Math.random() < 0.15 ? 1 : 0;
+  return sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.ARR_SLEEP_ALERT_AGE).observedValue === '触发提醒' ? 1 : 0;
 }
 
 function generateAgrrRawSample() {
-  const bucketWeights = [
-    { label: '低站立', weight: 0.2, min: 0, max: 119 },
-    { label: '中低站立', weight: 0.3, min: 120, max: 239 },
-    { label: '中高站立', weight: 0.3, min: 240, max: 359 },
-    { label: '高站立', weight: 0.2, min: 360, max: 480 }
-  ];
-  const randomValue = Math.random();
-  let cumulative = 0;
-  const selectedBucket = bucketWeights.find(bucket => {
-    cumulative += bucket.weight;
-    return randomValue <= cumulative;
-  }) || bucketWeights[bucketWeights.length - 1];
-
-  return Math.floor(Math.random() * (selectedBucket.max - selectedBucket.min + 1)) + selectedBucket.min;
+  const sample = sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.AGRR_ACTIVITY_BMI);
+  return standMinutesFromActivityLabel(sample.observedValue);
 }
 
 function generateAoueRawSample() {
-  const bucketWeights = [
-    { label: '0-1999', weight: 0.1, min: 0, max: 1999 },
-    { label: '2000-3999', weight: 0.15, min: 2000, max: 3999 },
-    { label: '4000-5999', weight: 0.2, min: 4000, max: 5999 },
-    { label: '6000-7999', weight: 0.2, min: 6000, max: 7999 },
-    { label: '8000-9999', weight: 0.15, min: 8000, max: 9999 },
-    { label: '10000-11999', weight: 0.1, min: 10000, max: 11999 },
-    { label: '12000-13999', weight: 0.05, min: 12000, max: 13999 },
-    { label: '14000+', weight: 0.05, min: 14000, max: 20000 }
-  ];
-  const randomValue = Math.random();
-  let cumulative = 0;
-  const selectedBucket = bucketWeights.find(bucket => {
-    cumulative += bucket.weight;
-    return randomValue <= cumulative;
-  }) || bucketWeights[bucketWeights.length - 1];
-
-  return Math.floor(Math.random() * (selectedBucket.max - selectedBucket.min + 1)) + selectedBucket.min;
+  const sample = sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.AOUE_STEPS_BMI);
+  return dailyStepsFromBucketLabel(sample.observedValue);
 }
 
 async function generateTspRawSample(distribution = null) {
@@ -3124,7 +3129,7 @@ async function runBatchSimulation() {
 
   for (let i = 0; i < totalRuns; i += 1) {
     const rawValue = generateArrRawSample();
-    const rawLabel = rawValue === 1 ? '触发' : '未触发';
+    const rawLabel = rawValue === 1 ? '触发提醒' : '未触发提醒';
     if (rawValue === 1) {
       rawCountOne += 1;
     } else {
@@ -3143,7 +3148,7 @@ async function runBatchSimulation() {
       rawValue,
       rawLabel,
       reportValue,
-      perturbedLabel: reportValue === 1 ? '触发' : '未触发'
+      perturbedLabel: reportValue === 1 ? '触发提醒' : '未触发提醒'
     });
   }
 

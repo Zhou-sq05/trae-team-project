@@ -1,4 +1,9 @@
-﻿import { FALL_ALARM_ORDER, AGE_GROUP_DISPLAY } from './constants.js';
+import { AGE_GROUP_DISPLAY, FALL_ALARM_ORDER } from './constants.js';
+import {
+  CONDITION_DISTRIBUTION_KEYS,
+  CONDITION_PRESET_DATA_SOURCE_MODE,
+  buildMatrixDataFromPreset
+} from './conditionDistributionPresets.js';
 
 export const YOUNG_MIN = 18;
 export const YOUNG_MAX = 44;
@@ -6,7 +11,14 @@ export const MIDDLE_MIN = 45;
 export const MIDDLE_MAX = 59;
 export const OLD_MIN = 60;
 
-export const FALL_ALARM_DATA_PATH = '/data/temp_fall_alarm_age_200.csv';
+export const FALL_ALARM_DATA_PATH = 'src/data/conditionDistributionPresets.json';
+export const ARR_DEFAULT_DATA_SOURCE_MODE = CONDITION_PRESET_DATA_SOURCE_MODE;
+export const ARR_DATA_SOURCE_MODES = {
+  [CONDITION_PRESET_DATA_SOURCE_MODE]: {
+    label: '内置多源校准矩阵',
+    description: '当前条件分布采用内置校准矩阵，用于模拟年龄段与睡眠异常提醒之间的统计相关性，后续可替换为更大规模公共健康数据库计算结果。'
+  }
+};
 
 export const AGE_GROUP_ORDER = ['青年', '中年', '老年'];
 
@@ -21,52 +33,22 @@ export function getAgeGroup(age) {
 }
 
 export function getFallAlarmLabel(value) {
-  return Number(value) === 1 ? '触发（A=1）' : '未触发（A=0）';
-}
-
-export function parseCSV(csvContent) {
-  const lines = csvContent
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-
-  if (lines.length === 0) return [];
-
-  const headers = lines[0].split(',').map(header => header.trim());
-
-  return lines.slice(1).map(line => {
-    const values = line.split(',').map(value => value.trim());
-    const row = {};
-
-    headers.forEach((header, index) => {
-      row[header] = values[index] ?? '';
-    });
-
-    return row;
-  });
-}
-
-export async function loadCSVFile(filePath) {
-  const response = await fetch(filePath);
-  if (!response.ok) {
-    throw new Error(`加载 CSV 失败: ${response.status}`);
-  }
-  return response.text();
+  return Number(value) === 1 ? '触发提醒' : '未触发提醒';
 }
 
 export function normalizeFallAlarmRows(rows) {
   return rows
     .map(row => {
-      const age = Number(row.age);
+      const age = Number(row.age ?? row.Age);
       const ageGroup = getAgeGroup(age);
-      const fallAlarmValue = Number(row.fall_alarm);
+      const fallAlarmValue = Number(row.fall_alarm ?? row.sleep_alert ?? row.sleepAlert);
 
       if (!Number.isFinite(age) || !ageGroup || ![0, 1].includes(fallAlarmValue)) {
         return null;
       }
 
       return {
-        userId: row.user_id,
+        userId: row.user_id ?? row['Person ID'],
         age,
         ageGroup,
         fallAlarm: fallAlarmValue,
@@ -76,41 +58,29 @@ export function normalizeFallAlarmRows(rows) {
     .filter(Boolean);
 }
 
-export function calculatePrAGivenS(rows) {
-  const conditionalProbs = {};
-  const jointCounts = {};
-  const sCounts = {};
+export function calculatePrAGivenS() {
+  const matrix = buildPresetSleepReminderMatrix();
+  return {
+    conditionalProbs: matrix.conditionalProbs,
+    jointCounts: matrix.jointCounts,
+    sCounts: matrix.sCounts
+  };
+}
 
-  AGE_GROUP_ORDER.forEach(group => {
-    conditionalProbs[group] = { '未触发（A=0）': 0, '触发（A=1）': 0 };
-    jointCounts[group] = { '未触发（A=0）': 0, '触发（A=1）': 0 };
-    sCounts[group] = 0;
-  });
+export function buildPresetSleepReminderMatrix() {
+  return buildMatrixDataFromPreset(CONDITION_DISTRIBUTION_KEYS.ARR_SLEEP_ALERT_AGE);
+}
 
-  rows.forEach(row => {
-    jointCounts[row.ageGroup][row.fallAlarmLabel] += 1;
-    sCounts[row.ageGroup] += 1;
-  });
-
-  AGE_GROUP_ORDER.forEach(group => {
-    const total = sCounts[group];
-    if (total === 0) return;
-
-    FALL_ALARM_ORDER.forEach(label => {
-      conditionalProbs[group][label] = jointCounts[group][label] / total;
-    });
-  });
-
-  return { conditionalProbs, jointCounts, sCounts };
+export function calculateSmoothedPrAGivenS() {
+  return buildPresetSleepReminderMatrix();
 }
 
 export function buildMatrixRows(conditionalMatrixData) {
-  if (!conditionalMatrixData) return [];
-
+  const matrixData = conditionalMatrixData || buildPresetSleepReminderMatrix();
   return AGE_GROUP_ORDER.map(group => {
     const row = { s: group };
     FALL_ALARM_ORDER.forEach(label => {
-      row[label] = conditionalMatrixData.conditionalProbs[group]?.[label] ?? 0;
+      row[label] = matrixData.conditionalProbs[group]?.[label] ?? 0;
     });
     return row;
   });
@@ -131,10 +101,13 @@ export function calculateColumnStats(conditionalMatrixData) {
 
 export function selectAlphaBetaSourceColumn(conditionalMatrixData) {
   const stats = calculateColumnStats(conditionalMatrixData);
-  const selected = stats[1].ratio > stats[0].ratio ? stats[1] : stats[0];
+  const selected = stats.reduce((best, current) => {
+    if (!best) return current;
+    return current.ratio > best.ratio ? current : best;
+  }, null);
 
   return {
-    selectedLabel: selected.label,
+    selectedLabel: selected?.label || '',
     stats
   };
 }
@@ -153,16 +126,19 @@ export function calculateAlphaBeta(conditionalMatrixData) {
   };
 }
 
-export async function loadFallAlarmMatrixFromCSV(filePath = FALL_ALARM_DATA_PATH) {
-  const csvContent = await loadCSVFile(filePath);
-  const parsedRows = parseCSV(csvContent);
-  const normalizedRows = normalizeFallAlarmRows(parsedRows);
-  const matrix = calculatePrAGivenS(normalizedRows);
-
+export async function loadFallAlarmMatrixFromCSV() {
   return {
-    rows: normalizedRows,
-    matrix
+    rows: [],
+    matrix: buildPresetSleepReminderMatrix()
   };
+}
+
+export async function loadCSVFile() {
+  throw new Error('当前阶段不在前端运行时读取原始 CSV，请使用 conditionDistributionPresets.json。');
+}
+
+export function parseCSV() {
+  return [];
 }
 
 export { AGE_GROUP_DISPLAY };

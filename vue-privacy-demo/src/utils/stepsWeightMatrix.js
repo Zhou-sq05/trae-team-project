@@ -1,52 +1,14 @@
-﻿import { STEP_BUCKET_ORDER, WEIGHT_STATUS_ORDER } from './constants.js';
+import { STEP_BUCKET_ORDER, WEIGHT_STATUS_ORDER } from './constants.js';
 import { choose } from './ldpAlgorithms.js';
+import {
+  CONDITION_DISTRIBUTION_KEYS,
+  buildMatrixDataFromPreset
+} from './conditionDistributionPresets.js';
+import { getStepsBucket } from './stepsBuckets.js';
 
-export { STEP_BUCKET_ORDER, WEIGHT_STATUS_ORDER };
+export { STEP_BUCKET_ORDER, WEIGHT_STATUS_ORDER, getStepsBucket };
 
-export const STEPS_WEIGHT_DATA_PATH = '/data/temp_steps_weight_200.csv';
-
-const STEP_BUCKET_RANGES = [
-  { label: '0-1999', min: 0, max: 1999 },
-  { label: '2000-3999', min: 2000, max: 3999 },
-  { label: '4000-5999', min: 4000, max: 5999 },
-  { label: '6000-7999', min: 6000, max: 7999 },
-  { label: '8000-9999', min: 8000, max: 9999 },
-  { label: '10000-11999', min: 10000, max: 11999 },
-  { label: '12000-13999', min: 12000, max: 13999 },
-  { label: '14000+', min: 14000, max: Number.POSITIVE_INFINITY }
-];
-
-export function getStepsBucket(steps) {
-  const numericSteps = Number(steps);
-  const bucket = STEP_BUCKET_RANGES.find(item => numericSteps >= item.min && numericSteps <= item.max);
-  return bucket?.label || null;
-}
-
-export function parseCSV(csvContent) {
-  const lines = csvContent
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-
-  if (!lines.length) return [];
-
-  const headers = lines[0].split(',').map(item => item.trim());
-  return lines.slice(1).map(line => {
-    const values = line.split(',').map(item => item.trim());
-    return headers.reduce((row, header, index) => {
-      row[header] = values[index] ?? '';
-      return row;
-    }, {});
-  });
-}
-
-export async function loadCSVFile(filePath) {
-  const response = await fetch(filePath);
-  if (!response.ok) {
-    throw new Error(`加载 CSV 失败: ${response.status}`);
-  }
-  return response.text();
-}
+export const STEPS_WEIGHT_DATA_PATH = 'src/data/conditionDistributionPresets.json';
 
 export function normalizeStepsRows(rows) {
   return rows
@@ -69,32 +31,13 @@ export function normalizeStepsRows(rows) {
     .filter(Boolean);
 }
 
-export function calculatePrAGivenS(rows) {
-  const conditionalProbs = {};
-  const jointCounts = {};
-  const sCounts = {};
-
-  WEIGHT_STATUS_ORDER.forEach(status => {
-    conditionalProbs[status] = Object.fromEntries(STEP_BUCKET_ORDER.map(bucket => [bucket, 0]));
-    jointCounts[status] = Object.fromEntries(STEP_BUCKET_ORDER.map(bucket => [bucket, 0]));
-    sCounts[status] = 0;
-  });
-
-  rows.forEach(row => {
-    jointCounts[row.weightStatus][row.stepsBucket] += 1;
-    sCounts[row.weightStatus] += 1;
-  });
-
-  WEIGHT_STATUS_ORDER.forEach(status => {
-    const total = sCounts[status];
-    if (!total) return;
-
-    STEP_BUCKET_ORDER.forEach(bucket => {
-      conditionalProbs[status][bucket] = jointCounts[status][bucket] / total;
-    });
-  });
-
-  return { conditionalProbs, jointCounts, sCounts };
+export function calculatePrAGivenS() {
+  const matrix = buildMatrixDataFromPreset(CONDITION_DISTRIBUTION_KEYS.AOUE_STEPS_BMI);
+  return {
+    conditionalProbs: matrix.conditionalProbs,
+    jointCounts: matrix.jointCounts,
+    sCounts: matrix.sCounts
+  };
 }
 
 export function buildStepsMatrixRows(matrixData) {
@@ -103,21 +46,17 @@ export function buildStepsMatrixRows(matrixData) {
   return WEIGHT_STATUS_ORDER.map(status => {
     const row = { s: status };
     STEP_BUCKET_ORDER.forEach(bucket => {
-      row[bucket] = matrixData.conditionalProbs[status]?.[bucket] ?? 0;
+      row[bucket] = matrixData.conditionalProbs?.[status]?.[bucket] ?? 0;
     });
     return row;
   });
 }
 
-function formatSupportFormula(status, terms, sum) {
-  return `${status}行求和 = ${terms.map(value => value.toFixed(4)).join(' + ')} = ${sum.toFixed(4)}`;
-}
-
-function getPairwiseSupportCandidates(matrixData, epsilon = 1) {
+function getPairwiseSupportCandidates(matrixData, epsilon = 0.5) {
   const pairs = [
-    ['偏瘦', '正常'],
-    ['偏瘦', '超重'],
-    ['正常', '超重']
+    ['正常', '超重'],
+    ['正常', '肥胖'],
+    ['超重', '肥胖']
   ];
   const expEpsilon = Math.exp(epsilon);
   const defaultAlpha = expEpsilon / (1 + expEpsilon);
@@ -125,8 +64,8 @@ function getPairwiseSupportCandidates(matrixData, epsilon = 1) {
 
   return pairs.map(([left, right]) => {
     const diffEntries = STEP_BUCKET_ORDER.map(bucket => {
-      const leftProb = matrixData.conditionalProbs[left]?.[bucket] ?? 0;
-      const rightProb = matrixData.conditionalProbs[right]?.[bucket] ?? 0;
+      const leftProb = matrixData.conditionalProbs?.[left]?.[bucket] ?? 0;
+      const rightProb = matrixData.conditionalProbs?.[right]?.[bucket] ?? 0;
       const ratio = rightProb === 0 ? (leftProb === 0 ? 1 : Number.POSITIVE_INFINITY) : leftProb / rightProb;
       const included = ratio >= expEpsilon;
 
@@ -191,7 +130,7 @@ function getPairwiseSupportCandidates(matrixData, epsilon = 1) {
 
 function calculateSupportProbabilities(matrixData, buckets, statuses = WEIGHT_STATUS_ORDER) {
   return statuses.map(status => {
-    const terms = buckets.map(bucket => matrixData.conditionalProbs[status]?.[bucket] ?? 0);
+    const terms = buckets.map(bucket => matrixData.conditionalProbs?.[status]?.[bucket] ?? 0);
     const sum = terms.reduce((acc, value) => acc + value, 0);
 
     return {
@@ -203,7 +142,7 @@ function calculateSupportProbabilities(matrixData, buckets, statuses = WEIGHT_ST
   });
 }
 
-export function calculateStepsAlphaBeta(matrixData, epsilon = 1) {
+export function calculateStepsAlphaBeta(matrixData, epsilon = 0.5) {
   if (!matrixData) {
     return {
       alpha: null,
@@ -248,14 +187,17 @@ export function calculateStepsAlphaBeta(matrixData, epsilon = 1) {
   };
 }
 
-export async function loadStepsMatrixFromCSV(filePath = STEPS_WEIGHT_DATA_PATH) {
-  const csvContent = await loadCSVFile(filePath);
-  const parsedRows = parseCSV(csvContent);
-  const normalizedRows = normalizeStepsRows(parsedRows);
-  const matrix = calculatePrAGivenS(normalizedRows);
-
+export async function loadStepsMatrixFromCSV() {
   return {
-    rows: normalizedRows,
-    matrix
+    rows: [],
+    matrix: buildMatrixDataFromPreset(CONDITION_DISTRIBUTION_KEYS.AOUE_STEPS_BMI)
   };
+}
+
+export async function loadCSVFile() {
+  throw new Error('当前阶段不在前端运行时读取原始 CSV，请使用 conditionDistributionPresets.json。');
+}
+
+export function parseCSV() {
+  return [];
 }

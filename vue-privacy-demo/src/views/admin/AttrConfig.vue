@@ -125,10 +125,21 @@
       width="860px"
     >
       <div v-if="currentAttribute" class="attribute-details">
-        <div v-if="currentAttribute.name === '是否触发异常跌倒告警'" class="attribute-details">
+        <div v-if="currentAttribute.name === '是否触发睡眠异常提醒'" class="attribute-details">
           <div class="form-item relation-row">
             <span class="relation-label">相关敏感属性 S：</span>
-            <span class="relation-value">年龄段分组</span>
+            <span class="relation-value">年龄段</span>
+          </div>
+
+          <div class="module-group">
+            <h3 class="module-title">场景说明</h3>
+            <p class="scenario-description">
+              该场景将年龄段作为敏感属性 S，将是否触发睡眠异常提醒作为非敏感采集属性 A。由于不同年龄段用户触发睡眠异常提醒的概率存在差异，系统通过条件分布 P(A|S) 计算内在不确定性参数，并结合 ARR 协议完成二值采集值的本地扰动。
+            </p>
+            <p class="scenario-description">当前数据源模式：{{ arrDataSourceLabel }}</p>
+            <p class="scenario-description">{{ arrDataSourceDescription }}</p>
+            <p class="scenario-description">{{ conditionPresetNotice }}</p>
+            <p class="scenario-description">dataSourceMode：{{ arrPresetSource.dataSourceMode }}；basis：{{ arrPresetSource.basis }}</p>
           </div>
 
           <div class="form-item">
@@ -155,13 +166,13 @@
             </div>
 
             <div v-if="matrixLoading" class="matrix-loading">
-              <span>正在根据当前 CSV 重新统计条件分布矩阵...</span>
+              <span>正在根据当前数据源模式重新统计睡眠异常提醒条件分布矩阵...</span>
             </div>
             <div v-else-if="fallAlarmMatrixData" class="matrix-container">
               <table class="matrix-table">
                 <thead>
                   <tr>
-                    <th>年龄段分组(S) \ 是否触发异常跌倒告警(A)</th>
+                    <th>年龄段(S) \ 是否触发睡眠异常提醒(A)</th>
                     <th
                       v-for="header in matrixHeaders"
                       :key="header"
@@ -191,7 +202,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(A|S)。</p>
+              <p>点击“计算条件分布矩阵”后，将根据当前数据源模式自动统计 P(是否触发睡眠异常提醒 | 年龄段)。</p>
             </div>
           </div>
 
@@ -318,9 +329,9 @@
               <div class="boundary-group">
                 <div class="boundary-title">体重状态分组</div>
                 <div class="group-display">
-                  <div class="group-item"><span class="group-name">偏瘦</span></div>
-                  <div class="group-item"><span class="group-name">正常</span></div>
-                  <div class="group-item"><span class="group-name">超重</span></div>
+                  <div v-for="status in WEIGHT_STATUS_ORDER" :key="status" class="group-item">
+                    <span class="group-name">{{ status }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -334,8 +345,10 @@
               </el-button>
             </div>
 
+            <p class="scenario-description">{{ conditionPresetNotice }}</p>
+            <p class="scenario-description">dataSourceMode：{{ standPresetSource.dataSourceMode }}；basis：{{ standPresetSource.basis }}</p>
             <div v-if="standMatrixLoading" class="matrix-loading">
-              <span>正在根据当前 CSV 重新统计条件分布矩阵...</span>
+              <span>正在从 conditionDistributionPresets.json 读取内置条件分布矩阵...</span>
             </div>
             <div v-else-if="standMatrixData" class="matrix-container">
               <table class="matrix-table">
@@ -371,7 +384,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(A|S)。</p>
+              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取内置矩阵 Pr(A|S)。</p>
             </div>
           </div>
 
@@ -472,9 +485,9 @@
               <div class="calibration-status-desc">{{ agrrPerturbationStatus.description }}</div>
             </div>
             <div class="calibration-tip">由 ε、α、β 自动校准</div>
-            <div class="calibration-tip">d = 4 表示 A 的域大小</div>
+            <div class="calibration-tip">d = 3 表示 A 的域大小</div>
             <div class="calibration-tip">满足 p + (d-1)q = 1</div>
-            <div class="calibration-tip">固定分档顺序：低站立 0-119，中低站立 120-239，中高站立 240-359，高站立 360+</div>
+            <div class="calibration-tip">固定分档顺序：低活动 0-119，中活动 120-239，高活动 240+</div>
             <div v-if="standCalibratedParams" class="calibration-info">
               <p>隐私预算 ε = {{ standCalibratedParams.epsilon }}</p>
               <p>域大小 d = {{ standCalibratedParams.d || standCalibratedParams.k }}</p>
@@ -514,8 +527,11 @@
               </el-button>
             </div>
 
+            <p class="scenario-description">{{ conditionPresetNotice }}</p>
+            <p class="scenario-description">dataSourceMode：{{ stepsPresetSource.dataSourceMode }}；basis：{{ stepsPresetSource.basis }}</p>
+            <p class="scenario-description">每日步数分布主要参考 Kaggle Daily Steps 字段，并结合 NHANES 中 BMI 与身体活动水平趋势校准。由于 Kaggle 肥胖组样本较少，未直接采用原始极端分布。</p>
             <div v-if="stepsMatrixLoading" class="matrix-loading">
-              <span>正在根据当前 CSV 重新统计条件分布矩阵...</span>
+              <span>正在从 conditionDistributionPresets.json 读取内置条件分布矩阵...</span>
             </div>
             <div v-else-if="stepsMatrixData" class="matrix-container">
               <table class="matrix-table">
@@ -558,7 +574,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(A|S)。</p>
+              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取内置矩阵 Pr(A|S)。</p>
             </div>
           </div>
 
@@ -755,6 +771,38 @@
           </div>
 
           <div class="module-group">
+            <h3 class="module-title">睡眠质量评分与敏感属性的条件分布矩阵 Pr(A|S)</h3>
+            <p class="scenario-description">{{ conditionPresetNotice }}</p>
+            <p class="scenario-description">TSP 的敏感属性为年龄段，同时建模睡眠质量评分值和评分缺失状态。该设计用于展示混合隐私风险下，采集值与缺失状态都可能泄露敏感属性。</p>
+            <p class="scenario-description">数据源模式：{{ sleepQualityPresetSource.dataSourceMode }}；依据：{{ sleepQualityPresetSource.basis }}</p>
+            <div v-if="sleepQualityMatrixData" class="matrix-container">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>年龄段(S) \ 睡眠质量评分(A)</th>
+                    <th v-for="header in SLEEP_QUALITY_BUCKET_ORDER" :key="header" class="matrix-value-column">
+                      {{ header }}
+                    </th>
+                    <th class="row-sum-column">行和</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in sleepQualityMatrixRows" :key="row.s">
+                    <th>{{ row.s }}</th>
+                    <td v-for="header in SLEEP_QUALITY_BUCKET_ORDER" :key="header" class="matrix-value-column">
+                      {{ formatProbability(row[header]) }}
+                    </td>
+                    <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="matrix-placeholder">
+              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取睡眠质量评分矩阵。</p>
+            </div>
+          </div>
+
+          <div class="module-group">
             <div class="section-header">
               <h3 class="module-title">缺失状态与敏感属性的条件分布矩阵 Pr(M|S)</h3>
               <el-button type="primary" plain :loading="sleepMissingMatrixLoading" @click="recalculateMatrix">
@@ -762,8 +810,9 @@
               </el-button>
             </div>
 
+            <p class="scenario-description">dataSourceMode：{{ sleepMissingPresetSource.dataSourceMode }}；basis：{{ sleepMissingPresetSource.basis }}</p>
             <div v-if="sleepMissingMatrixLoading" class="matrix-loading">
-              <span>正在根据当前 CSV 重新统计 Pr(M|S)...</span>
+              <span>正在从 conditionDistributionPresets.json 读取内置 Pr(M|S)...</span>
             </div>
             <div v-else-if="sleepMissingMatrixData" class="matrix-container">
               <table class="matrix-table">
@@ -799,7 +848,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将根据当前测试 CSV 自动统计 Pr(M|S)。</p>
+              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取内置矩阵 Pr(M|S)。</p>
             </div>
           </div>
 
@@ -1033,6 +1082,8 @@ import { useTaskStore } from '../../store/task';
 import { useUserStore } from '../../store/user';
 import {
   FALL_ALARM_DATA_PATH,
+  ARR_DEFAULT_DATA_SOURCE_MODE,
+  ARR_DATA_SOURCE_MODES,
   buildMatrixRows,
   calculateAlphaBeta,
   loadFallAlarmMatrixFromCSV
@@ -1054,13 +1105,21 @@ import {
 import {
   SLEEP_QUALITY_MISSING_DATA_PATH,
   MISSING_STATUS_ORDER,
+  SLEEP_QUALITY_BUCKET_ORDER,
   buildSleepMissingMatrixRows,
+  buildSleepQualityMatrixRows,
+  calculateCombinedTspAlphaBeta,
   calculateSleepMissingAlphaBeta,
+  loadSleepQualityMatrixFromPreset,
   loadSleepMissingMatrixFromCSV
 } from '../../utils/sleepQualityMissingMatrix.js';
 import { calculateARRParameters, calculateAGRParameters, calculateAOUEParameters, calculateTSPParameters } from '../../utils/ldpAlgorithms.js';
 import { getTspVersionMeta } from '../../utils/tspProtocol.js';
 import { getPerturbationStatus } from '../../utils/perturbationStatus.js';
+import {
+  CONDITION_PRESET_RUNTIME_NOTICE,
+  getConditionDistributionSource
+} from '../../utils/conditionDistributionPresets.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -1081,22 +1140,22 @@ const privacyBudgetSaved = ref(false);
 
 const basicConfig = ref({
   dataSource: '模拟数据',
-  privacyBudget: 1.0
+  privacyBudget: 0.5
 });
 
-const dialogPrivacyBudget = ref(1.0);
-const savedPrivacyBudget = ref(1.0);
+const dialogPrivacyBudget = ref(0.5);
+const savedPrivacyBudget = ref(0.5);
 
 const attributes = ref([
   {
     id: 1,
-    name: '是否触发异常跌倒告警',
+    name: '是否触发睡眠异常提醒',
     isProtected: false,
     protectionMode: 'indirect',
     algorithm: 'arr',
     status: '未配置',
     fixed: true,
-    tooltip: '是否触发异常跌倒告警与年龄段分组存在关联关系，固定采用间接隐私风险配置。'
+    tooltip: '是否触发睡眠异常提醒与年龄段存在统计相关性，固定采用间接隐私风险 + ARR 协议配置。'
   },
   {
     id: 2,
@@ -1146,6 +1205,13 @@ const alphaBetaResult = ref(null);
 const columnStats = ref([]);
 const calibrationLoading = ref(false);
 const calibratedParams = ref(null);
+const arrDataSourceMode = ref(ARR_DEFAULT_DATA_SOURCE_MODE);
+const arrDataSourceLabel = computed(() => (
+  ARR_DATA_SOURCE_MODES[arrDataSourceMode.value]?.label || '内置多源校准矩阵'
+));
+const arrDataSourceDescription = computed(() => (
+  ARR_DATA_SOURCE_MODES[arrDataSourceMode.value]?.description || CONDITION_PRESET_RUNTIME_NOTICE
+));
 
 // 站立时长相关状态
 const standMatrixLoading = ref(false);
@@ -1166,11 +1232,18 @@ const stepsCalibratedParams = ref(null);
 
 const sleepMissingMatrixLoading = ref(false);
 const sleepMissingMatrixData = ref(null);
+const sleepQualityMatrixData = ref(null);
 const sleepMissingAlphaBetaResult = ref(null);
 const sleepMissingColumnStats = ref([]);
 const sleepMissingCalibrationLoading = ref(false);
 const sleepMissingCalibratedParams = ref(null);
 
+const conditionPresetNotice = CONDITION_PRESET_RUNTIME_NOTICE;
+const arrPresetSource = computed(() => fallAlarmMatrixData.value?.source || getConditionDistributionSource('arr_sleep_alert_age'));
+const standPresetSource = computed(() => standMatrixData.value?.source || getConditionDistributionSource('agrr_activity_bmi'));
+const stepsPresetSource = computed(() => stepsMatrixData.value?.source || getConditionDistributionSource('aoue_steps_bmi'));
+const sleepQualityPresetSource = computed(() => sleepQualityMatrixData.value?.source || getConditionDistributionSource('tsp_sleep_quality_age'));
+const sleepMissingPresetSource = computed(() => sleepMissingMatrixData.value?.source || getConditionDistributionSource('tsp_sleep_quality_missing_age'));
 
 
 const matrixRows = computed(() => buildMatrixRows(fallAlarmMatrixData.value));
@@ -1185,11 +1258,12 @@ const unselectedColumnRatio = computed(() => {
 const standMatrixRows = computed(() => buildStandMatrixRows(standMatrixData.value));
 const stepsMatrixRows = computed(() => buildStepsMatrixRows(stepsMatrixData.value));
 const sleepMissingMatrixRows = computed(() => buildSleepMissingMatrixRows(sleepMissingMatrixData.value));
+const sleepQualityMatrixRows = computed(() => buildSleepQualityMatrixRows(sleepQualityMatrixData.value));
 const canCalculateStepsSupport = computed(() => Boolean(stepsMatrixData.value && privacyBudgetSaved.value));
 const canSaveCurrentConfig = computed(() => {
   if (!currentAttribute.value) return false;
 
-  if (currentAttribute.value.name === '是否触发异常跌倒告警') {
+  if (currentAttribute.value.name === '是否触发睡眠异常提醒') {
     return Boolean(
       hasGeneratedMatrix.value &&
       alphaBetaResult.value &&
@@ -1249,9 +1323,9 @@ const distributeSummary = computed(() => {
     tsp: 'TSP'
   };
   const summaryMap = {
-    '是否触发异常跌倒告警': {
+    '是否触发睡眠异常提醒': {
       sensitiveAttribute: '年龄段',
-      userProcessSummary: 'ARR：二值随机响应',
+      userProcessSummary: 'ARR：睡眠异常提醒二值采集 + 本地随机响应',
       parameterSummary: [
         `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
         `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
@@ -1339,6 +1413,9 @@ function rowSum(row) {
   if (MISSING_STATUS_ORDER.some(header => row[header] !== undefined)) {
     return MISSING_STATUS_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
   }
+  if (SLEEP_QUALITY_BUCKET_ORDER.some(header => row[header] !== undefined)) {
+    return SLEEP_QUALITY_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
+  }
   return STEP_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
 }
 
@@ -1369,12 +1446,33 @@ function savePrivacyBudget() {
   basicConfig.value.privacyBudget = nextValue;
   privacyBudgetSaved.value = true;
   calibratedParams.value = null;
+  arrDataSourceMode.value = ARR_DEFAULT_DATA_SOURCE_MODE;
   standCalibratedParams.value = null;
   stepsCalibratedParams.value = null;
   sleepMissingCalibratedParams.value = null;
+  if (standMatrixData.value) {
+    const nextStandResult = calculateStandAlphaBeta(standMatrixData.value, nextValue);
+    standAlphaBetaResult.value = nextStandResult;
+    standColumnStats.value = nextStandResult.columnStats;
+  }
+  if (stepsMatrixData.value) {
+    const nextStepsResult = calculateStepsAlphaBeta(stepsMatrixData.value, nextValue);
+    stepsAlphaBetaResult.value = nextStepsResult;
+    stepsSupportStats.value = nextStepsResult.supportStats;
+  }
+  if (sleepQualityMatrixData.value && sleepMissingMatrixData.value) {
+    const nextTspResult = calculateCombinedTspAlphaBeta(sleepQualityMatrixData.value, sleepMissingMatrixData.value, nextValue);
+    sleepMissingAlphaBetaResult.value = nextTspResult;
+    sleepMissingColumnStats.value = nextTspResult.stats;
+  }
   if (currentAttribute.value?.name === '每日步数分桶') {
     stepsAlphaBetaResult.value = null;
     stepsSupportStats.value = [];
+    if (stepsMatrixData.value) {
+      const nextStepsResult = calculateStepsAlphaBeta(stepsMatrixData.value, nextValue);
+      stepsAlphaBetaResult.value = nextStepsResult;
+      stepsSupportStats.value = nextStepsResult.supportStats;
+    }
   }
   ElMessage.success('隐私预算已保存');
 }
@@ -1392,6 +1490,7 @@ function resetMatrixState() {
   stepsAlphaBetaResult.value = null;
   stepsSupportStats.value = [];
   stepsCalibratedParams.value = null;
+  sleepQualityMatrixData.value = null;
   sleepMissingMatrixData.value = null;
   sleepMissingAlphaBetaResult.value = null;
   sleepMissingColumnStats.value = [];
@@ -1415,7 +1514,10 @@ function buildCurrentConfigPayload() {
       privacyBudgetSaved: privacyBudgetSaved.value,
       calibratedParams: standCalibratedParams.value,
       notes: {
-        dataPath: STAND_DURATION_DATA_PATH
+        dataPath: STAND_DURATION_DATA_PATH,
+        dataSourceMode: standMatrixData.value?.source?.dataSourceMode,
+        basis: standMatrixData.value?.source?.basis,
+        notes: standMatrixData.value?.source?.notes
       }
     };
   }
@@ -1432,7 +1534,10 @@ function buildCurrentConfigPayload() {
       privacyBudgetSaved: privacyBudgetSaved.value,
       calibratedParams: stepsCalibratedParams.value,
       notes: {
-        dataPath: STEPS_WEIGHT_DATA_PATH
+        dataPath: STEPS_WEIGHT_DATA_PATH,
+        dataSourceMode: stepsMatrixData.value?.source?.dataSourceMode,
+        basis: stepsMatrixData.value?.source?.basis,
+        notes: stepsMatrixData.value?.source?.notes
       }
     };
   }
@@ -1443,6 +1548,7 @@ function buildCurrentConfigPayload() {
       sceneType: 'sleepQualityTsp',
       tspVersion: sleepMissingCalibratedParams.value?.tspVersion ?? null,
       matrixData: sleepMissingMatrixData.value,
+      scoreMatrixData: sleepQualityMatrixData.value,
       columnStats: sleepMissingColumnStats.value,
       alphaBetaResult: sleepMissingAlphaBetaResult.value,
       epsilon: savedPrivacyBudget.value,
@@ -1450,7 +1556,12 @@ function buildCurrentConfigPayload() {
       privacyBudgetSaved: privacyBudgetSaved.value,
       calibratedParams: sleepMissingCalibratedParams.value,
       notes: {
-        dataPath: SLEEP_QUALITY_MISSING_DATA_PATH
+        dataPath: SLEEP_QUALITY_MISSING_DATA_PATH,
+        dataSourceMode: sleepMissingMatrixData.value?.source?.dataSourceMode,
+        scoreBasis: sleepQualityMatrixData.value?.source?.basis,
+        missingBasis: sleepMissingMatrixData.value?.source?.basis,
+        scoreNotes: sleepQualityMatrixData.value?.source?.notes,
+        missingNotes: sleepMissingMatrixData.value?.source?.notes
       }
     };
   }
@@ -1468,6 +1579,10 @@ function buildCurrentConfigPayload() {
     calibratedParams: calibratedParams.value,
     notes: {
       dataPath: FALL_ALARM_DATA_PATH,
+      dataSourceMode: arrDataSourceMode.value,
+      dataSourceDescription: arrDataSourceDescription.value,
+      basis: fallAlarmMatrixData.value?.source?.basis,
+      notes: fallAlarmMatrixData.value?.source?.notes,
       selectedColumnRatio: selectedColumnRatio.value,
       unselectedColumnRatio: unselectedColumnRatio.value
     }
@@ -1501,6 +1616,7 @@ function applySavedConfig(config) {
 
   if (config?.sceneType === 'sleepQualityTsp') {
     sleepMissingMatrixData.value = config?.matrixData || null;
+    sleepQualityMatrixData.value = config?.scoreMatrixData || null;
     sleepMissingAlphaBetaResult.value = config?.alphaBetaResult || null;
     sleepMissingColumnStats.value = config?.columnStats || config?.alphaBetaResult?.stats || [];
     sleepMissingCalibratedParams.value = config?.calibratedParams
@@ -1523,6 +1639,7 @@ function applySavedConfig(config) {
   alphaBetaResult.value = config?.alphaBetaResult || null;
   columnStats.value = config?.columnStats || config?.alphaBetaResult?.stats || [];
   calibratedParams.value = config?.calibratedParams || null;
+  arrDataSourceMode.value = ARR_DEFAULT_DATA_SOURCE_MODE;
   hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
   privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
   dialogPrivacyBudget.value = config?.epsilonDraft ?? config?.epsilon ?? basicConfig.value.privacyBudget;
@@ -1541,12 +1658,14 @@ function resetDialogForAttribute(attribute) {
 async function recalculateMatrix() {
   if (!currentAttribute.value) return;
 
-  if (currentAttribute.value.name === '是否触发异常跌倒告警') {
+  if (currentAttribute.value.name === '是否触发睡眠异常提醒') {
     matrixLoading.value = true;
     calibratedParams.value = null;
 
     try {
-      const result = await loadFallAlarmMatrixFromCSV();
+      const result = await loadFallAlarmMatrixFromCSV(FALL_ALARM_DATA_PATH, {
+        dataSourceMode: arrDataSourceMode.value
+      });
       fallAlarmMatrixData.value = result.matrix;
       const alphaBetaResultData = calculateAlphaBeta(result.matrix);
       alphaBetaResult.value = alphaBetaResultData;
@@ -1599,9 +1718,17 @@ async function recalculateMatrix() {
     sleepMissingCalibratedParams.value = null;
 
     try {
-      const result = await loadSleepMissingMatrixFromCSV();
-      sleepMissingMatrixData.value = result.matrix;
-      const alphaBetaResultData = calculateSleepMissingAlphaBeta(result.matrix, Number(savedPrivacyBudget.value) || 1.0);
+      const [scoreResult, missingResult] = await Promise.all([
+        loadSleepQualityMatrixFromPreset(),
+        loadSleepMissingMatrixFromCSV()
+      ]);
+      sleepQualityMatrixData.value = scoreResult.matrix;
+      sleepMissingMatrixData.value = missingResult.matrix;
+      const alphaBetaResultData = calculateCombinedTspAlphaBeta(
+        scoreResult.matrix,
+        missingResult.matrix,
+        Number(savedPrivacyBudget.value) || 0.5
+      );
       sleepMissingAlphaBetaResult.value = alphaBetaResultData;
       sleepMissingColumnStats.value = alphaBetaResultData.stats;
       hasGeneratedMatrix.value = true;
@@ -1642,7 +1769,7 @@ async function handleAttributeClick(attribute) {
   dialogVisible.value = true;
 
   if (
-    attribute.name === '是否触发异常跌倒告警' &&
+    attribute.name === '是否触发睡眠异常提醒' &&
     alphaBetaResult.value &&
     !fallAlarmMatrixData.value
   ) {
@@ -1677,7 +1804,7 @@ async function handleAttributeClick(attribute) {
 function calibrateParams() {
   if (!currentAttribute.value) return;
 
-  if (currentAttribute.value.name === '是否触发异常跌倒告警') {
+  if (currentAttribute.value.name === '是否触发睡眠异常提醒') {
     if (!alphaBetaResult.value) {
       ElMessage.warning('请先计算条件分布矩阵');
       return;
@@ -1702,7 +1829,7 @@ function calibrateParams() {
         d,
         protocol: 'ARR (Adaptive Randomized Response)',
         description: `基于 ${alphaBetaResult.value.selectedLabel} 列自动校准扰动参数。`,
-        dataSource: 'temp_fall_alarm_age_200.csv'
+        dataSource: fallAlarmMatrixData.value?.source?.label || '内置多源校准矩阵'
       };
 
       ElMessage.success('扰动参数校准完成');
@@ -1744,7 +1871,7 @@ function calibrateParams() {
         description: triggeredByThreshold
           ? `由于 α / β <= e^ε，系统直接取 p = 1、q = 0。当前 α = ${standAlphaBetaResult.value.alpha.toFixed(4)}，β = ${standAlphaBetaResult.value.beta.toFixed(4)}，ε = ${epsilon}。`
           : `系统依据不确定性参数选择规则选中 ${standAlphaBetaResult.value.selectedLabel} 列，并基于该列的 α、β 自动校准扰动参数。`,
-        dataSource: 'temp_stand_duration_weight_200.csv'
+        dataSource: standMatrixData.value?.source?.label || '内置多源校准矩阵'
       };
 
       ElMessage.success('扰动参数校准完成');
@@ -1784,7 +1911,7 @@ function calibrateParams() {
         description: clamped
           ? `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}。AOUE 先对每日步数分桶生成初始编码向量，再逐位扰动；本次原始 q = ${rawQ.toFixed(4)}，已按有效区间裁剪为 ${q.toFixed(4)}。`
           : `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}，先对每日步数分桶生成初始编码向量，再按 AOUE 逐位扰动。`,
-        dataSource: 'temp_steps_weight_200.csv'
+        dataSource: stepsMatrixData.value?.source?.label || '内置多源校准矩阵'
       };
 
       ElMessage.success('扰动参数校准完成');
@@ -1832,9 +1959,9 @@ function calibrateParams() {
         d: scoreDomainSize,
         unifiedDomainSize,
         protocol: 'TSP (Two-Stage Perturbation)',
-        description: '先基于缺失状态 M 的条件分布 Pr(M|S) 计算内在不确定性；第一阶段仅对非缺失样本的有效评分值 {1,2,3,4,5} 进行扰动，以注入与缺失状态等量的不确定性；第二阶段再将缺失值 0 与第一阶段处理后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动并上报。',
+        description: `同时读取睡眠质量评分矩阵 Pr(A|S) 与缺失状态矩阵 Pr(M|S)，本次内在不确定性参数来源为 ${sleepMissingAlphaBetaResult.value.selectedSource || sleepMissingAlphaBetaResult.value.selectedLabel}；第一阶段仅对非缺失样本的有效评分值 {1,2,3,4,5} 进行扰动，第二阶段再将缺失值 0 与第一阶段处理后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动并上报。`,
         budgetExplanation: 'TSP 使用统一的总隐私预算 ε。记有效值域大小 d = 5、统一域总大小 d + 1 = 6。第二阶段先在统一域 {0,1,2,3,4,5} 上求得 p2 / q2，其中满足 p2 + dq2 = 1；第一阶段再在有效评分域 {1,2,3,4,5} 上求得 p1 / q1，其中满足 p1 + (d - 1)q1 = 1。整体满足论文中的统一 ε-LDP 约束。',
-        dataSource: 'temp_sleep_quality_missing_age_500.csv'
+        dataSource: sleepMissingMatrixData.value?.source?.label || '内置多源校准矩阵'
       };
 
       ElMessage.success('两阶段扰动参数校准完成');
@@ -2134,6 +2261,12 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.scenario-description {
+  margin: 0 0 8px;
+  color: #425466;
+  line-height: 1.7;
 }
 
 .form-item {

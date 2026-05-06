@@ -1,12 +1,16 @@
-﻿import { MISSING_STATUS_ORDER } from './constants.js';
-import { AGE_GROUP_ORDER, FALL_ALARM_DATA_PATH, getAgeGroup, parseCSV, loadCSVFile } from './fallAlarmMatrix.js';
+import { MISSING_STATUS_ORDER, SLEEP_QUALITY_BUCKET_ORDER } from './constants.js';
+import { AGE_GROUP_ORDER, getAgeGroup } from './fallAlarmMatrix.js';
 import { calculateTSPAlphaBetaFromMissingProbs } from './ldpAlgorithms.js';
+import {
+  CONDITION_DISTRIBUTION_KEYS,
+  buildMatrixDataFromPreset
+} from './conditionDistributionPresets.js';
 
-export { MISSING_STATUS_ORDER };
-export const SLEEP_QUALITY_MISSING_DATA_PATH = '/data/temp_sleep_quality_missing_age_500.csv';
+export { MISSING_STATUS_ORDER, SLEEP_QUALITY_BUCKET_ORDER };
+export const SLEEP_QUALITY_MISSING_DATA_PATH = 'src/data/conditionDistributionPresets.json';
 
 export function getMissingLabel(value) {
-  return Number(value) === 1 ? '缺失（M=1）' : '非缺失（M=0）';
+  return Number(value) === 1 ? '缺失' : '未缺失';
 }
 
 export function normalizeSleepMissingRows(rows) {
@@ -38,32 +42,13 @@ export function normalizeSleepMissingRows(rows) {
     .filter(Boolean);
 }
 
-export function calculatePrMGivenS(rows) {
-  const conditionalProbs = {};
-  const jointCounts = {};
-  const sCounts = {};
-
-  AGE_GROUP_ORDER.forEach(group => {
-    conditionalProbs[group] = Object.fromEntries(MISSING_STATUS_ORDER.map(label => [label, 0]));
-    jointCounts[group] = Object.fromEntries(MISSING_STATUS_ORDER.map(label => [label, 0]));
-    sCounts[group] = 0;
-  });
-
-  rows.forEach(row => {
-    jointCounts[row.ageGroup][row.missingLabel] += 1;
-    sCounts[row.ageGroup] += 1;
-  });
-
-  AGE_GROUP_ORDER.forEach(group => {
-    const total = sCounts[group];
-    if (!total) return;
-
-    MISSING_STATUS_ORDER.forEach(label => {
-      conditionalProbs[group][label] = jointCounts[group][label] / total;
-    });
-  });
-
-  return { conditionalProbs, jointCounts, sCounts };
+export function calculatePrMGivenS() {
+  const matrix = buildMatrixDataFromPreset(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_MISSING_AGE);
+  return {
+    conditionalProbs: matrix.conditionalProbs,
+    jointCounts: matrix.jointCounts,
+    sCounts: matrix.sCounts
+  };
 }
 
 export function buildSleepMissingMatrixRows(matrixData) {
@@ -72,30 +57,72 @@ export function buildSleepMissingMatrixRows(matrixData) {
   return AGE_GROUP_ORDER.map(group => {
     const row = { s: group };
     MISSING_STATUS_ORDER.forEach(label => {
-      row[label] = matrixData.conditionalProbs[group]?.[label] ?? 0;
+      row[label] = matrixData.conditionalProbs?.[group]?.[label] ?? 0;
     });
     return row;
   });
 }
 
-export function calculateMissingColumnStats(matrixData) {
-  const rows = buildSleepMissingMatrixRows(matrixData);
+export function buildSleepQualityMatrixRows(matrixData) {
+  if (!matrixData) return [];
 
-  return MISSING_STATUS_ORDER.map(label => {
+  return AGE_GROUP_ORDER.map(group => {
+    const row = { s: group };
+    SLEEP_QUALITY_BUCKET_ORDER.forEach(label => {
+      row[label] = matrixData.conditionalProbs?.[group]?.[label] ?? 0;
+    });
+    return row;
+  });
+}
+
+function calculateColumnStats(matrixData, domain) {
+  const rows = domain === MISSING_STATUS_ORDER
+    ? buildSleepMissingMatrixRows(matrixData)
+    : buildSleepQualityMatrixRows(matrixData);
+
+  return domain.map(label => {
     const values = rows.map(row => row[label] ?? 0);
     const max = Math.max(...values);
     const min = Math.min(...values);
     const ratio = min === 0 ? Number.POSITIVE_INFINITY : max / min;
-    return { label, max, min, ratio };
+    return { label, max, min, alpha: max, beta: min, ratio };
   });
+}
+
+export function calculateMissingColumnStats(matrixData) {
+  return calculateColumnStats(matrixData, MISSING_STATUS_ORDER);
+}
+
+export function calculateSleepQualityColumnStats(matrixData) {
+  return calculateColumnStats(matrixData, SLEEP_QUALITY_BUCKET_ORDER);
 }
 
 function approximatelyEqual(left, right, tolerance = 1e-9) {
   return Math.abs(Number(left) - Number(right)) <= tolerance;
 }
 
-// TSP 的 alpha / beta 来源于缺失状态条件分布 Pr(M|S)。
-// 这里保留睡眠质量场景专用入口，避免调用方直接面对通用 calculateAlphaBeta。
+function calculateGenericMatrixAlphaBeta(matrixData, rowsBuilder, domain) {
+  const stats = calculateColumnStats(matrixData, domain);
+  const rows = rowsBuilder(matrixData);
+  const selectedStat = stats.reduce((best, current) => {
+    if (!best) return current;
+    return current.ratio > best.ratio ? current : best;
+  }, null);
+  const values = rows.map(row => row[selectedStat?.label] ?? 0);
+
+  return {
+    selectedLabel: selectedStat?.label || '',
+    alpha: Math.max(...values),
+    beta: Math.min(...values),
+    selectedStat,
+    stats
+  };
+}
+
+export function calculateSleepQualityAlphaBeta(matrixData) {
+  return calculateGenericMatrixAlphaBeta(matrixData, buildSleepQualityMatrixRows, SLEEP_QUALITY_BUCKET_ORDER);
+}
+
 export function calculateSleepMissingAlphaBeta(matrixData, epsilon) {
   const stats = calculateMissingColumnStats(matrixData);
   const rows = buildSleepMissingMatrixRows(matrixData);
@@ -114,14 +141,35 @@ export function calculateSleepMissingAlphaBeta(matrixData, epsilon) {
   };
 }
 
-export async function loadSleepMissingMatrixFromCSV(filePath = SLEEP_QUALITY_MISSING_DATA_PATH) {
-  const csvContent = await loadCSVFile(filePath);
-  const parsedRows = parseCSV(csvContent);
-  const normalizedRows = normalizeSleepMissingRows(parsedRows);
-  const matrix = calculatePrMGivenS(normalizedRows);
+export function calculateCombinedTspAlphaBeta(scoreMatrixData, missingMatrixData, epsilon) {
+  const scoreResult = calculateSleepQualityAlphaBeta(scoreMatrixData);
+  const missingResult = calculateSleepMissingAlphaBeta(missingMatrixData, epsilon);
+  const useScore = (scoreResult.beta === 0 ? Number.POSITIVE_INFINITY : scoreResult.alpha / scoreResult.beta)
+    > (missingResult.beta === 0 ? Number.POSITIVE_INFINITY : missingResult.alpha / missingResult.beta);
+  const selected = useScore ? scoreResult : missingResult;
 
   return {
-    rows: normalizedRows,
-    matrix
+    ...selected,
+    selectedSource: useScore ? '睡眠质量评分矩阵 P(A|S)' : '缺失状态矩阵 P(M|S)',
+    scoreResult,
+    missingResult,
+    stats: [
+      ...scoreResult.stats.map(item => ({ ...item, source: 'P(A|S)' })),
+      ...missingResult.stats.map(item => ({ ...item, source: 'P(M|S)' }))
+    ]
+  };
+}
+
+export async function loadSleepMissingMatrixFromCSV() {
+  return {
+    rows: [],
+    matrix: buildMatrixDataFromPreset(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_MISSING_AGE)
+  };
+}
+
+export async function loadSleepQualityMatrixFromPreset() {
+  return {
+    rows: [],
+    matrix: buildMatrixDataFromPreset(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_AGE)
   };
 }

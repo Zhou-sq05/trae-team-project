@@ -2,24 +2,17 @@
  * 常量定义
  */
 
-export const FALL_ALARM_ORDER = ['未触发（A=0）', '触发（A=1）'];
+export const FALL_ALARM_ORDER = ['未触发提醒', '触发提醒'];
 
-export const STAND_BUCKET_ORDER = ['低站立', '中低站立', '中高站立', '高站立'];
+export const STAND_BUCKET_ORDER = ['低活动', '中活动', '高活动'];
 
-export const STEP_BUCKET_ORDER = [
-  '0-1999',
-  '2000-3999',
-  '4000-5999',
-  '6000-7999',
-  '8000-9999',
-  '10000-11999',
-  '12000-13999',
-  '14000+'
-];
+export const STEP_BUCKET_ORDER = ['低步数', '中低步数', '中高步数', '高步数'];
 
-export const WEIGHT_STATUS_ORDER = ['偏瘦', '正常', '超重'];
+export const WEIGHT_STATUS_ORDER = ['正常', '超重', '肥胖'];
 
-export const MISSING_STATUS_ORDER = ['非缺失（M=0）', '缺失（M=1）'];
+export const MISSING_STATUS_ORDER = ['未缺失', '缺失'];
+
+export const SLEEP_QUALITY_BUCKET_ORDER = ['低质量', '中质量', '高质量'];
 
 export const AGE_GROUP_DISPLAY = [
   { name: '青年', range: '18-44岁' },

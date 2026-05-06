@@ -1,0 +1,112 @@
+{
+  "version": "1.0.0",
+  "description": "基于公开健康数据样本统计、平滑处理与趋势校准得到的条件分布矩阵，用于内在不确定性参数计算。",
+  "dataSourceMode": "multi_source_calibrated_preset",
+  "sources": [
+    "NHANES 2017-March 2020 Pre-Pandemic",
+    "Kaggle Sleep Health and Lifestyle Dataset",
+    "BRFSS/CHNS 健康行为趋势参考"
+  ],
+  "distributions": {
+    "arr_sleep_alert_age": {
+      "key": "arr_sleep_alert_age",
+      "protocol": "ARR",
+      "sensitiveAttribute": "年龄段",
+      "observedAttribute": "是否触发睡眠异常提醒",
+      "condition": "P(A|S)",
+      "sDomain": ["青年", "中年", "老年"],
+      "aDomain": ["未触发提醒", "触发提醒"],
+      "matrix": [
+        [0.8, 0.2],
+        [0.68, 0.32],
+        [0.56, 0.44]
+      ],
+      "dataSourceMode": "multi_source_calibrated_preset",
+      "basis": "参考 NHANES 睡眠问卷中年龄段与睡眠异常提醒趋势，并进行适度校准。",
+      "notes": [
+        "年龄越高，触发睡眠异常提醒概率越高。",
+        "该矩阵用于 ARR 二值采集值的间接隐私风险建模。"
+      ]
+    },
+    "agrr_activity_bmi": {
+      "key": "agrr_activity_bmi",
+      "protocol": "AGRR",
+      "sensitiveAttribute": "BMI类别",
+      "observedAttribute": "身体活动水平分档",
+      "condition": "P(A|S)",
+      "sDomain": ["正常", "超重", "肥胖"],
+      "aDomain": ["低活动", "中活动", "高活动"],
+      "matrix": [
+        [0.24, 0.34, 0.42],
+        [0.32, 0.38, 0.3],
+        [0.44, 0.36, 0.2]
+      ],
+      "dataSourceMode": "multi_source_calibrated_preset",
+      "basis": "参考 NHANES 中 BMI 与身体活动水平的统计趋势，并将活动水平统一为三档。",
+      "notes": [
+        "BMI 越高，低活动概率越高，高活动概率越低。",
+        "该矩阵用于 AGRR 多值分档采集的间接隐私风险建模。"
+      ]
+    },
+    "aoue_steps_bmi": {
+      "key": "aoue_steps_bmi",
+      "protocol": "AOUE",
+      "sensitiveAttribute": "BMI类别",
+      "observedAttribute": "每日步数分桶",
+      "condition": "P(A|S)",
+      "sDomain": ["正常", "超重", "肥胖"],
+      "aDomain": ["低步数", "中低步数", "中高步数", "高步数"],
+      "matrix": [
+        [0.16, 0.26, 0.36, 0.22],
+        [0.24, 0.31, 0.3, 0.15],
+        [0.4, 0.33, 0.2, 0.07]
+      ],
+      "dataSourceMode": "multi_source_calibrated_preset",
+      "basis": "参考 Kaggle Daily Steps 字段的实证分布，并结合 NHANES 中 BMI 与身体活动水平趋势进行校准。",
+      "notes": [
+        "BMI 越高，低步数概率越高，高步数概率越低。",
+        "由于 Kaggle 肥胖组样本较少，未直接采用原始极端分布。"
+      ]
+    },
+    "tsp_sleep_quality_age": {
+      "key": "tsp_sleep_quality_age",
+      "protocol": "TSP",
+      "sensitiveAttribute": "年龄段",
+      "observedAttribute": "睡眠质量评分",
+      "condition": "P(A|S)",
+      "sDomain": ["青年", "中年", "老年"],
+      "aDomain": ["低质量", "中质量", "高质量"],
+      "matrix": [
+        [0.22, 0.52, 0.26],
+        [0.34, 0.44, 0.22],
+        [0.48, 0.36, 0.16]
+      ],
+      "dataSourceMode": "multi_source_calibrated_preset",
+      "basis": "参考 Kaggle Quality of Sleep 字段，并结合 NHANES 年龄与睡眠异常趋势进行校准。",
+      "notes": [
+        "TSP 的敏感属性固定为年龄段。",
+        "年龄越高，低睡眠质量概率越高，高睡眠质量概率越低。"
+      ]
+    },
+    "tsp_sleep_quality_missing_age": {
+      "key": "tsp_sleep_quality_missing_age",
+      "protocol": "TSP",
+      "sensitiveAttribute": "年龄段",
+      "observedAttribute": "睡眠质量评分缺失状态",
+      "condition": "P(M|S)",
+      "sDomain": ["青年", "中年", "老年"],
+      "aDomain": ["未缺失", "缺失"],
+      "matrix": [
+        [0.96, 0.04],
+        [0.9, 0.1],
+        [0.82, 0.18]
+      ],
+      "dataSourceMode": "multi_source_calibrated_preset",
+      "basis": "用于 TSP 的缺失状态隐私风险建模，并参考年龄与睡眠健康上报有效性的总体趋势。",
+      "notes": [
+        "年龄越高，睡眠质量评分缺失或未有效上报的概率越高。",
+        "该矩阵与睡眠质量评分矩阵共同用于 TSP 混合隐私风险建模。"
+      ]
+    }
+  }
+}

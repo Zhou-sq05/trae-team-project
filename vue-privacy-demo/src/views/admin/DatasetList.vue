@@ -243,7 +243,7 @@ function getTaskById(taskId) {
 
 function getProtectedAttribute(task) {
   if (!task?.attributes?.length) return null;
-  const supportedNames = ['是否触发异常跌倒告警', '日均站立时长分档', '每日步数分桶', '睡眠质量评分'];
+  const supportedNames = ['是否触发睡眠异常提醒', '日均站立时长分档', '每日步数分桶', '睡眠质量评分'];
   return (
     task.attributes.find(attribute => supportedNames.includes(attribute.name) && attribute.isProtected) ||
     task.attributes.find(attribute => supportedNames.includes(attribute.name) && attribute.status === '已配置') ||
@@ -256,8 +256,8 @@ function getTaskMeta(taskId) {
   const task = getTaskById(taskId);
   const attribute = getProtectedAttribute(task);
   const map = {
-    '是否触发异常跌倒告警': {
-      attributeName: '是否触发异常跌倒告警',
+    '是否触发睡眠异常提醒': {
+      attributeName: '是否触发睡眠异常提醒',
       algorithm: 'ARR',
       mode: '间接隐私风险'
     },
@@ -294,7 +294,7 @@ function formatDateTime(value) {
 }
 
 function formatArrLabel(value) {
-  return Number(value) === 1 ? '触发' : '未触发';
+  return Number(value) === 1 ? '触发提醒' : '未触发提醒';
 }
 
 function formatAgrrLabel(bucket, code) {
