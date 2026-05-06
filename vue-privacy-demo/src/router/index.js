@@ -45,6 +45,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/admin/arr-multi-user-simulation',
+    name: 'ArrMultiUserReportSimulation',
+    component: () => import('../views/admin/ArrMultiUserReportSimulation.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/user/device',
     name: 'UserDevice',
     component: () => import('../views/user/UserDevice.vue'),

@@ -37,6 +37,10 @@
               <el-icon><DataAnalysis /></el-icon>
               <span>聚合结果</span>
             </el-menu-item>
+            <el-menu-item index="/admin/arr-multi-user-simulation">
+              <el-icon><Monitor /></el-icon>
+              <span>ARR 多用户上报模拟</span>
+            </el-menu-item>
           </el-menu>
         </el-aside>
         <el-main>
@@ -169,7 +173,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { House, Setting, Document, DataAnalysis, ArrowDown } from '@element-plus/icons-vue';
+import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useUserStore } from '../../store/user';
 

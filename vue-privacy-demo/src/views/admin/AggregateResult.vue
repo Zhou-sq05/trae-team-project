@@ -37,6 +37,10 @@
               <el-icon><DataAnalysis /></el-icon>
               <span>聚合结果</span>
             </el-menu-item>
+            <el-menu-item index="/admin/arr-multi-user-simulation">
+              <el-icon><Monitor /></el-icon>
+              <span>ARR 多用户上报模拟</span>
+            </el-menu-item>
           </el-menu>
         </el-aside>
         <el-main>
@@ -232,7 +236,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import { House, Setting, Document, DataAnalysis, ArrowDown, QuestionFilled } from '@element-plus/icons-vue'
+import { House, Setting, Document, DataAnalysis, ArrowDown, QuestionFilled, Monitor } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { getAggregateResults as getTspAlignedAggregateResults } from '../../services/taskAggregateResultService'
 import { getAvailableBatches, getTspAggregateDiagnostics } from '../../services/aggregateDiagnosticsService'

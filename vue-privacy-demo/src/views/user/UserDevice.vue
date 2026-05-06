@@ -158,7 +158,7 @@
           </div>
         </div>
 
-        <div class="dynamic-form-panel separated-panel">
+        <div v-if="currentTaskDetail?.scenario !== 'arr'" class="dynamic-form-panel separated-panel">
           <div class="summary-heading">
             <h3>手环端连续采集</h3>
             <span class="section-tip">在当前页面连续执行本地扰动，健康手环持续采集</span>
@@ -204,6 +204,7 @@
         <template v-if="['arr', 'agrr', 'aoue', 'tsp'].includes(currentTaskDetail?.scenario)">
           <div class="demo-tab-bar">
             <button
+              v-if="currentTaskDetail?.scenario !== 'arr'"
               type="button"
               class="demo-tab-button"
               :class="{ active: activeDemoTab === 'single' }"
@@ -1165,8 +1166,9 @@ const rawSummaryCards = computed(() => {
 });
 
 const arrRawCards = computed(() => [
-  { label: '原始提醒值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' },
-  { label: '原始编码值', value: String(dynamicForm.fallAlarm) }
+  { label: '当前用户原始值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' },
+  { label: 'ARR 二元取值', value: '0 = 未触发提醒，1 = 触发提醒' },
+  { label: '扰动前值', value: `${dynamicForm.fallAlarm}（${dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒'}）` }
 ]);
 
 const agrrRawCards = computed(() => [
@@ -1183,7 +1185,13 @@ const aoueRawCards = computed(() => [
 
 const arrParameterCards = computed(() => [
   { label: 'p（保留原值概率）', value: arrParametersReady.value ? arrConfigParams.value.p.toFixed(4) : '--' },
-  { label: 'q（翻转为相反值概率）', value: arrParametersReady.value ? arrConfigParams.value.q.toFixed(4) : '--' }
+  { label: 'q（翻转为相反值概率）', value: arrParametersReady.value ? arrConfigParams.value.q.toFixed(4) : '--' },
+  {
+    label: '扰动概率说明',
+    value: arrParametersReady.value
+      ? `以 p=${arrConfigParams.value.p.toFixed(4)} 保留扰动前值，以 q=${arrConfigParams.value.q.toFixed(4)} 翻转为另一个二元值`
+      : '--'
+  }
 ]);
 
 const agrrParameterCards = computed(() => [
@@ -1198,12 +1206,22 @@ const aoueParameterCards = computed(() => [
 
 const arrResultCards = computed(() => [
   {
-    label: '扰动后结果',
+    label: '扰动前值',
+    value: `${dynamicForm.fallAlarm}（${dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒'}）`
+  },
+  {
+    label: '扰动后值',
     value: arrSimulationResult.value ? (arrSimulationResult.value.perturbedLabel) : '--'
   },
   {
     label: '上报值',
     value: arrSimulationResult.value ? String(arrSimulationResult.value.reportValue) : '--'
+  },
+  {
+    label: '单次扰动过程',
+    value: arrSimulationResult.value
+      ? `输入 ${arrSimulationResult.value.rawValue}，输出 ${arrSimulationResult.value.reportValue}`
+      : '点击“执行一次扰动”后展示本次 ARR 随机扰动结果'
   }
 ]);
 

@@ -20,7 +20,7 @@
       </el-header>
       <el-container>
         <el-aside width="200px">
-          <el-menu :default-active="activeMenu" class="el-menu-vertical-demo">
+          <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/dashboard">
               <el-icon><house /></el-icon>
               <span>首页</span>
@@ -36,6 +36,10 @@
             <el-menu-item index="/admin/aggregate">
               <el-icon><data-analysis /></el-icon>
               <span>聚合结果</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/arr-multi-user-simulation">
+              <el-icon><monitor /></el-icon>
+              <span>ARR 多用户上报模拟</span>
             </el-menu-item>
 
           </el-menu>
