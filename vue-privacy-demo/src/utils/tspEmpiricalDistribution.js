@@ -4,6 +4,7 @@ import {
   CONDITION_DISTRIBUTION_KEYS,
   getConditionDistribution,
   sampleObservedValue,
+  samplePriorValue,
   sampleSensitiveValue
 } from './conditionDistributionPresets.js';
 
@@ -46,12 +47,12 @@ function toProbabilityMap(counts, total) {
 
 function createSyntheticRows(sampleSize = 500) {
   return Array.from({ length: sampleSize }, (_, index) => {
-    const ageGroup = sampleSensitiveValue(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_AGE);
-    const missingSample = sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_MISSING_AGE, ageGroup);
+    const ageGroup = sampleSensitiveValue(CONDITION_DISTRIBUTION_KEYS.TSP_MISSING_AGE);
+    const missingSample = sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.TSP_MISSING_AGE, ageGroup);
     const sleepMissing = missingSample.observedValue === '缺失' ? 1 : 0;
     const qualitySample = sleepMissing === 1
       ? { observedValue: null }
-      : sampleObservedValue(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_AGE, ageGroup);
+      : samplePriorValue(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_VALUE_PRIOR);
     const sleepScore = sleepMissing === 1 ? null : QUALITY_SCORE_MAP[qualitySample.observedValue] ?? 3;
 
     return {
@@ -114,8 +115,8 @@ export function buildTspEmpiricalDistribution(rows = createSyntheticRows()) {
   return {
     filePath: SLEEP_QUALITY_MISSING_DATA_PATH,
     dataSourceMode: 'multi_source_calibrated_preset',
-    scorePreset: getConditionDistribution(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_AGE),
-    missingPreset: getConditionDistribution(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_MISSING_AGE),
+    scorePrior: getConditionDistribution(CONDITION_DISTRIBUTION_KEYS.TSP_SLEEP_QUALITY_VALUE_PRIOR),
+    missingPreset: getConditionDistribution(CONDITION_DISTRIBUTION_KEYS.TSP_MISSING_AGE),
     sampleSize: rows.length,
     nonMissingSampleSize: missingCounts.nonMissing,
     rows,

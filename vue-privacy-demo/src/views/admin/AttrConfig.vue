@@ -771,45 +771,14 @@
           </div>
 
           <div class="module-group">
-            <h3 class="module-title">睡眠质量评分与敏感属性的条件分布矩阵 Pr(A|S)</h3>
-            <p class="scenario-description">{{ conditionPresetNotice }}</p>
-            <p class="scenario-description">TSP 的敏感属性为年龄段，同时建模睡眠质量评分值和评分缺失状态。该设计用于展示混合隐私风险下，采集值与缺失状态都可能泄露敏感属性。</p>
-            <p class="scenario-description">数据源模式：{{ sleepQualityPresetSource.dataSourceMode }}；依据：{{ sleepQualityPresetSource.basis }}</p>
-            <div v-if="sleepQualityMatrixData" class="matrix-container">
-              <table class="matrix-table">
-                <thead>
-                  <tr>
-                    <th>年龄段(S) \ 睡眠质量评分(A)</th>
-                    <th v-for="header in SLEEP_QUALITY_BUCKET_ORDER" :key="header" class="matrix-value-column">
-                      {{ header }}
-                    </th>
-                    <th class="row-sum-column">行和</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in sleepQualityMatrixRows" :key="row.s">
-                    <th>{{ row.s }}</th>
-                    <td v-for="header in SLEEP_QUALITY_BUCKET_ORDER" :key="header" class="matrix-value-column">
-                      {{ formatProbability(row[header]) }}
-                    </td>
-                    <td class="row-sum-column">{{ formatProbability(rowSum(row)) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取睡眠质量评分矩阵。</p>
-            </div>
-          </div>
-
-          <div class="module-group">
             <div class="section-header">
-              <h3 class="module-title">缺失状态与敏感属性的条件分布矩阵 Pr(M|S)</h3>
+              <h3 class="module-title">年龄段 -> 睡眠质量评分缺失状态 Pr(M|S)</h3>
               <el-button type="primary" plain :loading="sleepMissingMatrixLoading" @click="recalculateMatrix">
                 {{ sleepMissingMatrixData ? '重新计算' : '计算条件分布矩阵' }}
               </el-button>
             </div>
 
+            <p class="scenario-description">该场景属于混合隐私风险：睡眠质量评分有效值本身具有直接隐私风险，而评分缺失状态虽然不是评分值本身，但可能与年龄段相关，从而产生间接隐私风险。系统先基于 P(M|S) 计算缺失状态的内在不确定性，再向有效评分值注入等量不确定性，最后对缺失值与有效值统一扰动，以满足 ε-LDP。</p>
             <p class="scenario-description">dataSourceMode：{{ sleepMissingPresetSource.dataSourceMode }}；basis：{{ sleepMissingPresetSource.basis }}</p>
             <div v-if="sleepMissingMatrixLoading" class="matrix-loading">
               <span>正在从 conditionDistributionPresets.json 读取内置 Pr(M|S)...</span>
@@ -1105,12 +1074,8 @@ import {
 import {
   SLEEP_QUALITY_MISSING_DATA_PATH,
   MISSING_STATUS_ORDER,
-  SLEEP_QUALITY_BUCKET_ORDER,
   buildSleepMissingMatrixRows,
-  buildSleepQualityMatrixRows,
-  calculateCombinedTspAlphaBeta,
   calculateSleepMissingAlphaBeta,
-  loadSleepQualityMatrixFromPreset,
   loadSleepMissingMatrixFromCSV
 } from '../../utils/sleepQualityMissingMatrix.js';
 import { calculateARRParameters, calculateAGRParameters, calculateAOUEParameters, calculateTSPParameters } from '../../utils/ldpAlgorithms.js';
@@ -1232,7 +1197,6 @@ const stepsCalibratedParams = ref(null);
 
 const sleepMissingMatrixLoading = ref(false);
 const sleepMissingMatrixData = ref(null);
-const sleepQualityMatrixData = ref(null);
 const sleepMissingAlphaBetaResult = ref(null);
 const sleepMissingColumnStats = ref([]);
 const sleepMissingCalibrationLoading = ref(false);
@@ -1242,8 +1206,7 @@ const conditionPresetNotice = CONDITION_PRESET_RUNTIME_NOTICE;
 const arrPresetSource = computed(() => fallAlarmMatrixData.value?.source || getConditionDistributionSource('arr_sleep_alert_age'));
 const standPresetSource = computed(() => standMatrixData.value?.source || getConditionDistributionSource('agrr_activity_bmi'));
 const stepsPresetSource = computed(() => stepsMatrixData.value?.source || getConditionDistributionSource('aoue_steps_bmi'));
-const sleepQualityPresetSource = computed(() => sleepQualityMatrixData.value?.source || getConditionDistributionSource('tsp_sleep_quality_age'));
-const sleepMissingPresetSource = computed(() => sleepMissingMatrixData.value?.source || getConditionDistributionSource('tsp_sleep_quality_missing_age'));
+const sleepMissingPresetSource = computed(() => sleepMissingMatrixData.value?.source || getConditionDistributionSource('tsp_missing_age'));
 
 
 const matrixRows = computed(() => buildMatrixRows(fallAlarmMatrixData.value));
@@ -1258,7 +1221,6 @@ const unselectedColumnRatio = computed(() => {
 const standMatrixRows = computed(() => buildStandMatrixRows(standMatrixData.value));
 const stepsMatrixRows = computed(() => buildStepsMatrixRows(stepsMatrixData.value));
 const sleepMissingMatrixRows = computed(() => buildSleepMissingMatrixRows(sleepMissingMatrixData.value));
-const sleepQualityMatrixRows = computed(() => buildSleepQualityMatrixRows(sleepQualityMatrixData.value));
 const canCalculateStepsSupport = computed(() => Boolean(stepsMatrixData.value && privacyBudgetSaved.value));
 const canSaveCurrentConfig = computed(() => {
   if (!currentAttribute.value) return false;
@@ -1413,9 +1375,6 @@ function rowSum(row) {
   if (MISSING_STATUS_ORDER.some(header => row[header] !== undefined)) {
     return MISSING_STATUS_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
   }
-  if (SLEEP_QUALITY_BUCKET_ORDER.some(header => row[header] !== undefined)) {
-    return SLEEP_QUALITY_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
-  }
   return STEP_BUCKET_ORDER.reduce((sum, header) => sum + (row[header] || 0), 0);
 }
 
@@ -1460,8 +1419,8 @@ function savePrivacyBudget() {
     stepsAlphaBetaResult.value = nextStepsResult;
     stepsSupportStats.value = nextStepsResult.supportStats;
   }
-  if (sleepQualityMatrixData.value && sleepMissingMatrixData.value) {
-    const nextTspResult = calculateCombinedTspAlphaBeta(sleepQualityMatrixData.value, sleepMissingMatrixData.value, nextValue);
+  if (sleepMissingMatrixData.value) {
+    const nextTspResult = calculateSleepMissingAlphaBeta(sleepMissingMatrixData.value, nextValue);
     sleepMissingAlphaBetaResult.value = nextTspResult;
     sleepMissingColumnStats.value = nextTspResult.stats;
   }
@@ -1490,7 +1449,6 @@ function resetMatrixState() {
   stepsAlphaBetaResult.value = null;
   stepsSupportStats.value = [];
   stepsCalibratedParams.value = null;
-  sleepQualityMatrixData.value = null;
   sleepMissingMatrixData.value = null;
   sleepMissingAlphaBetaResult.value = null;
   sleepMissingColumnStats.value = [];
@@ -1548,7 +1506,6 @@ function buildCurrentConfigPayload() {
       sceneType: 'sleepQualityTsp',
       tspVersion: sleepMissingCalibratedParams.value?.tspVersion ?? null,
       matrixData: sleepMissingMatrixData.value,
-      scoreMatrixData: sleepQualityMatrixData.value,
       columnStats: sleepMissingColumnStats.value,
       alphaBetaResult: sleepMissingAlphaBetaResult.value,
       epsilon: savedPrivacyBudget.value,
@@ -1558,9 +1515,7 @@ function buildCurrentConfigPayload() {
       notes: {
         dataPath: SLEEP_QUALITY_MISSING_DATA_PATH,
         dataSourceMode: sleepMissingMatrixData.value?.source?.dataSourceMode,
-        scoreBasis: sleepQualityMatrixData.value?.source?.basis,
         missingBasis: sleepMissingMatrixData.value?.source?.basis,
-        scoreNotes: sleepQualityMatrixData.value?.source?.notes,
         missingNotes: sleepMissingMatrixData.value?.source?.notes
       }
     };
@@ -1616,7 +1571,6 @@ function applySavedConfig(config) {
 
   if (config?.sceneType === 'sleepQualityTsp') {
     sleepMissingMatrixData.value = config?.matrixData || null;
-    sleepQualityMatrixData.value = config?.scoreMatrixData || null;
     sleepMissingAlphaBetaResult.value = config?.alphaBetaResult || null;
     sleepMissingColumnStats.value = config?.columnStats || config?.alphaBetaResult?.stats || [];
     sleepMissingCalibratedParams.value = config?.calibratedParams
@@ -1718,15 +1672,10 @@ async function recalculateMatrix() {
     sleepMissingCalibratedParams.value = null;
 
     try {
-      const [scoreResult, missingResult] = await Promise.all([
-        loadSleepQualityMatrixFromPreset(),
-        loadSleepMissingMatrixFromCSV()
-      ]);
-      sleepQualityMatrixData.value = scoreResult.matrix;
-      sleepMissingMatrixData.value = missingResult.matrix;
-      const alphaBetaResultData = calculateCombinedTspAlphaBeta(
-        scoreResult.matrix,
-        missingResult.matrix,
+      const result = await loadSleepMissingMatrixFromCSV();
+      sleepMissingMatrixData.value = result.matrix;
+      const alphaBetaResultData = calculateSleepMissingAlphaBeta(
+        result.matrix,
         Number(savedPrivacyBudget.value) || 0.5
       );
       sleepMissingAlphaBetaResult.value = alphaBetaResultData;
@@ -1959,7 +1908,7 @@ function calibrateParams() {
         d: scoreDomainSize,
         unifiedDomainSize,
         protocol: 'TSP (Two-Stage Perturbation)',
-        description: `同时读取睡眠质量评分矩阵 Pr(A|S) 与缺失状态矩阵 Pr(M|S)，本次内在不确定性参数来源为 ${sleepMissingAlphaBetaResult.value.selectedSource || sleepMissingAlphaBetaResult.value.selectedLabel}；第一阶段仅对非缺失样本的有效评分值 {1,2,3,4,5} 进行扰动，第二阶段再将缺失值 0 与第一阶段处理后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动并上报。`,
+        description: `基于缺失状态矩阵 P(M|S) 计算内在不确定性参数，本次来源为 ${sleepMissingAlphaBetaResult.value.selectedSource || sleepMissingAlphaBetaResult.value.selectedLabel}；第一阶段向非缺失样本的有效评分值 {1,2,3,4,5} 注入等量不确定性，第二阶段再将缺失值 0 与第一阶段处理后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动并上报。`,
         budgetExplanation: 'TSP 使用统一的总隐私预算 ε。记有效值域大小 d = 5、统一域总大小 d + 1 = 6。第二阶段先在统一域 {0,1,2,3,4,5} 上求得 p2 / q2，其中满足 p2 + dq2 = 1；第一阶段再在有效评分域 {1,2,3,4,5} 上求得 p1 / q1，其中满足 p1 + (d - 1)q1 = 1。整体满足论文中的统一 ε-LDP 约束。',
         dataSource: sleepMissingMatrixData.value?.source?.label || '内置多源校准矩阵'
       };

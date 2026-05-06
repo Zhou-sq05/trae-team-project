@@ -68,45 +68,33 @@
         "由于 Kaggle 肥胖组样本较少，未直接采用原始极端分布。"
       ]
     },
-    "tsp_sleep_quality_age": {
-      "key": "tsp_sleep_quality_age",
+    "tsp_missing_age": {
+      "key": "tsp_missing_age",
       "protocol": "TSP",
       "sensitiveAttribute": "年龄段",
-      "observedAttribute": "睡眠质量评分",
-      "condition": "P(A|S)",
-      "sDomain": ["青年", "中年", "老年"],
-      "aDomain": ["低质量", "中质量", "高质量"],
-      "matrix": [
-        [0.22, 0.52, 0.26],
-        [0.34, 0.44, 0.22],
-        [0.48, 0.36, 0.16]
-      ],
-      "dataSourceMode": "multi_source_calibrated_preset",
-      "basis": "参考 Kaggle Quality of Sleep 字段，并结合 NHANES 年龄与睡眠异常趋势进行校准。",
-      "notes": [
-        "TSP 的敏感属性固定为年龄段。",
-        "年龄越高，低睡眠质量概率越高，高睡眠质量概率越低。"
-      ]
-    },
-    "tsp_sleep_quality_missing_age": {
-      "key": "tsp_sleep_quality_missing_age",
-      "protocol": "TSP",
-      "sensitiveAttribute": "年龄段",
-      "observedAttribute": "睡眠质量评分缺失状态",
+      "relatedNonSensitiveAttribute": "睡眠质量评分缺失状态",
       "condition": "P(M|S)",
       "sDomain": ["青年", "中年", "老年"],
-      "aDomain": ["未缺失", "缺失"],
+      "mDomain": ["未缺失", "缺失"],
       "matrix": [
         [0.96, 0.04],
         [0.9, 0.1],
         [0.82, 0.18]
       ],
       "dataSourceMode": "multi_source_calibrated_preset",
-      "basis": "用于 TSP 的缺失状态隐私风险建模，并参考年龄与睡眠健康上报有效性的总体趋势。",
-      "notes": [
-        "年龄越高，睡眠质量评分缺失或未有效上报的概率越高。",
-        "该矩阵与睡眠质量评分矩阵共同用于 TSP 混合隐私风险建模。"
-      ]
+      "basis": "参考 NHANES 睡眠问卷有效响应情况及年龄相关缺失风险趋势进行校准。",
+      "notes": "年龄升高时，睡眠质量评分缺失概率上升。该矩阵用于计算缺失状态 M 关于年龄段 S 的内在不确定性参数。"
+    },
+    "tsp_sleep_quality_value_prior": {
+      "key": "tsp_sleep_quality_value_prior",
+      "protocol": "TSP",
+      "attribute": "睡眠质量评分有效值",
+      "distributionType": "value_prior_for_simulation",
+      "domain": ["低质量", "中质量", "高质量"],
+      "distribution": [0.3, 0.48, 0.22],
+      "dataSourceMode": "multi_source_calibrated_preset",
+      "basis": "参考 Kaggle Quality of Sleep 字段分布并进行平滑校准。",
+      "notes": "该分布仅用于生成非缺失用户的睡眠质量评分真实值和聚合真值对比，不用于计算 TSP 的内在不确定性。"
     }
   }
 }
