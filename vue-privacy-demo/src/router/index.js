@@ -51,6 +51,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/user/demo/agrr-multi-client-upload',
+    name: 'AgrrMultiClientUploadDemo',
+    component: () => import('../views/user/AgrrMultiClientUploadDemo.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/admin/demo/arr-experiment-comparison',
     name: 'ArrExperimentComparison',
     component: () => import('../views/admin/ArrExperimentComparison.vue'),

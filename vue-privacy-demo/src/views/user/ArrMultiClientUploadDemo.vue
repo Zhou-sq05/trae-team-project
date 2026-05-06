@@ -223,10 +223,10 @@ const STAGE_TEXT = {
   }
 };
 
-const ANIMATION_INTERVAL_MS = 45;
-const ANIMATION_BATCH_SIZE = 10;
+const ANIMATION_INTERVAL_MS = 150;
+const ANIMATION_BATCH_SIZE = 5;
 const ROW_HEIGHT = 48;
-const HIGHLIGHT_MS = 700;
+const HIGHLIGHT_MS = 560;
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -297,14 +297,16 @@ function createClientRow(index) {
 
 function scrollTableToIndex(index) {
   nextTick(() => {
-    const top = Math.max(0, index * ROW_HEIGHT - ROW_HEIGHT * 4);
-    if (typeof tableRef.value?.setScrollTop === 'function') {
-      tableRef.value.setScrollTop(top);
-      return;
-    }
     const wrapper = tableRef.value?.$el?.querySelector?.('.el-scrollbar__wrap');
     if (wrapper) {
-      wrapper.scrollTop = top;
+      const middleOffset = wrapper.clientHeight * 0.62;
+      const top = Math.max(0, index * ROW_HEIGHT - middleOffset);
+      wrapper.scrollTo({ top, behavior: 'smooth' });
+      return;
+    }
+    if (typeof tableRef.value?.setScrollTop === 'function') {
+      const top = Math.max(0, index * ROW_HEIGHT - ROW_HEIGHT * 7);
+      tableRef.value.setScrollTop(top);
     }
   });
 }

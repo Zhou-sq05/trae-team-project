@@ -203,6 +203,14 @@
           >
             演示：ARR 多客户端上报
           </el-button>
+          <el-button
+            v-if="currentTaskDetail?.scenario === 'agrr'"
+            type="primary"
+            plain
+            @click="goToAgrrMultiClientDemo"
+          >
+            演示：AGRR 多客户端上报
+          </el-button>
           <el-button @click="goToDashboard">返回首页</el-button>
         </div>
       </div>
@@ -3568,6 +3576,10 @@ function goToDashboard() {
 
 function goToArrMultiClientDemo() {
   router.push('/user/demo/arr-multi-client-upload');
+}
+
+function goToAgrrMultiClientDemo() {
+  router.push('/user/demo/agrr-multi-client-upload');
 }
 
 function handleLogout() {
