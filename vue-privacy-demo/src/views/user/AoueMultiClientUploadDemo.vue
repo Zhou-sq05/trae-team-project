@@ -113,6 +113,9 @@
           :title="progressNotice"
           show-icon
         />
+        <div v-if="currentBatchText" class="batch-progress-tip">
+          {{ currentBatchText }}
+        </div>
 
         <section class="detail-section">
           <div class="detail-title">
@@ -227,7 +230,6 @@ const STAGE_TEXT = {
 
 const ANIMATION_INTERVAL_MS = 150;
 const ANIMATION_BATCH_SIZE = 5;
-const ROW_HEIGHT = 48;
 const HIGHLIGHT_MS = 560;
 
 const router = useRouter();
@@ -242,6 +244,7 @@ const completedStep = ref(0);
 const activeStage = ref('');
 const stageProgress = ref(0);
 const progressNotice = ref('');
+const currentBatchText = ref('');
 const highlightedRows = ref([]);
 const tableRef = ref(null);
 let animationTimer = null;
@@ -302,14 +305,13 @@ function scrollTableToIndex(index) {
   nextTick(() => {
     const wrapper = tableRef.value?.$el?.querySelector?.('.el-scrollbar__wrap');
     if (wrapper) {
-      const middleOffset = wrapper.clientHeight * 0.62;
-      const top = Math.max(0, index * ROW_HEIGHT - middleOffset);
-      wrapper.scrollTo({ top, behavior: 'smooth' });
+      if (index <= 0) {
+        wrapper.scrollTo({ top: 0, behavior: 'auto' });
+      }
       return;
     }
-    if (typeof tableRef.value?.setScrollTop === 'function') {
-      const top = Math.max(0, index * ROW_HEIGHT - ROW_HEIGHT * 7);
-      tableRef.value.setScrollTop(top);
+    if (index <= 0 && typeof tableRef.value?.setScrollTop === 'function') {
+      tableRef.value.setScrollTop(0);
     }
   });
 }
@@ -319,7 +321,7 @@ function markRows(startIndex, endIndex) {
     .slice(startIndex, endIndex)
     .map(row => row.userNo);
   highlightedRows.value = marked;
-  scrollTableToIndex(Math.max(endIndex - 1, 0));
+  currentBatchText.value = `当前批次：客户端 ${String(startIndex + 1).padStart(3, '0')}—${String(endIndex).padStart(3, '0')}，本批处理 ${endIndex - startIndex} 条`;
 
   clearHighlightTimer();
   highlightTimer = setTimeout(() => {
@@ -376,7 +378,9 @@ function finishStage(onComplete) {
   completedStep.value = Math.max(completedStep.value, STAGE_STEP[stage] || 0);
   activeStage.value = '';
   stageProgress.value = AOUE_DEMO_SAMPLE_COUNT;
-  progressNotice.value = STAGE_TEXT[stage]?.done || '';
+  progressNotice.value = stage === STAGES.UPLOAD
+    ? '已完成 500 个虚拟客户端的 AOUE 本地扰动上报'
+    : STAGE_TEXT[stage]?.done || '';
   onComplete?.();
 }
 
@@ -462,6 +466,7 @@ function resetDemo() {
   activeStage.value = '';
   stageProgress.value = 0;
   progressNotice.value = '';
+  currentBatchText.value = '';
   highlightedRows.value = [];
   scrollTableToIndex(0);
 }
@@ -796,7 +801,18 @@ onUnmounted(() => {
 }
 
 .upload-notice {
+  margin-bottom: 10px;
+}
+
+.batch-progress-tip {
   margin-bottom: 16px;
+  padding: 9px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .detail-section {

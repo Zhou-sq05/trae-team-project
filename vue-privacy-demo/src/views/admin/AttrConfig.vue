@@ -66,14 +66,14 @@
 
               <div class="attr-config">
                 <el-table :data="tableAttributes" style="width: 100%">
-                  <el-table-column prop="name" label="采集属性" min-width="220">
+                  <el-table-column prop="name" label="采集属性" min-width="190">
                     <template #default="scope">
                       <span class="attribute-link" @click="handleAttributeClick(scope.row)">
                         {{ scope.row.name }}
                       </span>
                     </template>
                   </el-table-column>
-                  <el-table-column label="防护模式" width="170">
+                  <el-table-column label="防护模式" width="140">
                     <template #default="scope">
                       <div class="fixed-value">
                         <el-tag type="primary">
@@ -85,21 +85,57 @@
                       </div>
                     </template>
                   </el-table-column>
-                  <el-table-column label="算法协议" width="140">
+                  <el-table-column label="算法协议" width="105">
                     <template #default="scope">
                       <div class="fixed-value">
                         <el-tag type="success">{{ scope.row.algorithm.toUpperCase() }}</el-tag>
                       </div>
                     </template>
                   </el-table-column>
-                  <el-table-column label="状态" width="100">
+                  <el-table-column min-width="180">
+                    <template #header>
+                      <div class="param-column-header">
+                        <span>新方案扰动参数</span>
+                        <el-tooltip content="根据内在不确定性参数和隐私预算计算得到，用于本项目采用的改进本地差分隐私采集方案。">
+                          <el-icon><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                    <template #default="scope">
+                      <div class="param-display param-display--new">
+                        <template v-if="scope.row.newParamLines.length">
+                          <span v-for="line in scope.row.newParamLines" :key="line" class="param-chip">{{ line }}</span>
+                        </template>
+                        <span v-else class="param-muted">待配置</span>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column min-width="180">
+                    <template #header>
+                      <div class="param-column-header">
+                        <span>传统方案扰动参数</span>
+                        <el-tooltip content="传统本地差分隐私机制在相同隐私预算下的扰动概率，用于与新方案进行对比。">
+                          <el-icon><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                    <template #default="scope">
+                      <div class="param-display param-display--traditional">
+                        <template v-if="scope.row.traditionalParamLines.length">
+                          <span v-for="line in scope.row.traditionalParamLines" :key="line" class="param-chip">{{ line }}</span>
+                        </template>
+                        <span v-else class="param-muted">待配置</span>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="状态" width="90">
                     <template #default="scope">
                       <el-tag :type="scope.row.configStatus === '已配置' ? 'success' : 'info'">
                         {{ scope.row.configStatus }}
                       </el-tag>
                     </template>
                   </el-table-column>
-                      <el-table-column label="操作" width="240">
+                      <el-table-column label="操作" width="210">
                         <template #default="scope">
                           <div class="action-cell">
                             <el-button type="primary" link @click="handleAttributeClick(scope.row)">
@@ -1170,11 +1206,113 @@ const attributes = ref([
 const ageGroupDisplay = AGE_GROUP_DISPLAY;
 const matrixHeaders = FALL_ALARM_ORDER;
 
+function formatParamNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(4) : null;
+}
+
+function getAttributeDomainSize(attribute) {
+  if (attribute.name === '是否触发睡眠异常提醒') return 2;
+  if (attribute.name === '日均站立时长分档') return STAND_BUCKET_ORDER.length;
+  if (attribute.name === '每日步数分桶') return STEP_BUCKET_ORDER.length;
+  if (attribute.name === '睡眠质量评分') return 5;
+  return 2;
+}
+
+function calculateDisplayParams(attribute, config) {
+  const calibrated = config?.calibratedParams;
+  if (calibrated?.p != null && calibrated?.q != null) {
+    return {
+      p: formatParamNumber(calibrated.p),
+      q: formatParamNumber(calibrated.q)
+    };
+  }
+  if (calibrated?.p1 != null && calibrated?.q1 != null && calibrated?.p2 != null && calibrated?.q2 != null) {
+    return {
+      p1: formatParamNumber(calibrated.p1),
+      q1: formatParamNumber(calibrated.q1),
+      p2: formatParamNumber(calibrated.p2),
+      q2: formatParamNumber(calibrated.q2)
+    };
+  }
+
+  const alpha = Number(config?.alphaBetaResult?.alpha);
+  const beta = Number(config?.alphaBetaResult?.beta);
+  const epsilon = Number(config?.epsilon ?? config?.epsilonDraft);
+  if (!Number.isFinite(alpha) || !Number.isFinite(beta) || !Number.isFinite(epsilon)) {
+    return null;
+  }
+
+  const domainSize = getAttributeDomainSize(attribute);
+  if (attribute.algorithm === 'arr') {
+    const { p, q } = calculateARRParameters(alpha, beta, epsilon, domainSize);
+    return { p: formatParamNumber(p), q: formatParamNumber(q) };
+  }
+  if (attribute.algorithm === 'agrr') {
+    const { p, q } = calculateAGRParameters(alpha, beta, epsilon, domainSize);
+    return { p: formatParamNumber(p), q: formatParamNumber(q) };
+  }
+  if (attribute.algorithm === 'aoue') {
+    const { p, q } = calculateAOUEParameters(alpha, beta, epsilon);
+    return { p: formatParamNumber(p), q: formatParamNumber(q) };
+  }
+  if (attribute.algorithm === 'tsp') {
+    const { p1, q1, p2, q2 } = calculateTSPParameters(alpha, beta, epsilon, domainSize);
+    return {
+      p1: formatParamNumber(p1),
+      q1: formatParamNumber(q1),
+      p2: formatParamNumber(p2),
+      q2: formatParamNumber(q2)
+    };
+  }
+  return null;
+}
+
+function buildNewParamLines(attribute, config) {
+  const params = calculateDisplayParams(attribute, config);
+  if (!params) return [];
+  if (attribute.algorithm === 'tsp') {
+    return [
+      `p1=${params.p1 ?? '--'}，q1=${params.q1 ?? '--'}`,
+      `p2=${params.p2 ?? '--'}，q2=${params.q2 ?? '--'}`
+    ];
+  }
+  return [`p=${params.p ?? '--'}，q=${params.q ?? '--'}`];
+}
+
+function buildTraditionalParamLines(attribute, config) {
+  if (attribute.algorithm === 'tsp') {
+    return ['暂未配置'];
+  }
+
+  const epsilon = Number(config?.epsilon ?? config?.epsilonDraft);
+  if (!Number.isFinite(epsilon)) {
+    return [];
+  }
+
+  const expEpsilon = Math.exp(epsilon);
+  if (attribute.algorithm === 'aoue') {
+    return [
+      `p=${formatParamNumber(0.5)}，q=${formatParamNumber(1 / (expEpsilon + 1))}`
+    ];
+  }
+
+  const domainSize = getAttributeDomainSize(attribute);
+  const p = expEpsilon / (expEpsilon + domainSize - 1);
+  const q = 1 / (expEpsilon + domainSize - 1);
+  return [`p=${formatParamNumber(p)}，q=${formatParamNumber(q)}`];
+}
+
 const tableAttributes = computed(() =>
-  attributes.value.map(attribute => ({
-    ...attribute,
-    configStatus: attributeConfigStore.hasConfigById(attribute.id) ? '已配置' : '未配置'
-  }))
+  attributes.value.map(attribute => {
+    const config = attributeConfigStore.getConfigById(attribute.id);
+    return {
+      ...attribute,
+      configStatus: config ? '已配置' : '未配置',
+      newParamLines: buildNewParamLines(attribute, config),
+      traditionalParamLines: buildTraditionalParamLines(attribute, config)
+    };
+  })
 );
 
 const matrixLoading = ref(false);
@@ -2141,6 +2279,54 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.param-column-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.param-column-header .el-icon {
+  color: #909399;
+  cursor: help;
+}
+
+.param-display {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.35;
+}
+
+.param-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.param-display--new .param-chip {
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+}
+
+.param-display--traditional .param-chip {
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.param-muted {
+  color: #909399;
+  font-size: 12px;
 }
 
 .distribute-dialog-body {
