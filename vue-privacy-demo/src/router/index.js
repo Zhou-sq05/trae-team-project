@@ -45,9 +45,15 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/admin/arr-multi-user-simulation',
-    name: 'ArrMultiUserReportSimulation',
-    component: () => import('../views/admin/ArrMultiUserReportSimulation.vue'),
+    path: '/user/demo/arr-multi-client-upload',
+    name: 'ArrMultiClientUploadDemo',
+    component: () => import('../views/user/ArrMultiClientUploadDemo.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/demo/arr-experiment-comparison',
+    name: 'ArrExperimentComparison',
+    component: () => import('../views/admin/ArrExperimentComparison.vue'),
     meta: { requiresAuth: true }
   },
   {

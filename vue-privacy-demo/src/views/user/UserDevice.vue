@@ -195,6 +195,14 @@
         </div>
 
         <div class="control-buttons">
+          <el-button
+            v-if="currentTaskDetail?.scenario === 'arr'"
+            type="primary"
+            plain
+            @click="goToArrMultiClientDemo"
+          >
+            演示：ARR 多客户端上报
+          </el-button>
           <el-button @click="goToDashboard">返回首页</el-button>
         </div>
       </div>
@@ -324,12 +332,23 @@
                   当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段扰动演示。
                 </div>
                 <div class="action-row">
-                  <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                    {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
+                  <el-button
+                    v-if="currentTaskDetail?.scenario === 'arr'"
+                    type="success"
+                    @click="executeArrPerturbAndSubmit"
+                    :loading="submitting"
+                    :disabled="!canRunSingleSimulation"
+                  >
+                    执行本地扰动并上报
                   </el-button>
-                  <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
-                    提交上报
-                  </el-button>
+                  <template v-else>
+                    <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
+                      {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
+                    </el-button>
+                    <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
+                      提交上报
+                    </el-button>
+                  </template>
                 </div>
               </div>
             </template>
@@ -2495,6 +2514,15 @@ function simulateArrPerturbation(showMessage = true) {
   }
 }
 
+function executeArrPerturbAndSubmit() {
+  simulateArrPerturbation(false);
+  if (!arrSimulationResult.value) {
+    ElMessage.warning('请先完成填写，并确保管理端已保存当前 ARR 参数');
+    return;
+  }
+  submitData();
+}
+
 function performAgrrPerturbation(rawMinutes) {
   if (!agrrParametersReady.value) {
     return null;
@@ -3536,6 +3564,10 @@ function submitData() {
 
 function goToDashboard() {
   router.push('/');
+}
+
+function goToArrMultiClientDemo() {
+  router.push('/user/demo/arr-multi-client-upload');
 }
 
 function handleLogout() {

@@ -39,10 +39,15 @@
               <el-icon><DataAnalysis /></el-icon>
               <span>聚合结果</span>
             </el-menu-item>
-            <el-menu-item index="/admin/arr-multi-user-simulation">
-              <el-icon><Monitor /></el-icon>
-              <span>ARR 多用户上报模拟</span>
-            </el-menu-item>
+            <el-sub-menu index="/admin/demo">
+              <template #title>
+                <el-icon><Monitor /></el-icon>
+                <span>演示与验证</span>
+              </template>
+              <el-menu-item index="/admin/demo/arr-experiment-comparison">
+                演示：ARR 实验效果对比
+              </el-menu-item>
+            </el-sub-menu>
           </el-menu>
         </el-aside>
 

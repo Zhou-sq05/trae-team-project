@@ -37,10 +37,15 @@
               <el-icon><DataAnalysis /></el-icon>
               <span>聚合结果</span>
             </el-menu-item>
-            <el-menu-item index="/admin/arr-multi-user-simulation">
-              <el-icon><Monitor /></el-icon>
-              <span>ARR 多用户上报模拟</span>
-            </el-menu-item>
+            <el-sub-menu index="/admin/demo">
+              <template #title>
+                <el-icon><Monitor /></el-icon>
+                <span>演示与验证</span>
+              </template>
+              <el-menu-item index="/admin/demo/arr-experiment-comparison">
+                演示：ARR 实验效果对比
+              </el-menu-item>
+            </el-sub-menu>
           </el-menu>
         </el-aside>
         <el-main>
@@ -77,7 +82,7 @@
 
               <div v-if="perturbationData.length === 0" class="no-data">
                 <el-empty description="暂无聚合结果" />
-                <p class="empty-tip">请先完成用户端连续采集并上报当前任务的数据，再查看聚合结果。</p>
+                <p class="empty-tip">{{ emptyAggregateTip }}</p>
               </div>
 
               <template v-else-if="currentData">
@@ -93,7 +98,44 @@
                   </div>
                 </section>
 
-                <section class="summary-section">
+                <section v-if="isArrAggregateView" class="summary-section">
+                  <div class="section-heading">
+                    <h3>ARR 服务端可见统计</h3>
+                    <p>聚合端只展示服务器收到的扰动后数据统计和基于扰动参数计算出的聚合估计结果，不展示用户原始值、真实计数或误差指标。</p>
+                  </div>
+                  <div class="detail-table-wrap">
+                    <table class="detail-table">
+                      <thead>
+                        <tr>
+                          <th>取值类别</th>
+                          <th>扰动后计数</th>
+                          <th>聚合估计值</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in arrAggregateRows" :key="row.label">
+                          <td class="detail-table__label">{{ row.label }}</td>
+                          <td class="detail-table__value">{{ row.reportCount }}</td>
+                          <td class="detail-table__value">{{ formatMetric(row.estimatedCount) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section v-if="isArrAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>ARR 扰动参数</h3>
+                  </div>
+                  <div class="summary-strip">
+                    <div class="summary-card summary-card--adaptive" v-for="item in arrParamCards" :key="item.label">
+                      <div class="summary-label">{{ item.label }}</div>
+                      <div class="summary-value">{{ item.value }}</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section v-if="!isArrAggregateView" class="summary-section">
                   <div class="section-heading">
                     <h3>核心结果指标</h3>
                     <p v-if="coreSectionDescription">{{ coreSectionDescription }}</p>
@@ -123,7 +165,7 @@
                   </div>
                 </section>
 
-                <section v-if="currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
+                <section v-if="!isArrAggregateView && currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
                   <div class="section-heading">
                     <h3>服务端接收计数</h3>
                     <p>这里直接展示服务端收到的统一域计数 c0, c1, ..., c5，其中 c0 对应上报值 0，ci 对应上报值 i（i=1..5）。</p>
@@ -141,7 +183,7 @@
                   </div>
                 </section>
 
-                <section class="summary-section">
+                <section v-if="!isArrAggregateView" class="summary-section">
                   <div class="section-heading">
                     <h3>{{ currentData.algorithm === 'TSP' ? '聚合结果分块' : '真实与聚合估计对照' }}</h3>
                   </div>
@@ -199,7 +241,7 @@
                   </div>
                 </section>
 
-                <section v-if="currentData.algorithm === 'TSP'" class="summary-section compact-section">
+                <section v-if="!isArrAggregateView && currentData.algorithm === 'TSP'" class="summary-section compact-section">
                   <div class="section-heading">
                     <h3>{{ detailSectionTitle }}</h3>
                     <p>{{ detailSectionDescription }}</p>
@@ -260,6 +302,18 @@ let comparisonChartInstances = []
 const currentData = computed(() => perturbationData.value.find(item => item.id === selectedData.value) || null)
 const selectedTask = computed(() => tasks.value.find(task => String(task.id) === String(selectedTaskId.value)) || null)
 const usesTspAlignedView = computed(() => String(selectedTask.value?.protocol || '').toUpperCase() === 'TSP')
+const isSelectedArrTask = computed(() => {
+  const attribute = selectedTask.value?.attributes?.[0]
+  return selectedTask.value?.algorithm === 'arr'
+    || attribute?.algorithm === 'arr'
+    || attribute?.name === '是否触发睡眠异常提醒'
+})
+const isArrAggregateView = computed(() => currentData.value?.algorithm === 'ARR')
+const emptyAggregateTip = computed(() => (
+  isSelectedArrTask.value
+    ? '请先通过用户端“演示：ARR 多客户端上报”生成扰动后上报数据，再查看聚合结果。'
+    : '请先完成用户端上报当前任务的数据，再查看聚合结果。'
+))
 
 const compactSummaryCards = computed(() => {
   return currentData.value?.summaryCards || []
@@ -306,6 +360,45 @@ const tspReportedCountCards = computed(() => {
     label: `c${index}`,
     value: String(value ?? 0)
   }))
+})
+
+const arrReportCounts = computed(() => {
+  if (!selectedTaskId.value) return [0, 0]
+  try {
+    const records = JSON.parse(localStorage.getItem('submittedData') || '[]')
+    return records.reduce((counts, item) => {
+      const taskMatches = String(item.task_id ?? item.taskId) === String(selectedTaskId.value)
+      const protocol = item?.reportData?.protocol || item?.protocol
+      if (!taskMatches || protocol !== 'ARR') return counts
+
+      const reportValue = Number(item.reportData?.perturbedValue ?? item.reportData?.reportValue ?? item.report_value) === 1 ? 1 : 0
+      counts[reportValue] += 1
+      return counts
+    }, [0, 0])
+  } catch (error) {
+    console.error('加载 ARR 上报计数失败:', error)
+    return [0, 0]
+  }
+})
+
+const arrAggregateRows = computed(() => {
+  const labels = ['未触发提醒', '触发提醒']
+  return labels.map((label, index) => ({
+    label,
+    reportCount: arrReportCounts.value[index] ?? 0,
+    estimatedCount: currentData.value?.compareRows?.[index]?.estimatedCount ?? 0
+  }))
+})
+
+const arrParamCards = computed(() => {
+  const config = selectedTask.value?.configSnapshot || {}
+  const params = config.calibratedParams || {}
+  return [
+    { label: '隐私预算 ε', value: String(config.epsilon ?? selectedTask.value?.privacyBudget ?? '--') },
+    { label: 'p', value: Number.isFinite(Number(params.p)) ? Number(params.p).toFixed(4) : '--' },
+    { label: 'q', value: Number.isFinite(Number(params.q)) ? Number(params.q).toFixed(4) : '--' },
+    { label: '样本数', value: String(currentData.value?.sampleCount ?? 0) }
+  ]
 })
 
 const handleLogout = () => {
