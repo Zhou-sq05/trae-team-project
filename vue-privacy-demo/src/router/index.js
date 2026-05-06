@@ -27,6 +27,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/admin/scenario-overview',
+    name: 'ScenarioOverview',
+    component: () => import('../views/admin/ScenarioOverview.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/admin/attr-config',
     name: 'AttrConfig',
     component: () => import('../views/admin/AttrConfig.vue'),

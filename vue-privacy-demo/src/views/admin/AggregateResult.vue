@@ -25,6 +25,10 @@
               <el-icon><House /></el-icon>
               <span>首页</span>
             </el-menu-item>
+            <el-menu-item index="/admin/scenario-overview">
+              <el-icon><Document /></el-icon>
+              <span>场景说明</span>
+            </el-menu-item>
             <el-menu-item index="/admin/attr-config">
               <el-icon><Setting /></el-icon>
               <span>属性配置</span>
@@ -43,7 +47,7 @@
                 <span>演示与验证</span>
               </template>
               <el-menu-item index="/admin/demo/arr-experiment-comparison">
-                演示：ARR 实验效果对比
+                实验效果对比
               </el-menu-item>
             </el-sub-menu>
           </el-menu>

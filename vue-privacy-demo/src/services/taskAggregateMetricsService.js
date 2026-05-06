@@ -451,6 +451,19 @@ function createAggregateViewModel({
     epsilon: String(config.epsilon),
     sampleCount: summary.sampleCount,
     domainSize: labels.length,
+    trueCounts,
+    reportCounts: summary.reportCounts || [],
+    estimatedCounts,
+    perturbParams: {
+      p: Number(config.p),
+      q: Number(config.q),
+      p1: Number(config.p1),
+      q1: Number(config.q1),
+      p2: Number(config.p2),
+      q2: Number(config.q2),
+      pStar: Number(config.pStar),
+      qStar: Number(config.qStar)
+    },
     metrics,
     summaryCards: [
       { label: '任务名称', value: attributeName },
