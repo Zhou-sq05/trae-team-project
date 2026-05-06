@@ -158,7 +158,7 @@
           </div>
         </div>
 
-        <div v-if="currentTaskDetail?.scenario !== 'arr'" class="dynamic-form-panel separated-panel">
+        <div v-if="!['arr', 'agrr'].includes(currentTaskDetail?.scenario)" class="dynamic-form-panel separated-panel">
           <div class="summary-heading">
             <h3>手环端连续采集</h3>
             <span class="section-tip">在当前页面连续执行本地扰动，健康手环持续采集</span>
@@ -211,6 +211,14 @@
           >
             演示：AGRR 多客户端上报
           </el-button>
+          <el-button
+            v-if="currentTaskDetail?.scenario === 'aoue'"
+            type="primary"
+            plain
+            @click="goToAoueMultiClientDemo"
+          >
+            演示：AOUE 多客户端上报
+          </el-button>
           <el-button @click="goToDashboard">返回首页</el-button>
         </div>
       </div>
@@ -218,7 +226,7 @@
       <div class="right-section">
         <h3>演示调试区域</h3>
         <template v-if="['arr', 'agrr', 'aoue', 'tsp'].includes(currentTaskDetail?.scenario)">
-          <div class="demo-tab-bar">
+          <div v-if="currentTaskDetail?.scenario !== 'agrr'" class="demo-tab-bar">
             <button
               v-if="currentTaskDetail?.scenario !== 'arr'"
               type="button"
@@ -2167,7 +2175,7 @@ const currentBatchResultTip = computed(() => {
     return '当前结果为手环端连续生成缺失/非缺失样本；非缺失样本先执行第一阶段评分扰动，随后所有样本统一进入 {0,1,2,3,4,5} 的第二阶段扰动并生成最终上报值。';
   }
   if (currentTaskDetail.value?.scenario === 'agrr') {
-    return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始分钟数样本、映射到 4 档后，再执行 AGRR 本地扰动得到的统计结果。'} 原始分钟数仅用于映射分档，真正执行扰动与上报的是分档后的档位编码。`;
+    return `${currentPerturbationStatus.value?.description || '当前结果为单个客户端采集原始分钟数、映射到活动分档后，再执行 AGRR 本地扰动得到的上报结果。'} 原始分钟数仅用于映射分档，真正执行扰动与上报的是分档后的档位编码。`;
   }
   if (currentTaskDetail.value?.scenario === 'aoue') {
     return `${currentPerturbationStatus.value?.description || '当前结果为手环端连续生成原始步数样本并执行 AOUE 本地扰动。'} 原始步数先映射为初始编码向量，再逐位扰动为扰动后编码向量；下表展示了原始分布与扰动后编码向量累计分布的对比。`;
@@ -2247,7 +2255,7 @@ const processPreviewCards = computed(() => {
 const processPreviewTip = computed(() => {
   if (!currentTaskDetail.value) return '';
   if (currentTaskDetail.value.scenario === 'agrr') {
-    return '当前 AGRR 已接入单次扰动、连续采集和上报链路，扰动对象为分档后的档位，而不是原始分钟数。';
+    return '当前 AGRR 保留单次扰动和上报链路，扰动对象为分档后的档位，而不是原始分钟数。';
   }
 
   if (currentTaskDetail.value.scenario === 'aoue') {
@@ -3580,6 +3588,10 @@ function goToArrMultiClientDemo() {
 
 function goToAgrrMultiClientDemo() {
   router.push('/user/demo/agrr-multi-client-upload');
+}
+
+function goToAoueMultiClientDemo() {
+  router.push('/user/demo/aoue-multi-client-upload');
 }
 
 function handleLogout() {
