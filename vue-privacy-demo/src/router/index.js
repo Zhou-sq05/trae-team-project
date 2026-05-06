@@ -63,6 +63,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/user/demo/tsp-multi-client-upload',
+    name: 'TspMultiClientUploadDemo',
+    component: () => import('../views/user/TspMultiClientUploadDemo.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/admin/demo/arr-experiment-comparison',
     name: 'ArrExperimentComparison',
     component: () => import('../views/admin/ArrExperimentComparison.vue'),

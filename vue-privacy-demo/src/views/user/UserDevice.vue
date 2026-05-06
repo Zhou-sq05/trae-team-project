@@ -158,7 +158,7 @@
           </div>
         </div>
 
-        <div v-if="!['arr', 'agrr'].includes(currentTaskDetail?.scenario)" class="dynamic-form-panel separated-panel">
+        <div v-if="!['arr', 'agrr', 'tsp'].includes(currentTaskDetail?.scenario)" class="dynamic-form-panel separated-panel">
           <div class="summary-heading">
             <h3>手环端连续采集</h3>
             <span class="section-tip">在当前页面连续执行本地扰动，健康手环持续采集</span>
@@ -219,6 +219,14 @@
           >
             演示：AOUE 多客户端上报
           </el-button>
+          <el-button
+            v-if="currentTaskDetail?.scenario === 'tsp'"
+            type="primary"
+            plain
+            @click="goToTspMultiClientDemo"
+          >
+            演示：TSP 多客户端上报
+          </el-button>
           <el-button @click="goToDashboard">返回首页</el-button>
         </div>
       </div>
@@ -226,7 +234,7 @@
       <div class="right-section">
         <h3>演示调试区域</h3>
         <template v-if="['arr', 'agrr', 'aoue', 'tsp'].includes(currentTaskDetail?.scenario)">
-          <div v-if="currentTaskDetail?.scenario !== 'agrr'" class="demo-tab-bar">
+          <div v-if="!['agrr', 'tsp'].includes(currentTaskDetail?.scenario)" class="demo-tab-bar">
             <button
               v-if="currentTaskDetail?.scenario !== 'arr'"
               type="button"
@@ -2244,7 +2252,7 @@ const processPreviewCards = computed(() => {
       ];
     case 'tsp':
       return [
-        { label: '处理链路', value: '缺失状态/评分 -> 第一阶段 -> 第二阶段 -> 上报值（下一步接入）' },
+        { label: '处理链路', value: '缺失状态/评分 -> 第一阶段 -> 第二阶段 -> 上报值' },
         { label: '当前状态', value: dynamicForm.sleepMissing === 1 ? '仅上报缺失状态' : `评分 ${dynamicForm.sleepScore ?? '--'}` }
       ];
     default:
@@ -2260,6 +2268,10 @@ const processPreviewTip = computed(() => {
 
   if (currentTaskDetail.value.scenario === 'aoue') {
     return '当前 AOUE 已按初始编码向量逐位独立扰动接入单次演示、连续采集与上报链路，展示结果与扰动后编码向量保持一致。';
+  }
+
+  if (currentTaskDetail.value.scenario === 'tsp') {
+    return '当前 TSP 使用两阶段扰动链路：非缺失评分先进入第一阶段有效值扰动，随后缺失值 0 与有效值统一进入第二阶段扰动。';
   }
 
   return '当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。';
@@ -3592,6 +3604,10 @@ function goToAgrrMultiClientDemo() {
 
 function goToAoueMultiClientDemo() {
   router.push('/user/demo/aoue-multi-client-upload');
+}
+
+function goToTspMultiClientDemo() {
+  router.push('/user/demo/tsp-multi-client-upload');
 }
 
 function handleLogout() {
