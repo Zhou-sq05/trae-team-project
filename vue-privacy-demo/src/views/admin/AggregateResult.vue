@@ -102,34 +102,118 @@
                   </div>
                 </section>
 
+                <el-alert
+                  v-if="isArrAggregateView"
+                  class="server-view-alert"
+                  type="info"
+                  show-icon
+                  :closable="false"
+                >
+                  <template #title>
+                    <div class="server-view-alert__content">
+                      <span>
+                        服务端视角说明：真实系统中，服务器只能接收客户端上传的扰动后值，并基于协议参数进行频率估计。本页面不展示用户原始值、真实计数和误差指标；这些内容仅在实验效果对比页面中用于模拟验证。
+                      </span>
+                      <el-button size="small" type="primary" plain @click="goToExperimentComparison">
+                        查看实验效果对比
+                      </el-button>
+                    </div>
+                  </template>
+                </el-alert>
+
+                <el-alert
+                  v-if="isAgrrAggregateView"
+                  class="server-view-alert"
+                  type="info"
+                  show-icon
+                  :closable="false"
+                >
+                  <template #title>
+                    <div class="server-view-alert__content">
+                      <span>
+                        服务端视角说明：真实系统中，服务器只能接收客户端上传的扰动后值，并基于 AGRR 协议参数进行频率估计。本页面不展示用户原始值、真实计数和误差指标；这些内容仅在实验效果对比页面中用于模拟验证。
+                      </span>
+                      <el-button size="small" type="primary" plain @click="goToExperimentComparison">
+                        查看实验效果对比
+                      </el-button>
+                    </div>
+                  </template>
+                </el-alert>
+
+                <el-alert
+                  v-if="isAoueAggregateView"
+                  class="server-view-alert"
+                  type="info"
+                  show-icon
+                  :closable="false"
+                >
+                  <template #title>
+                    <div class="server-view-alert__content">
+                      <span>
+                        服务端视角说明：服务器只能接收客户端上传的 AOUE 扰动后编码向量，并统计各 bit 位的上报次数，再基于 AOUE 协议参数进行频率估计。本页面仅展示服务端可见的扰动后向量统计与校正估计结果。
+                      </span>
+                      <el-button size="small" type="primary" plain @click="goToExperimentComparison">
+                        查看实验效果对比
+                      </el-button>
+                    </div>
+                  </template>
+                </el-alert>
+
+                <el-alert
+                  v-if="isTspAggregateView"
+                  class="server-view-alert"
+                  type="info"
+                  show-icon
+                  :closable="false"
+                >
+                  <template #title>
+                    <div class="server-view-alert__content">
+                      <span>
+                        服务端视角说明：TSP 聚合端基于两阶段扰动后的观测结果和协议参数进行校正估计，并展示估计方差与稳定性指标。本页面仅展示服务端可见的扰动观测统计与 TSP 校正估计结果。
+                      </span>
+                    </div>
+                  </template>
+                </el-alert>
+
                 <section v-if="isArrAggregateView" class="summary-section">
                   <div class="section-heading">
-                    <h3>ARR 服务端可见统计</h3>
-                    <p>聚合端只展示服务器收到的扰动后数据统计和基于扰动参数计算出的聚合估计结果，不展示用户原始值、真实计数或误差指标。</p>
+                    <h3>ARR 服务端统计与频数估计</h3>
+                    <p>服务端观测计数表示服务器实际接收到的扰动后上报数据统计；聚合频数估计表示基于 ARR 协议参数 p、q 校正后的群体频数估计结果。</p>
                   </div>
                   <div class="detail-table-wrap">
                     <table class="detail-table">
                       <thead>
                         <tr>
                           <th>取值类别</th>
-                          <th>扰动后计数</th>
-                          <th>聚合估计值</th>
+                          <th>服务端观测计数</th>
+                          <th>聚合频数估计</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr v-for="row in arrAggregateRows" :key="row.label">
                           <td class="detail-table__label">{{ row.label }}</td>
                           <td class="detail-table__value">{{ row.reportCount }}</td>
-                          <td class="detail-table__value">{{ formatMetric(row.estimatedCount) }}</td>
+                          <td class="detail-table__value arr-estimate-value">{{ formatEstimateCount(row.estimatedCount) }}</td>
                         </tr>
                       </tbody>
                     </table>
+                  </div>
+                  <p class="arr-table-note">聚合频数估计并不直接等同于服务端观测计数，而是基于 ARR 随机响应概率进行校正后的群体统计结果。</p>
+                </section>
+
+                <section v-if="isArrAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>服务端观测计数与聚合频数估计</h3>
+                    <p>该图仅对比服务端观测计数与由 ARR 参数校正得到的聚合频数估计，不包含真实计数。</p>
+                  </div>
+                  <div class="arr-chart-card">
+                    <div ref="arrChartRef" class="arr-chart-container"></div>
                   </div>
                 </section>
 
                 <section v-if="isArrAggregateView" class="summary-section compact-section">
                   <div class="section-heading">
-                    <h3>ARR 扰动参数</h3>
+                    <h3>ARR 聚合所用参数</h3>
                   </div>
                   <div class="summary-strip">
                     <div class="summary-card summary-card--adaptive" v-for="item in arrParamCards" :key="item.label">
@@ -139,7 +223,364 @@
                   </div>
                 </section>
 
-                <section v-if="!isArrAggregateView" class="summary-section">
+                <section v-if="isArrAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>ARR 聚合频数估计公式</h3>
+                  </div>
+                  <div class="formula-card">
+                    <p>
+                      设服务器收到某一类别的服务端观测计数为 <strong>y</strong>，样本总数为 <strong>n</strong>。由于真实属于该类别的用户以概率 <strong>p</strong> 上报该类别，真实不属于该类别的用户也可能以概率 <strong>q</strong> 被扰动为该类别，因此有：
+                    </p>
+                    <div class="formula-expression">
+                      <span>E[<span class="formula-var">y</span>]</span>
+                      <span>=</span>
+                      <span><span class="formula-var">p</span> · <span class="formula-var">x</span> + <span class="formula-var">q</span> · (<span class="formula-var">n</span> - <span class="formula-var">x</span>)</span>
+                    </div>
+                    <p>由此可得到该类别真实计数的无偏估计：</p>
+                    <div class="formula-expression">
+                      <span><span class="formula-hat">x</span></span>
+                      <span>=</span>
+                      <span>(<span class="formula-var">y</span> - <span class="formula-var">n</span><span class="formula-var">q</span>) / (<span class="formula-var">p</span> - <span class="formula-var">q</span>)</span>
+                    </div>
+                    <div class="formula-flow">
+                      <span>服务端观测计数 y</span>
+                      <span>→</span>
+                      <span>代入 ARR 参数 p、q</span>
+                      <span>→</span>
+                      <span>校正随机扰动偏差</span>
+                      <span>→</span>
+                      <span>得到群体频数估计 x̂</span>
+                    </div>
+                    <p class="formula-note">该公式得到的是群体频数估计结果，不会恢复任何单个用户的原始数据。</p>
+                  </div>
+                </section>
+
+                <section v-if="isAgrrAggregateView" class="summary-section">
+                  <div class="section-heading">
+                    <h3>AGRR 服务端统计与频数估计</h3>
+                    <p>服务端观测计数是服务器实际接收到的扰动后数据统计；聚合频数估计是基于 AGRR 随机响应概率进行校正后的群体频数估计结果。</p>
+                  </div>
+                  <div class="detail-table-wrap">
+                    <table class="detail-table">
+                      <thead>
+                        <tr>
+                          <th>取值类别</th>
+                          <th>服务端观测计数</th>
+                          <th>聚合频数估计</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in agrrAggregateRows" :key="row.label">
+                          <td class="detail-table__label">{{ row.label }}</td>
+                          <td class="detail-table__value">{{ row.reportCount }}</td>
+                          <td class="detail-table__value arr-estimate-value">{{ formatEstimateCount(row.estimatedCount) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="arr-table-note">聚合频数估计并不直接等同于服务端观测计数，而是基于 AGRR 随机响应概率进行校正后的群体统计结果。</p>
+                </section>
+
+                <section v-if="isAgrrAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>服务端观测计数与聚合频数估计</h3>
+                    <p>该图仅展示服务端观测计数和 AGRR 参数校正后的聚合频数估计，不包含真实计数或误差指标。</p>
+                  </div>
+                  <div class="arr-chart-card">
+                    <div ref="agrrChartRef" class="arr-chart-container"></div>
+                  </div>
+                </section>
+
+                <section v-if="isAgrrAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>AGRR 聚合所用参数</h3>
+                  </div>
+                  <div class="summary-strip">
+                    <div class="summary-card summary-card--adaptive" v-for="item in agrrParamCards" :key="item.label">
+                      <div class="summary-label">{{ item.label }}</div>
+                      <div class="summary-value">{{ item.value }}</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section v-if="isAgrrAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>AGRR 聚合频数估计公式</h3>
+                  </div>
+                  <div class="formula-card">
+                    <p>
+                      设第 <strong>i</strong> 类的真实群体计数为 <strong>x<sub>i</sub></strong>，服务端观测计数为 <strong>y<sub>i</sub></strong>，样本总数为 <strong>n</strong>，取值域大小为 <strong>d</strong>。在 AGRR 多分类随机响应中，真实属于第 i 类的用户以概率 <strong>p</strong> 上报第 i 类，真实不属于第 i 类的用户也可能以概率 <strong>q</strong> 被扰动为第 i 类，因此有：
+                    </p>
+                    <div class="formula-expression">
+                      <span>E[<span class="formula-var">y<sub>i</sub></span>]</span>
+                      <span>=</span>
+                      <span><span class="formula-var">p</span> · <span class="formula-var">x<sub>i</sub></span> + <span class="formula-var">q</span> · (<span class="formula-var">n</span> - <span class="formula-var">x<sub>i</sub></span>)</span>
+                    </div>
+                    <p>整理上式，可得到第 i 类群体频数的无偏估计：</p>
+                    <div class="formula-expression">
+                      <span><span class="formula-hat">x</span><sub>i</sub></span>
+                      <span>=</span>
+                      <span>(<span class="formula-var">y<sub>i</sub></span> - <span class="formula-var">n</span><span class="formula-var">q</span>) / (<span class="formula-var">p</span> - <span class="formula-var">q</span>)</span>
+                    </div>
+                    <div class="formula-flow">
+                      <span>扰动后类别计数 y<sub>i</sub></span>
+                      <span>→</span>
+                      <span>代入 AGRR 参数 p、q</span>
+                      <span>→</span>
+                      <span>校正多分类随机响应偏差</span>
+                      <span>→</span>
+                      <span>得到各类别群体频数估计 x̂<sub>i</sub></span>
+                    </div>
+                    <p class="formula-note">该公式估计的是群体频数，不会恢复任何单个用户的原始数据或敏感属性。</p>
+                  </div>
+                </section>
+
+                <section v-if="isAoueAggregateView" class="summary-section">
+                  <div class="section-heading">
+                    <h3>AOUE 服务端观测与校正估计对比</h3>
+                    <p>服务端观测计数表示扰动后向量中各 bit 位为 1 的累计次数；AOUE 校正频数估计表示基于协议参数 p、q 对扰动观测结果进行无偏校正后的估计分布。校正偏移仅表示校正估计相对服务端观测结果的变化，不涉及客户端未扰动数据。</p>
+                  </div>
+                  <div class="detail-table-wrap">
+                    <table class="detail-table">
+                      <thead>
+                        <tr>
+                          <th>取值类别</th>
+                          <th>服务端观测计数</th>
+                          <th>服务端观测频率</th>
+                          <th>AOUE 校正频数估计</th>
+                          <th>AOUE 校正频率</th>
+                          <th>校正偏移</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in aoueAggregateRows" :key="row.label">
+                          <td class="detail-table__label">{{ row.label }}</td>
+                          <td class="detail-table__value">{{ row.reportCount }}</td>
+                          <td class="detail-table__value">{{ formatDisplayFrequency(row.observedFrequency) }}</td>
+                          <td class="detail-table__value arr-estimate-value">{{ formatEstimateCount(row.estimatedCount) }}</td>
+                          <td class="detail-table__value arr-estimate-value">{{ formatDisplayFrequency(row.correctedFrequency) }}</td>
+                          <td class="detail-table__value">
+                            <span :class="['aoue-offset-chip', getAoueOffsetClass(row.correctionOffset)]">
+                              {{ formatAoueCorrectionOffset(row.correctionOffset) }}
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="arr-table-note">校正偏移只用于展示 AOUE 参数校正后相对服务端观测分布的变化，不代表评估指标。</p>
+                </section>
+
+                <section v-if="isAoueAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>服务端观测频率 vs AOUE 校正频率</h3>
+                    <p>该图仅展示服务端观测频率和 AOUE 参数校正后的频率分布。</p>
+                  </div>
+                  <div class="arr-chart-card">
+                    <div ref="aoueChartRef" class="arr-chart-container"></div>
+                  </div>
+                </section>
+
+                <section v-if="isAoueAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>AOUE 聚合所用参数</h3>
+                  </div>
+                  <div class="summary-strip">
+                    <div class="summary-card summary-card--adaptive" v-for="item in aoueParamCards" :key="item.label">
+                      <div class="summary-label">{{ item.label }}</div>
+                      <div class="summary-value">{{ item.value }}</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section v-if="isAoueAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>AOUE 聚合频数估计公式</h3>
+                  </div>
+                  <div class="formula-card">
+                    <p>
+                      AOUE 中，客户端先将本地取值编码为 one-hot 向量，再对每一位独立执行随机扰动。设第 <strong>i</strong> 个 bit 位对应的待估计群体计数为 <strong>x<sub>i</sub></strong>，服务端观测计数为 <strong>y<sub>i</sub></strong>，样本总数为 <strong>n</strong>。本地 bit 为 1 时以概率 <strong>p</strong> 上报 1，本地 bit 为 0 时也可能以概率 <strong>q</strong> 被扰动为 1，因此有：
+                    </p>
+                    <div class="formula-expression">
+                      <span>E[<span class="formula-var">y<sub>i</sub></span>]</span>
+                      <span>=</span>
+                      <span><span class="formula-var">p</span> · <span class="formula-var">x<sub>i</sub></span> + <span class="formula-var">q</span> · (<span class="formula-var">n</span> - <span class="formula-var">x<sub>i</sub></span>)</span>
+                    </div>
+                    <p>整理上式，可得到第 i 个 bit 位对应类别的群体频数估计：</p>
+                    <div class="formula-expression">
+                      <span><span class="formula-hat">x</span><sub>i</sub></span>
+                      <span>=</span>
+                      <span>(<span class="formula-var">y<sub>i</sub></span> - <span class="formula-var">n</span><span class="formula-var">q</span>) / (<span class="formula-var">p</span> - <span class="formula-var">q</span>)</span>
+                    </div>
+                    <div class="formula-flow">
+                      <span>扰动后 bit 计数 y<sub>i</sub></span>
+                      <span>→</span>
+                      <span>代入 AOUE 参数 p、q</span>
+                      <span>→</span>
+                      <span>校正按位随机扰动偏差</span>
+                      <span>→</span>
+                      <span>得到各类别群体频数估计 x̂<sub>i</sub></span>
+                    </div>
+                    <p class="formula-note">该公式得到的是群体频数估计结果，不会恢复任何单个用户的本地采集取值。</p>
+                  </div>
+                </section>
+
+                <section v-if="isAoueAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>为什么服务端观测 bit 总和可能变大？</h3>
+                  </div>
+                  <div class="formula-card bit-sum-note-card">
+                    AOUE 对 one-hot 编码向量的每一位独立扰动。本地 one-hot 向量通常只有一个 bit 为 1，但原本为 0 的位置也可能以概率 q 被扰动为 1，因此扰动后向量中的 1 的数量可能增加。服务端不会直接把扰动后 bit 总和当作待估计分布，而是基于 p、q 进行概率校正估计。
+                  </div>
+                </section>
+
+                <section v-if="isTspAggregateView" class="summary-section">
+                  <div class="section-heading">
+                    <h3>TSP 聚合任务概览</h3>
+                    <p>TSP 协议通过两阶段扰动机制对用户上报值进行隐私保护。服务端基于两阶段扰动观测结果和协议参数，对各类别频数进行校正估计，并进一步展示估计方差以观察结果稳定性。</p>
+                  </div>
+                  <div class="summary-strip">
+                    <div class="summary-card summary-card--adaptive" v-for="item in tspOverviewCards" :key="item.label">
+                      <div class="summary-label">{{ item.label }}</div>
+                      <div class="summary-value">{{ item.value }}</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section v-if="isTspAggregateView" class="summary-section">
+                  <div class="section-heading">
+                    <h3>两阶段服务端观测统计</h3>
+                    <p>第一阶段表展示有效评分域及缺失跳过状态的中间观测统计；第二阶段表展示统一上报域中的最终观测统计。</p>
+                  </div>
+                  <div class="tsp-stage-grid">
+                    <div class="tsp-stage-card">
+                      <div class="mini-chart-title">第一阶段服务端观测统计</div>
+                      <div class="detail-table-wrap">
+                        <table class="detail-table">
+                          <thead>
+                            <tr>
+                              <th>取值类别</th>
+                              <th>第一阶段观测计数</th>
+                              <th>第一阶段观测频率</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="row in tspStageOneRows" :key="row.label">
+                              <td class="detail-table__label">{{ row.label }}</td>
+                              <td class="detail-table__value">{{ row.count }}</td>
+                              <td class="detail-table__value">{{ formatDisplayFrequency(row.frequency) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div class="tsp-stage-card">
+                      <div class="mini-chart-title">第二阶段服务端观测统计</div>
+                      <div class="detail-table-wrap">
+                        <table class="detail-table">
+                          <thead>
+                            <tr>
+                              <th>取值类别</th>
+                              <th>第二阶段观测计数</th>
+                              <th>第二阶段观测频率</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="row in tspStageTwoRows" :key="row.label">
+                              <td class="detail-table__label">{{ row.label }}</td>
+                              <td class="detail-table__value">{{ row.count }}</td>
+                              <td class="detail-table__value">{{ formatDisplayFrequency(row.frequency) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section v-if="isTspAggregateView" class="summary-section">
+                  <div class="section-heading">
+                    <h3>TSP 校正估计结果</h3>
+                    <p>校正偏移只表示 TSP 校正频率相对服务端观测频率的变化，不代表评估指标。估计方差用于观察各类别校正估计结果的稳定性。</p>
+                  </div>
+                  <div class="detail-table-wrap">
+                    <table class="detail-table">
+                      <thead>
+                        <tr>
+                          <th>取值类别</th>
+                          <th>服务端观测频率</th>
+                          <th>TSP 校正频数估计</th>
+                          <th>TSP 校正频率</th>
+                          <th>校正偏移</th>
+                          <th>估计方差</th>
+                          <th>稳定性评价</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in tspCorrectedRows" :key="row.label">
+                          <td class="detail-table__label">{{ row.label }}</td>
+                          <td class="detail-table__value">{{ formatDisplayFrequency(row.observedFrequency) }}</td>
+                          <td class="detail-table__value arr-estimate-value">{{ formatEstimateCount(row.estimatedCount) }}</td>
+                          <td class="detail-table__value arr-estimate-value">{{ formatDisplayFrequency(row.correctedFrequency) }}</td>
+                          <td class="detail-table__value">
+                            <span :class="['aoue-offset-chip', getAoueOffsetClass(row.correctionOffset)]">
+                              {{ formatAoueCorrectionOffset(row.correctionOffset) }}
+                            </span>
+                          </td>
+                          <td class="detail-table__value">{{ formatVariance(row.variance) }}</td>
+                          <td class="detail-table__value">
+                            <el-tag :type="getStabilityTagType(row.variance)" effect="light">
+                              {{ getStabilityLabel(row.variance) }}
+                            </el-tag>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section v-if="isTspAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>服务端观测频率 vs TSP 校正频率</h3>
+                    <p>该图仅展示服务端观测频率与 TSP 两阶段校正后的频率分布。</p>
+                  </div>
+                  <div class="arr-chart-card">
+                    <div ref="tspFrequencyChartRef" class="arr-chart-container"></div>
+                  </div>
+                </section>
+
+                <section v-if="isTspAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>各类别估计方差对比图</h3>
+                    <p>该图展示各类别 TSP 校正频率估计的理论波动规模，用于观察聚合结果稳定性。</p>
+                  </div>
+                  <div class="arr-chart-card">
+                    <div ref="tspVarianceChartRef" class="arr-chart-container"></div>
+                  </div>
+                </section>
+
+                <section v-if="isTspAggregateView" class="summary-section compact-section">
+                  <div class="section-heading">
+                    <h3>TSP 两阶段校正流程</h3>
+                  </div>
+                  <div class="formula-card">
+                    <p>
+                      第一阶段在有效评分域内扰动，使用参数 <strong>p1</strong>、<strong>q1</strong>；第二阶段在统一上报域内扰动，使用参数 <strong>p2</strong>、<strong>q2</strong>。服务端先统计统一上报域中的观测计数，再按当前 TSP 参数对缺失状态和评分类别分别进行校正估计。
+                    </p>
+                    <div class="formula-flow">
+                      <span>第二阶段观测计数</span>
+                      <span>→</span>
+                      <span>代入 p2、q2 校正缺失状态</span>
+                      <span>→</span>
+                      <span>结合 p1、q1、p2、q2 校正有效评分</span>
+                      <span>→</span>
+                      <span>得到 TSP 校正频数估计</span>
+                    </div>
+                    <p class="formula-note">TSP 聚合端展示的是群体频数估计结果，不会恢复任何单个用户的本地采集取值。</p>
+                  </div>
+                </section>
+
+                <section v-if="!isArrAggregateView && !isAgrrAggregateView && !isAoueAggregateView && !isTspAggregateView" class="summary-section">
                   <div class="section-heading">
                     <h3>核心结果指标</h3>
                     <p v-if="coreSectionDescription">{{ coreSectionDescription }}</p>
@@ -169,7 +610,7 @@
                   </div>
                 </section>
 
-                <section v-if="!isArrAggregateView && currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
+                <section v-if="!isArrAggregateView && !isAgrrAggregateView && !isAoueAggregateView && !isTspAggregateView && currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
                   <div class="section-heading">
                     <h3>服务端接收计数</h3>
                     <p>这里直接展示服务端收到的统一域计数 c0, c1, ..., c5，其中 c0 对应上报值 0，ci 对应上报值 i（i=1..5）。</p>
@@ -187,9 +628,9 @@
                   </div>
                 </section>
 
-                <section v-if="!isArrAggregateView" class="summary-section">
+                <section v-if="!isArrAggregateView && !isAgrrAggregateView && !isAoueAggregateView && !isTspAggregateView" class="summary-section">
                   <div class="section-heading">
-                    <h3>{{ currentData.algorithm === 'TSP' ? '聚合结果分块' : '真实与聚合估计对照' }}</h3>
+                    <h3>{{ currentData.algorithm === 'TSP' ? '聚合结果分块' : `${currentData.algorithm} 服务端统计与频数估计` }}</h3>
                   </div>
 
                   <div class="result-blocks">
@@ -209,7 +650,7 @@
                               </tr>
                               <tr>
                                 <th>真实值</th>
-                                <th>聚合估计值</th>
+                                <th>聚合频数估计</th>
                                 <th>计数误差</th>
                                 <th>真实频率</th>
                                 <th>估计频率</th>
@@ -245,7 +686,7 @@
                   </div>
                 </section>
 
-                <section v-if="!isArrAggregateView && currentData.algorithm === 'TSP'" class="summary-section compact-section">
+                <section v-if="!isArrAggregateView && !isAgrrAggregateView && !isAoueAggregateView && !isTspAggregateView && currentData.algorithm === 'TSP'" class="summary-section compact-section">
                   <div class="section-heading">
                     <h3>{{ detailSectionTitle }}</h3>
                     <p>{{ detailSectionDescription }}</p>
@@ -300,8 +741,18 @@ const selectedBatchId = ref('')
 const perturbationData = ref([])
 const selectedData = ref(1)
 const comparisonChartRefs = ref([])
+const arrChartRef = ref(null)
+const agrrChartRef = ref(null)
+const aoueChartRef = ref(null)
+const tspFrequencyChartRef = ref(null)
+const tspVarianceChartRef = ref(null)
 const tspDiagnostics = ref(null)
 let comparisonChartInstances = []
+let arrChartInstance = null
+let agrrChartInstance = null
+let aoueChartInstance = null
+let tspFrequencyChartInstance = null
+let tspVarianceChartInstance = null
 
 const currentData = computed(() => perturbationData.value.find(item => item.id === selectedData.value) || null)
 const selectedTask = computed(() => tasks.value.find(task => String(task.id) === String(selectedTaskId.value)) || null)
@@ -313,6 +764,9 @@ const isSelectedArrTask = computed(() => {
     || attribute?.name === '是否触发睡眠异常提醒'
 })
 const isArrAggregateView = computed(() => currentData.value?.algorithm === 'ARR')
+const isAgrrAggregateView = computed(() => currentData.value?.algorithm === 'AGRR')
+const isAoueAggregateView = computed(() => currentData.value?.algorithm === 'AOUE')
+const isTspAggregateView = computed(() => currentData.value?.algorithm === 'TSP')
 const emptyAggregateTip = computed(() => (
   isSelectedArrTask.value
     ? '请先通过用户端“演示：ARR 多客户端上报”生成扰动后上报数据，再查看聚合结果。'
@@ -366,6 +820,145 @@ const tspReportedCountCards = computed(() => {
   }))
 })
 
+const tspSampleCount = computed(() => Number(currentData.value?.sampleCount ?? 0) || 0)
+
+const tspLabels = computed(() => {
+  const rows = currentData.value?.compareRows || []
+  return rows.length ? rows.map(row => row.label) : ['缺失值 0', '1 分', '2 分', '3 分', '4 分', '5 分']
+})
+
+const tspReportCounts = computed(() => {
+  return tspLabels.value.map((_, index) => Number(currentData.value?.reportCounts?.[index] ?? 0))
+})
+
+const tspDisplayEstimatedCounts = computed(() => {
+  const total = tspSampleCount.value
+  const rawCounts = tspLabels.value.map((_, index) => Number(currentData.value?.estimatedCounts?.[index] ?? currentData.value?.compareRows?.[index]?.estimatedCount ?? 0))
+  const nonNegativeCounts = rawCounts.map(value => Math.max(0, Number(value) || 0))
+  const currentSum = nonNegativeCounts.reduce((sum, value) => sum + value, 0)
+
+  if (!total || !nonNegativeCounts.length) {
+    return nonNegativeCounts.map(() => 0)
+  }
+
+  if (currentSum <= 0) {
+    const uniformValue = total / nonNegativeCounts.length
+    return nonNegativeCounts.map(() => Number(uniformValue.toFixed(4)))
+  }
+
+  return nonNegativeCounts.map(value => Number(((value / currentSum) * total).toFixed(4)))
+})
+
+const tspConfigValues = computed(() => {
+  const params = currentData.value?.perturbParams || {}
+  const d2 = Number(currentData.value?.domainSize ?? tspLabels.value.length)
+  const d1 = Math.max(1, d2 - 1)
+  return {
+    epsilon: currentData.value?.epsilon ?? selectedTask.value?.privacyBudget ?? '--',
+    d1,
+    d2,
+    p1: Number(params.p1),
+    q1: Number(params.q1),
+    p2: Number(params.p2),
+    q2: Number(params.q2),
+    pStar: Number(params.pStar),
+    qStar: Number(params.qStar),
+    alpha: Number(currentData.value?.alpha),
+    beta: Number(currentData.value?.beta)
+  }
+})
+
+const tspOverviewCards = computed(() => {
+  const config = tspConfigValues.value
+  const intrinsicEnabled = Number(config.alpha) > 0 || Number(config.beta) > 0
+  return [
+    { label: '任务名称', value: currentData.value?.attributeName || '睡眠质量评分' },
+    { label: '采集属性', value: '睡眠质量评分' },
+    { label: '样本总数', value: String(tspSampleCount.value || 0) },
+    { label: '隐私预算 ε', value: String(config.epsilon) },
+    { label: '第一阶段取值域大小 d1', value: String(config.d1) },
+    { label: '第二阶段取值域大小 d2', value: String(config.d2) },
+    { label: '第一阶段 p1 / q1', value: `${formatProbability(config.p1)} / ${formatProbability(config.q1)}` },
+    { label: '第二阶段 p2 / q2', value: `${formatProbability(config.p2)} / ${formatProbability(config.q2)}` },
+    { label: '内在不确定性参数', value: intrinsicEnabled ? '已启用' : '无' }
+  ]
+})
+
+const tspStageOneRows = computed(() => {
+  const total = tspSampleCount.value || 1
+  const rows = tspDiagnostics.value?.recordsTable || []
+  const counts = new Array(tspConfigValues.value.d1 + 1).fill(0)
+
+  rows.forEach(row => {
+    const value = row.stage1Result
+    if (value === 'skipped' || value == null || Number(value) === 0) {
+      counts[0] += 1
+      return
+    }
+    const numericValue = Number(value)
+    if (Number.isInteger(numericValue) && numericValue >= 1 && numericValue <= tspConfigValues.value.d1) {
+      counts[numericValue] += 1
+    }
+  })
+
+  return counts.map((count, index) => ({
+    label: index === 0 ? '缺失值 0（第一阶段跳过）' : `${index} 分`,
+    count,
+    frequency: count / total
+  }))
+})
+
+const tspStageTwoRows = computed(() => {
+  const total = tspSampleCount.value || 1
+  return tspLabels.value.map((label, index) => {
+    const count = tspReportCounts.value[index] ?? 0
+    return {
+      label,
+      count,
+      frequency: count / total
+    }
+  })
+})
+
+const tspVarianceByCategory = computed(() => {
+  const total = tspSampleCount.value || 0
+  const config = tspConfigValues.value
+  if (!total) return tspLabels.value.map(() => 0)
+
+  return tspLabels.value.map((_, index) => {
+    const observedFrequency = Number(tspReportCounts.value[index] ?? 0) / total
+    const delta = index === 0
+      ? Number(config.p2) - Number(config.q2)
+      : Number(config.pStar) - Number(config.qStar)
+
+    if (!Number.isFinite(delta) || Math.abs(delta) < 1e-8) {
+      return 0
+    }
+
+    const theta = Math.min(1, Math.max(0, observedFrequency))
+    return Math.max(0, theta * (1 - theta) / (total * delta * delta))
+  })
+})
+
+const tspCorrectedRows = computed(() => {
+  const total = tspSampleCount.value || 1
+  return tspLabels.value.map((label, index) => {
+    const observedCount = tspReportCounts.value[index] ?? 0
+    const estimatedCount = tspDisplayEstimatedCounts.value[index] ?? 0
+    const observedFrequency = observedCount / total
+    const correctedFrequency = estimatedCount / total
+    return {
+      label,
+      observedCount,
+      observedFrequency,
+      estimatedCount,
+      correctedFrequency,
+      correctionOffset: correctedFrequency - observedFrequency,
+      variance: tspVarianceByCategory.value[index] ?? 0
+    }
+  })
+})
+
 const arrReportCounts = computed(() => {
   if (!selectedTaskId.value) return [0, 0]
   try {
@@ -394,20 +987,78 @@ const arrAggregateRows = computed(() => {
   }))
 })
 
+const agrrAggregateRows = computed(() => {
+  return (currentData.value?.compareRows || []).map((row, index) => ({
+    label: row.label,
+    reportCount: currentData.value?.reportCounts?.[index] ?? 0,
+    estimatedCount: row.estimatedCount ?? currentData.value?.estimatedCounts?.[index] ?? 0
+  }))
+})
+
+const aoueAggregateRows = computed(() => {
+  const sampleCount = Number(currentData.value?.sampleCount ?? 0) || 1
+  return (currentData.value?.compareRows || []).map((row, index) => ({
+    label: row.label,
+    bitIndex: index + 1,
+    reportCount: currentData.value?.reportCounts?.[index] ?? 0,
+    estimatedCount: row.estimatedCount ?? currentData.value?.estimatedCounts?.[index] ?? 0,
+    observedFrequency: Number(currentData.value?.reportCounts?.[index] ?? 0) / sampleCount,
+    correctedFrequency: Number(row.estimatedCount ?? currentData.value?.estimatedCounts?.[index] ?? 0) / sampleCount,
+    correctionOffset: (
+      Number(row.estimatedCount ?? currentData.value?.estimatedCounts?.[index] ?? 0)
+      - Number(currentData.value?.reportCounts?.[index] ?? 0)
+    ) / sampleCount
+  }))
+})
+
 const arrParamCards = computed(() => {
   const config = selectedTask.value?.configSnapshot || {}
   const params = config.calibratedParams || {}
+  const sampleCount = Number(currentData.value?.sampleCount ?? 0)
   return [
     { label: '隐私预算 ε', value: String(config.epsilon ?? selectedTask.value?.privacyBudget ?? '--') },
+    { label: '样本数 n', value: Number.isFinite(sampleCount) ? String(Math.round(sampleCount)) : '0' },
     { label: 'p', value: Number.isFinite(Number(params.p)) ? Number(params.p).toFixed(4) : '--' },
-    { label: 'q', value: Number.isFinite(Number(params.q)) ? Number(params.q).toFixed(4) : '--' },
-    { label: '样本数', value: String(currentData.value?.sampleCount ?? 0) }
+    { label: 'q', value: Number.isFinite(Number(params.q)) ? Number(params.q).toFixed(4) : '--' }
+  ]
+})
+
+const agrrParamCards = computed(() => {
+  const params = currentData.value?.perturbParams || {}
+  const sampleCount = Number(currentData.value?.sampleCount ?? 0)
+  const domainSize = Number(currentData.value?.domainSize ?? agrrAggregateRows.value.length)
+  return [
+    { label: '隐私预算 ε', value: String(currentData.value?.epsilon ?? selectedTask.value?.privacyBudget ?? '--') },
+    { label: '样本数 n', value: Number.isFinite(sampleCount) ? String(Math.round(sampleCount)) : '0' },
+    { label: '取值域大小 d', value: Number.isFinite(domainSize) ? String(Math.round(domainSize)) : '--' },
+    { label: 'p（保持真实类别概率）', value: Number.isFinite(Number(params.p)) ? Number(params.p).toFixed(4) : '--' },
+    { label: 'q（扰动到其他类别概率）', value: Number.isFinite(Number(params.q)) ? Number(params.q).toFixed(4) : '--' }
+  ]
+})
+
+const aoueParamCards = computed(() => {
+  const params = currentData.value?.perturbParams || {}
+  const sampleCount = Number(currentData.value?.sampleCount ?? 0)
+  const domainSize = Number(currentData.value?.domainSize ?? aoueAggregateRows.value.length)
+  return [
+    { label: '隐私预算 ε', value: String(currentData.value?.epsilon ?? selectedTask.value?.privacyBudget ?? '--') },
+    { label: '样本数 n', value: Number.isFinite(sampleCount) ? String(Math.round(sampleCount)) : '0' },
+    { label: '向量维度 d', value: Number.isFinite(domainSize) ? String(Math.round(domainSize)) : '--' },
+    { label: 'p（原始 bit 为 1 时上报 1 的概率）', value: Number.isFinite(Number(params.p)) ? Number(params.p).toFixed(4) : '--' },
+    { label: 'q（原始 bit 为 0 时上报 1 的概率）', value: Number.isFinite(Number(params.q)) ? Number(params.q).toFixed(4) : '--' }
   ]
 })
 
 const handleLogout = () => {
   userStore.logout()
   router.push('/login')
+}
+
+function goToExperimentComparison() {
+  router.push({
+    path: '/admin/demo/arr-experiment-comparison',
+    query: selectedTaskId.value ? { taskId: selectedTaskId.value } : {}
+  })
 }
 
 function loadTasks() {
@@ -447,6 +1098,58 @@ function formatDistributionMap(distribution) {
 
 function formatMetric(value) {
   return Number(value).toFixed(4)
+}
+
+function formatEstimateCount(value) {
+  return Number(value).toFixed(2)
+}
+
+function formatProbability(value) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue.toFixed(4) : '--'
+}
+
+function formatDisplayFrequency(value) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue.toFixed(4) : '--'
+}
+
+function formatVariance(value) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return '--'
+  if (numericValue > 0 && numericValue < 0.0001) {
+    return numericValue.toExponential(2)
+  }
+  return numericValue.toFixed(8)
+}
+
+function formatAoueCorrectionOffset(value) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return '--'
+  if (numericValue > 0) return `↑ 上调 ${numericValue.toFixed(4)}`
+  if (numericValue < 0) return `↓ 下调 ${Math.abs(numericValue).toFixed(4)}`
+  return '0.0000'
+}
+
+function getAoueOffsetClass(value) {
+  const numericValue = Number(value)
+  if (numericValue > 0) return 'is-positive'
+  if (numericValue < 0) return 'is-negative'
+  return 'is-neutral'
+}
+
+function getStabilityLabel(value) {
+  const numericValue = Number(value)
+  if (numericValue < 0.0005) return '方差较低：估计较稳定'
+  if (numericValue < 0.002) return '方差中等：存在一定波动'
+  return '方差较高：建议增加样本量'
+}
+
+function getStabilityTagType(value) {
+  const numericValue = Number(value)
+  if (numericValue < 0.0005) return 'success'
+  if (numericValue < 0.002) return 'warning'
+  return 'danger'
 }
 
 function formatDelta(value) {
@@ -490,6 +1193,282 @@ function disposeComparisonCharts() {
   comparisonChartInstances = []
 }
 
+function disposeArrChart() {
+  if (arrChartInstance) {
+    arrChartInstance.dispose()
+    arrChartInstance = null
+  }
+}
+
+function disposeAgrrChart() {
+  if (agrrChartInstance) {
+    agrrChartInstance.dispose()
+    agrrChartInstance = null
+  }
+}
+
+function disposeAoueChart() {
+  if (aoueChartInstance) {
+    aoueChartInstance.dispose()
+    aoueChartInstance = null
+  }
+}
+
+function disposeTspCharts() {
+  if (tspFrequencyChartInstance) {
+    tspFrequencyChartInstance.dispose()
+    tspFrequencyChartInstance = null
+  }
+  if (tspVarianceChartInstance) {
+    tspVarianceChartInstance.dispose()
+    tspVarianceChartInstance = null
+  }
+}
+
+function updateArrChart() {
+  if (!arrChartInstance) return
+
+  arrChartInstance.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: {
+      data: ['服务端观测计数', '聚合频数估计'],
+      top: 0
+    },
+    grid: {
+      left: '4%',
+      right: '4%',
+      bottom: '8%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: arrAggregateRows.value.map(row => row.label),
+      axisTick: { alignWithLabel: true }
+    },
+    yAxis: {
+      type: 'value',
+      name: '计数'
+    },
+    series: [
+      {
+        name: '服务端观测计数',
+        type: 'bar',
+        barGap: '0%',
+        data: arrAggregateRows.value.map(row => row.reportCount),
+        itemStyle: { color: '#8fb9f5', borderRadius: [6, 6, 0, 0] }
+      },
+      {
+        name: '聚合频数估计',
+        type: 'bar',
+        barGap: '0%',
+        data: arrAggregateRows.value.map(row => Number(row.estimatedCount.toFixed?.(2) ?? row.estimatedCount)),
+        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
+      }
+    ]
+  })
+}
+
+function initArrChart() {
+  disposeArrChart()
+  if (!isArrAggregateView.value || !arrChartRef.value) return
+  arrChartInstance = echarts.init(arrChartRef.value)
+  updateArrChart()
+}
+
+function updateAgrrChart() {
+  if (!agrrChartInstance) return
+
+  agrrChartInstance.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: {
+      data: ['服务端观测计数', '聚合频数估计'],
+      top: 0
+    },
+    grid: {
+      left: '4%',
+      right: '4%',
+      bottom: '8%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: agrrAggregateRows.value.map(row => row.label),
+      axisTick: { alignWithLabel: true },
+      axisLabel: { interval: 0 }
+    },
+    yAxis: {
+      type: 'value',
+      name: '计数'
+    },
+    series: [
+      {
+        name: '服务端观测计数',
+        type: 'bar',
+        barGap: '0%',
+        data: agrrAggregateRows.value.map(row => row.reportCount),
+        itemStyle: { color: '#8fb9f5', borderRadius: [6, 6, 0, 0] }
+      },
+      {
+        name: '聚合频数估计',
+        type: 'bar',
+        barGap: '0%',
+        data: agrrAggregateRows.value.map(row => Number(row.estimatedCount.toFixed?.(2) ?? row.estimatedCount)),
+        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
+      }
+    ]
+  })
+}
+
+function initAgrrChart() {
+  disposeAgrrChart()
+  if (!isAgrrAggregateView.value || !agrrChartRef.value) return
+  agrrChartInstance = echarts.init(agrrChartRef.value)
+  updateAgrrChart()
+}
+
+function updateAoueChart() {
+  if (!aoueChartInstance) return
+
+  aoueChartInstance.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: {
+      data: ['服务端观测频率', 'AOUE 校正频率'],
+      top: 0
+    },
+    grid: {
+      left: '4%',
+      right: '4%',
+      bottom: '8%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: aoueAggregateRows.value.map(row => row.label),
+      axisTick: { alignWithLabel: true },
+      axisLabel: { interval: 0 }
+    },
+    yAxis: {
+      type: 'value',
+      name: '频率'
+    },
+    series: [
+      {
+        name: '服务端观测频率',
+        type: 'bar',
+        barGap: '0%',
+        data: aoueAggregateRows.value.map(row => Number(row.observedFrequency.toFixed?.(4) ?? row.observedFrequency)),
+        itemStyle: { color: '#8fb9f5', borderRadius: [6, 6, 0, 0] }
+      },
+      {
+        name: 'AOUE 校正频率',
+        type: 'bar',
+        barGap: '0%',
+        data: aoueAggregateRows.value.map(row => Number(row.correctedFrequency.toFixed?.(4) ?? row.correctedFrequency)),
+        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
+      }
+    ]
+  })
+}
+
+function initAoueChart() {
+  disposeAoueChart()
+  if (!isAoueAggregateView.value || !aoueChartRef.value) return
+  aoueChartInstance = echarts.init(aoueChartRef.value)
+  updateAoueChart()
+}
+
+function updateTspCharts() {
+  const rows = tspCorrectedRows.value
+
+  if (tspFrequencyChartInstance) {
+    tspFrequencyChartInstance.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: {
+        data: ['服务端观测频率', 'TSP 校正频率'],
+        top: 0
+      },
+      grid: {
+        left: '4%',
+        right: '4%',
+        bottom: '8%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: rows.map(row => row.label),
+        axisTick: { alignWithLabel: true },
+        axisLabel: { interval: 0 }
+      },
+      yAxis: {
+        type: 'value',
+        name: '频率'
+      },
+      series: [
+        {
+          name: '服务端观测频率',
+          type: 'bar',
+          barGap: '0%',
+          data: rows.map(row => Number(row.observedFrequency.toFixed(4))),
+          itemStyle: { color: '#8fb9f5', borderRadius: [6, 6, 0, 0] }
+        },
+        {
+          name: 'TSP 校正频率',
+          type: 'bar',
+          barGap: '0%',
+          data: rows.map(row => Number(row.correctedFrequency.toFixed(4))),
+          itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
+        }
+      ]
+    })
+  }
+
+  if (tspVarianceChartInstance) {
+    tspVarianceChartInstance.setOption({
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        valueFormatter: value => formatVariance(value)
+      },
+      grid: {
+        left: '4%',
+        right: '4%',
+        bottom: '8%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: rows.map(row => row.label),
+        axisTick: { alignWithLabel: true },
+        axisLabel: { interval: 0 }
+      },
+      yAxis: {
+        type: 'value',
+        name: '估计方差'
+      },
+      series: [
+        {
+          name: '估计方差',
+          type: 'bar',
+          data: rows.map(row => Number(row.variance.toPrecision(6))),
+          itemStyle: { color: '#7c8cf8', borderRadius: [6, 6, 0, 0] }
+        }
+      ]
+    })
+  }
+}
+
+function initTspCharts() {
+  disposeTspCharts()
+  if (!isTspAggregateView.value) return
+  if (tspFrequencyChartRef.value) {
+    tspFrequencyChartInstance = echarts.init(tspFrequencyChartRef.value)
+  }
+  if (tspVarianceChartRef.value) {
+    tspVarianceChartInstance = echarts.init(tspVarianceChartRef.value)
+  }
+  updateTspCharts()
+}
+
 function updateComparisonCharts() {
   resultSections.value.forEach((section, index) => {
     const instance = comparisonChartInstances[index]
@@ -498,7 +1477,7 @@ function updateComparisonCharts() {
     instance.setOption({
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: {
-        data: ['真实分布', '聚合估计分布'],
+        data: ['真实分布', '聚合频数估计分布'],
         top: 0
       },
       grid: {
@@ -520,13 +1499,14 @@ function updateComparisonCharts() {
         {
           name: '真实频率',
           type: 'bar',
-          barGap: '20%',
+          barGap: '0%',
           data: section.chartData.map(row => row.trueFreq),
           itemStyle: { color: '#67c23a', borderRadius: [6, 6, 0, 0] }
         },
         {
-          name: '估计频率',
+          name: '聚合频数估计频率',
           type: 'bar',
+          barGap: '0%',
           data: section.chartData.map(row => row.estimatedFreq),
           itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
         }
@@ -558,6 +1538,10 @@ onMounted(async () => {
   loadAggregateData()
   await nextTick()
   initComparisonCharts()
+  initArrChart()
+  initAgrrChart()
+  initAoueChart()
+  initTspCharts()
   window.addEventListener('resize', handleWindowResize)
 })
 
@@ -568,17 +1552,29 @@ watch(selectedTaskId, async () => {
   loadAggregateData()
   await nextTick()
   initComparisonCharts()
+  initArrChart()
+  initAgrrChart()
+  initAoueChart()
+  initTspCharts()
 })
 
 watch(selectedBatchId, async () => {
   loadAggregateData()
   await nextTick()
   initComparisonCharts()
+  initArrChart()
+  initAgrrChart()
+  initAoueChart()
+  initTspCharts()
 })
 
 watch(selectedData, async () => {
   await nextTick()
   initComparisonCharts()
+  initArrChart()
+  initAgrrChart()
+  initAoueChart()
+  initTspCharts()
 })
 
 function handleWindowResize() {
@@ -587,11 +1583,30 @@ function handleWindowResize() {
       instance.resize()
     }
   })
+  if (arrChartInstance) {
+    arrChartInstance.resize()
+  }
+  if (agrrChartInstance) {
+    agrrChartInstance.resize()
+  }
+  if (aoueChartInstance) {
+    aoueChartInstance.resize()
+  }
+  if (tspFrequencyChartInstance) {
+    tspFrequencyChartInstance.resize()
+  }
+  if (tspVarianceChartInstance) {
+    tspVarianceChartInstance.resize()
+  }
 }
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleWindowResize)
   disposeComparisonCharts()
+  disposeArrChart()
+  disposeAgrrChart()
+  disposeAoueChart()
+  disposeTspCharts()
 })
 </script>
 
@@ -706,6 +1721,20 @@ onBeforeUnmount(() => {
 
 .summary-section--compact {
   margin-bottom: 18px;
+}
+
+.server-view-alert {
+  margin: 0 0 22px;
+  border: 1px solid #cfe5ff;
+  background: #f3f9ff;
+}
+
+.server-view-alert__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  line-height: 1.6;
 }
 
 .compact-section {
@@ -890,6 +1919,44 @@ onBeforeUnmount(() => {
   color: #58718f;
 }
 
+.arr-estimate-value {
+  color: #0f5db8;
+  font-weight: 800;
+}
+
+.arr-table-note {
+  margin: 12px 2px 0;
+  color: #607086;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.aoue-offset-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 106px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.aoue-offset-chip.is-positive {
+  background: #fff1f2;
+  color: #c24155;
+}
+
+.aoue-offset-chip.is-negative {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.aoue-offset-chip.is-neutral {
+  background: #f2f5f8;
+  color: #7b8aa0;
+}
+
 .result-blocks {
   display: flex;
   flex-direction: column;
@@ -1003,6 +2070,132 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.arr-chart-card {
+  height: 320px;
+  border: 1px solid #e6edf7;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f3f8fd 100%);
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.arr-chart-container {
+  width: 100%;
+  height: 100%;
+}
+
+.formula-card {
+  padding: 18px;
+  border: 1px solid #dfeaf7;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
+  color: #516276;
+  line-height: 1.7;
+}
+
+.formula-card p {
+  margin: 0 0 12px;
+}
+
+.formula-expression {
+  width: fit-content;
+  max-width: 100%;
+  margin: 10px 0 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #eef6ff;
+  border: 1px solid #d8e9fb;
+  color: #183153;
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.formula-expression sub,
+.formula-flow sub,
+.formula-card sub {
+  font-size: 0.7em;
+  line-height: 0;
+  vertical-align: sub;
+}
+
+.formula-var {
+  font-style: italic;
+}
+
+.formula-hat {
+  position: relative;
+  display: inline-block;
+  font-style: italic;
+}
+
+.formula-hat::before {
+  content: '^';
+  position: absolute;
+  left: 50%;
+  top: -0.72em;
+  transform: translateX(-50%);
+  font-size: 0.78em;
+  line-height: 1;
+}
+
+.formula-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.formula-flow span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e3edf8;
+  color: #2f4b68;
+  font-size: 13px;
+}
+
+.formula-flow span:nth-child(even) {
+  border: none;
+  background: transparent;
+  color: #7a93b1;
+  padding: 0;
+  font-weight: 700;
+}
+
+.formula-note {
+  margin-bottom: 0;
+  color: #1f5f99;
+  font-weight: 700;
+}
+
+.bit-sum-note-card {
+  color: #4b6178;
+  font-size: 14px;
+}
+
+.tsp-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.tsp-stage-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e6edf7;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
+}
+
 .source-section {
   background: #f8fbff;
   border: 1px solid #e4edf7;
@@ -1062,8 +2255,8 @@ onBeforeUnmount(() => {
 }
 
 .detail-table th {
-  background: #f4f8fc;
-  color: #5f738b;
+  background: #eef6ff;
+  color: #365a7c;
   font-size: 13px;
   font-weight: 700;
 }
@@ -1082,6 +2275,12 @@ onBeforeUnmount(() => {
   width: 180px;
   color: #1f2d3d;
   font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .tsp-stage-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .detail-table__desc {

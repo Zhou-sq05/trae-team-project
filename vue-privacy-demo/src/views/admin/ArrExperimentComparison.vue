@@ -117,36 +117,67 @@
                     <template #header>
                       <div class="block-heading block-heading--compact">
                         <h3>估计结果明细</h3>
-                        <span>表格固定高度，支持内部滚动查看不同协议类别</span>
+                        <span>表格完整展示当前任务的所有类别，便于从上到下对比讲解</span>
                       </div>
                     </template>
-                    <el-table :data="comparisonRows" height="300" border style="width: 100%">
+                    <div class="table-explain-card">
+                      本表用于模拟实验验证。真实计数仅来自模拟数据生成过程；新方案和传统方案均为聚合估计结果。为突出估计效果，误差列展示估计值与真实计数之间的绝对误差。
+                    </div>
+                    <el-table :data="comparisonRows" border style="width: 100%">
                       <el-table-column prop="label" label="类别" min-width="150" fixed />
                       <el-table-column prop="trueCount" label="真实计数" min-width="120" align="center" />
-                      <el-table-column prop="reportCount" label="扰动后观测计数" min-width="150" align="center" />
+                      <el-table-column prop="reportCount" label="扰动后观测计数" min-width="150" align="center">
+                        <template #default="scope">
+                          <span class="muted-count">{{ scope.row.reportCount }}</span>
+                        </template>
+                      </el-table-column>
                       <el-table-column prop="newEstimate" label="新方案聚合估计值" min-width="170" align="center">
-                        <template #default="scope">{{ formatNumber(scope.row.newEstimate) }}</template>
+                        <template #default="scope">
+                          <span class="new-estimate-value">{{ formatNumber(scope.row.newEstimate) }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column prop="newError" label="新方案绝对误差" min-width="150" align="center">
+                        <template #default="scope">{{ formatAbsoluteError(scope.row.newError) }}</template>
                       </el-table-column>
                       <el-table-column prop="traditionalEstimate" label="传统方案估计值" min-width="160" align="center">
                         <template #default="scope">{{ formatOptionalNumber(scope.row.traditionalEstimate) }}</template>
                       </el-table-column>
-                      <el-table-column prop="newError" label="新方案误差" min-width="130" align="center">
-                        <template #default="scope">{{ formatSigned(scope.row.newError) }}</template>
+                      <el-table-column prop="traditionalError" label="传统方案绝对误差" min-width="150" align="center">
+                        <template #default="scope">{{ formatOptionalAbsoluteError(scope.row.traditionalError) }}</template>
                       </el-table-column>
-                      <el-table-column prop="traditionalError" label="传统方案误差" min-width="130" align="center">
-                        <template #default="scope">{{ formatOptionalSigned(scope.row.traditionalError) }}</template>
+                      <el-table-column label="误差降低" min-width="130" align="center">
+                        <template #default="scope">{{ formatErrorReduction(scope.row) }}</template>
                       </el-table-column>
                     </el-table>
+                    <div v-if="hasNegativeTraditionalEstimate" class="table-footnote">
+                      传统方案估计值可能因随机扰动校正产生负估计，表格保留原始计算结果用于对比；实际应用中可根据任务需求进行非负截断或归一化处理。
+                    </div>
                   </el-card>
 
                   <el-card shadow="never" class="result-card">
                     <template #header>
                       <div class="block-heading block-heading--compact">
-                        <h3>分布对比图</h3>
-                        <span>真实分布、扰动后观测分布、聚合估计分布对比</span>
+                        <h3>分布拟合对比图</h3>
+                        <span>主图聚焦真实分布、新方案聚合估计分布和传统方案估计分布</span>
                       </div>
                     </template>
+                    <div class="chart-conclusion-card">
+                      {{ chartConclusionText }}
+                    </div>
                     <div ref="chartRef" class="chart-box"></div>
+                    <div class="chart-note">
+                      扰动后观测分布作为中间观测结果保留在表格中。传统方案估计值可能因噪声校正出现负值，图中保留原始估计结果用于对比。
+                    </div>
+                  </el-card>
+
+                  <el-card shadow="never" class="result-card">
+                    <template #header>
+                      <div class="block-heading block-heading--compact">
+                        <h3>估计误差对比</h3>
+                        <span>使用表格中已有误差字段的绝对值，突出不同方案的估计偏差</span>
+                      </div>
+                    </template>
+                    <div ref="errorChartRef" class="chart-box chart-box--error"></div>
                   </el-card>
                 </section>
               </template>
@@ -197,7 +228,9 @@ const attributeConfigStore = useAttributeConfigStore();
 const selectedTaskId = ref('');
 const currentResult = ref(null);
 const chartRef = ref(null);
+const errorChartRef = ref(null);
 let chartInstance = null;
+let errorChartInstance = null;
 
 const activeMenu = computed(() => route.path);
 const user = computed(() => userStore.user);
@@ -209,6 +242,25 @@ const selectedTask = computed(() => experimentTasks.value.find(task => String(ta
 const currentProtocol = computed(() => getTaskProtocol(selectedTask.value));
 const comparisonRows = computed(() => buildComparisonRows());
 const metricCards = computed(() => buildMetricCards());
+const hasTraditionalEstimate = computed(() => comparisonRows.value.some(row => row.traditionalEstimate != null));
+const hasNegativeTraditionalEstimate = computed(() => comparisonRows.value.some(row => Number(row.traditionalEstimate) < 0));
+const chartConclusionText = computed(() => {
+  if (!currentResult.value) {
+    return '';
+  }
+  const rows = comparisonRows.value;
+  const newMae = average(rows.map(row => Math.abs(Number(row.newError))));
+  const traditionalMae = average(
+    rows
+      .filter(row => row.traditionalError != null)
+      .map(row => Math.abs(Number(row.traditionalError)))
+  );
+
+  if (traditionalMae == null) {
+    return `当前任务暂未配置传统方案估计结果，仅展示新方案估计效果。新方案 MAE = ${formatOptionalNumber(newMae)}。`;
+  }
+  return `当前任务下，新方案聚合估计结果更接近真实分布。新方案 MAE = ${formatOptionalNumber(newMae)}，传统方案 MAE = ${formatOptionalNumber(traditionalMae)}。`;
+});
 const emptyText = computed(() => {
   if (!experimentTasks.value.length) {
     return '暂无可对比任务，请先在属性配置页下发 ARR、AGRR、AOUE 或 TSP 任务。';
@@ -333,37 +385,47 @@ function renderChart() {
   nextTick(() => {
     if (!chartRef.value || !currentResult.value) {
       chartInstance?.clear();
+      errorChartInstance?.clear();
       return;
     }
 
     if (!chartInstance) {
       chartInstance = echarts.init(chartRef.value);
     }
+    if (errorChartRef.value && !errorChartInstance) {
+      errorChartInstance = echarts.init(errorChartRef.value);
+    }
+    chartInstance.resize();
+    errorChartInstance?.resize();
 
     const rows = comparisonRows.value;
     const series = [
       {
         name: '真实分布',
         type: 'bar',
-        data: rows.map(row => Number(row.trueCount || 0))
-      },
-      {
-        name: '扰动后观测分布',
-        type: 'bar',
-        data: rows.map(row => Number(row.reportCount || 0))
+        barGap: '0%',
+        barMaxWidth: 34,
+        data: rows.map(row => Number(row.trueCount || 0)),
+        itemStyle: { color: '#67c23a', borderRadius: [6, 6, 0, 0] }
       },
       {
         name: '新方案聚合估计分布',
         type: 'bar',
-        data: rows.map(row => Number(row.newEstimate || 0))
+        barGap: '0%',
+        barMaxWidth: 34,
+        data: rows.map(row => Number(row.newEstimate || 0)),
+        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
       }
     ];
 
-    if (rows.some(row => row.traditionalEstimate != null)) {
+    if (hasTraditionalEstimate.value) {
       series.push({
         name: '传统方案估计分布',
         type: 'bar',
-        data: rows.map(row => row.traditionalEstimate == null ? 0 : Number(row.traditionalEstimate))
+        barGap: '0%',
+        barMaxWidth: 34,
+        data: rows.map(row => row.traditionalEstimate == null ? 0 : Number(row.traditionalEstimate)),
+        itemStyle: { color: '#909399', borderRadius: [6, 6, 0, 0] }
       });
     }
 
@@ -379,6 +441,41 @@ function renderChart() {
       yAxis: { type: 'value' },
       series
     }, true);
+
+    const errorSeries = [
+      {
+        name: '新方案绝对误差',
+        type: 'bar',
+        barGap: '0%',
+        barMaxWidth: 34,
+        data: rows.map(row => Math.abs(Number(row.newError || 0))),
+        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
+      }
+    ];
+
+    if (hasTraditionalEstimate.value) {
+      errorSeries.push({
+        name: '传统方案绝对误差',
+        type: 'bar',
+        barGap: '0%',
+        barMaxWidth: 34,
+        data: rows.map(row => row.traditionalError == null ? 0 : Math.abs(Number(row.traditionalError))),
+        itemStyle: { color: '#f59e0b', borderRadius: [6, 6, 0, 0] }
+      });
+    }
+
+    errorChartInstance?.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { top: 0 },
+      grid: { top: 48, left: 52, right: 24, bottom: 48 },
+      xAxis: {
+        type: 'category',
+        data: rows.map(row => row.label),
+        axisLabel: { interval: 0 }
+      },
+      yAxis: { type: 'value', name: '绝对误差' },
+      series: errorSeries
+    }, true);
   });
 }
 
@@ -392,6 +489,36 @@ function formatNumber(value) {
 
 function formatOptionalNumber(value) {
   return value == null ? '--' : formatNumber(value);
+}
+
+function formatAbsoluteError(value) {
+  const numeric = Math.abs(Number(value || 0));
+  return Number.isFinite(numeric) ? numeric.toFixed(2) : '--';
+}
+
+function formatOptionalAbsoluteError(value) {
+  if (value == null) {
+    return '--';
+  }
+  return formatAbsoluteError(value);
+}
+
+function getAbsoluteErrors(row) {
+  const newError = Math.abs(Number(row?.newError ?? 0));
+  const traditionalError = row?.traditionalError == null ? null : Math.abs(Number(row.traditionalError));
+  return {
+    newError: Number.isFinite(newError) ? newError : 0,
+    traditionalError: Number.isFinite(traditionalError) ? traditionalError : null
+  };
+}
+
+function formatErrorReduction(row) {
+  const { newError, traditionalError } = getAbsoluteErrors(row);
+  if (traditionalError == null || traditionalError <= 0) {
+    return '--';
+  }
+  const reduction = ((traditionalError - newError) / traditionalError) * 100;
+  return reduction >= 0 ? `降低 ${reduction.toFixed(2)}%` : `增加 ${Math.abs(reduction).toFixed(2)}%`;
 }
 
 function formatSigned(value) {
@@ -424,7 +551,9 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', renderChart);
   chartInstance?.dispose();
+  errorChartInstance?.dispose();
   chartInstance = null;
+  errorChartInstance = null;
 });
 </script>
 
@@ -474,29 +603,26 @@ onUnmounted(() => {
   height: calc(100vh - 60px);
   padding: 16px;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 32px;
 }
 
 .experiment-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  min-height: 100%;
   border-radius: 10px;
 }
 
 .experiment-card > :deep(.el-card__header) {
-  flex: 0 0 auto;
   padding: 16px 18px;
 }
 
 .experiment-card > :deep(.el-card__body) {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px 18px 18px;
-  overflow-y: auto;
+  padding: 16px 18px 24px;
+  overflow-y: visible;
   overflow-x: hidden;
 }
 
@@ -611,13 +737,11 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  flex: 1;
-  min-height: 0;
 }
 
 .result-card {
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .result-card > :deep(.el-card__header) {
@@ -627,6 +751,12 @@ onUnmounted(() => {
 
 .result-card > :deep(.el-card__body) {
   padding: 14px;
+}
+
+.result-card :deep(.el-table__header th) {
+  background: #eef6ff;
+  color: #365a7c;
+  font-weight: 700;
 }
 
 .block-heading {
@@ -652,11 +782,66 @@ onUnmounted(() => {
   font-size: 16px;
 }
 
+.table-explain-card {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.muted-count {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.new-estimate-value {
+  color: #0f5db8;
+  font-weight: 800;
+}
+
+.table-footnote {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.chart-conclusion-card {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 600;
+}
+
 .chart-box {
-  height: 320px;
+  height: 360px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fff;
+}
+
+.chart-box--error {
+  height: 320px;
+}
+
+.chart-note {
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 @media (max-width: 1100px) {

@@ -103,6 +103,9 @@
           <el-button v-if="isAnimating" type="warning" plain @click="finishCurrentStage">
             立即完成当前步骤
           </el-button>
+          <el-button type="primary" plain :disabled="!selectedTask" @click="completeAllSteps">
+            一键完成
+          </el-button>
           <el-button @click="resetDemo">重置演示</el-button>
         </section>
 
@@ -514,6 +517,26 @@ function persistSubmissionRecords() {
 function startUpload() {
   if (!canUpload.value) return;
   runStage(STAGES.UPLOAD, uploadRows, persistSubmissionRecords);
+}
+
+function completeAllSteps() {
+  if (!selectedTask.value) {
+    ElMessage.warning('请先选择 ARR 任务');
+    return;
+  }
+
+  resetDemo();
+  batchId.value = createBatchId();
+  appendClientRows(0, ARR_DEMO_SAMPLE_COUNT);
+  encodeRows(0, ARR_DEMO_SAMPLE_COUNT);
+  perturbRows(0, ARR_DEMO_SAMPLE_COUNT);
+  uploadRows(0, ARR_DEMO_SAMPLE_COUNT);
+  completedStep.value = 4;
+  activeStage.value = '';
+  stageProgress.value = ARR_DEMO_SAMPLE_COUNT;
+  progressNotice.value = '已一键完成 500 个客户端的 ARR 本地扰动上报。';
+  markRows(Math.max(ARR_DEMO_SAMPLE_COUNT - ANIMATION_BATCH_SIZE, 0), ARR_DEMO_SAMPLE_COUNT);
+  persistSubmissionRecords();
 }
 
 function goToUserDevice() {

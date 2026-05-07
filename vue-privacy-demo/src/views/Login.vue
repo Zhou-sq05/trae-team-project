@@ -52,8 +52,8 @@ const pageTitle = computed(() => {
 
 const loginFormRef = ref(null)
 const loginForm = reactive({
-  username: userType.value === 'admin' ? 'admin' : '',
-  password: userType.value === 'admin' ? '123456' : ''
+  username: userType.value === 'admin' ? '管理001' : '',
+  password: userType.value === 'admin' ? 'password' : ''
 })
 
 const loginRules = {
