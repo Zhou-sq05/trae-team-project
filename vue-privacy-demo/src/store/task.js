@@ -17,6 +17,10 @@ export const useTaskStore = defineStore('task', {
       this.tasks = this.tasks.filter(task => task.id !== taskId)
       this.saveToLocalStorage()
     },
+    clearTasks() {
+      this.tasks = []
+      this.saveToLocalStorage()
+    },
     saveToLocalStorage() {
       localStorage.setItem('tasks', JSON.stringify(this.tasks))
     },

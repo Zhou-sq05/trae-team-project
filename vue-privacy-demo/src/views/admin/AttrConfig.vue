@@ -49,7 +49,7 @@
                 <span>演示与验证</span>
               </template>
               <el-menu-item index="/admin/demo/arr-experiment-comparison">
-                实验效果对比
+                误差评估
               </el-menu-item>
             </el-sub-menu>
           </el-menu>
@@ -60,107 +60,133 @@
             <el-card shadow="hover">
               <template #header>
                 <div class="card-header">
-                  <span>采集属性配置</span>
+                  <div class="card-header-copy">
+                    <span>采集属性配置</span>
+                    <p>新方案参数由内在不确定性建模结果计算得到，传统方案参数作为基线对比；配置下发后，用户端将按照对应协议完成本地扰动上报。</p>
+                  </div>
+                  <el-button
+                    plain
+                    class="clear-task-button"
+                    :icon="Delete"
+                    :disabled="taskStore.taskList.length === 0"
+                    @click="handleClearAllTaskIds"
+                  >
+                    清空任务ID
+                  </el-button>
                 </div>
               </template>
 
               <div class="attr-config">
-                <el-table :data="tableAttributes" style="width: 100%">
-                  <el-table-column prop="name" label="采集属性" min-width="190">
-                    <template #default="scope">
-                      <span class="attribute-link" @click="handleAttributeClick(scope.row)">
-                        {{ scope.row.name }}
-                      </span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="防护模式" width="140">
-                    <template #default="scope">
-                      <div class="fixed-value">
-                        <el-tag type="primary">
-                          {{ scope.row.protectionMode === 'hybrid' ? '混合隐私风险' : '间接隐私风险' }}
-                        </el-tag>
-                        <el-tooltip :content="scope.row.tooltip">
-                          <el-icon><QuestionFilled /></el-icon>
-                        </el-tooltip>
+                <section class="config-card-list">
+                  <article
+                    v-for="attribute in tableAttributes"
+                    :key="attribute.id"
+                    class="config-card-item"
+                  >
+                    <div class="config-card-main">
+                      <div class="config-card-head">
+                        <div>
+                          <div class="config-attr-name">{{ attribute.name }}</div>
+                          <div class="scheme-tags">
+                            <el-tag type="success" effect="light">{{ attribute.algorithm.toUpperCase() }}</el-tag>
+                            <el-tag type="primary" effect="light">
+                              {{ attribute.protectionMode === 'hybrid' ? '混合隐私风险' : '间接隐私风险' }}
+                            </el-tag>
+                          </div>
+                        </div>
                       </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="算法协议" width="105">
-                    <template #default="scope">
-                      <div class="fixed-value">
-                        <el-tag type="success">{{ scope.row.algorithm.toUpperCase() }}</el-tag>
+
+                      <div class="param-panel-grid">
+                        <div class="param-panel param-panel--new">
+                          <div class="param-panel-title">新方案扰动参数</div>
+                          <div class="param-panel-subtitle">基于内在不确定性计算</div>
+                          <div
+                            class="param-display param-display--new"
+                            :class="{ 'param-display--tsp': attribute.algorithm === 'tsp' }"
+                          >
+                            <template v-if="attribute.newParamGroups.length">
+                              <div
+                                v-for="group in attribute.newParamGroups"
+                                :key="group.title"
+                                class="param-group"
+                              >
+                                <div v-if="group.title" class="param-group-title">{{ group.title }}</div>
+                                <div class="param-block-row">
+                                  <div
+                                    v-for="param in group.params"
+                                    :key="param.name"
+                                    class="param-block"
+                                  >
+                                    <span class="param-name">{{ param.name }}</span>
+                                    <strong class="param-value">{{ param.value }}</strong>
+                                  </div>
+                                </div>
+                              </div>
+                            </template>
+                            <span v-else class="param-muted">待配置</span>
+                          </div>
+                        </div>
+
+                        <div class="param-panel param-panel--traditional">
+                          <div class="param-panel-title">传统方案扰动参数</div>
+                          <div class="param-panel-subtitle">基线对比参数</div>
+                            <div class="param-display param-display--traditional">
+                              <div v-if="attribute.algorithm === 'tsp'" class="not-applicable">
+                                <span>TSP 为混合隐私风险场景，当前无传统单阶段参数对照。</span>
+                              </div>
+                            <template v-else-if="attribute.traditionalParamGroups.length">
+                              <div
+                                v-for="group in attribute.traditionalParamGroups"
+                                :key="group.title"
+                                class="param-group"
+                              >
+                                <div v-if="group.title" class="param-group-title">{{ group.title }}</div>
+                                <div class="param-block-row">
+                                  <div
+                                    v-for="param in group.params"
+                                    :key="param.name"
+                                    class="param-block"
+                                  >
+                                    <span class="param-name">{{ param.name }}</span>
+                                    <strong class="param-value">{{ param.value }}</strong>
+                                  </div>
+                                </div>
+                              </div>
+                            </template>
+                            <span v-else class="param-muted">待配置</span>
+                          </div>
+                        </div>
                       </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column min-width="180">
-                    <template #header>
-                      <div class="param-column-header">
-                        <span>新方案扰动参数</span>
-                        <el-tooltip content="根据内在不确定性参数和隐私预算计算得到，用于本项目采用的改进本地差分隐私采集方案。">
-                          <el-icon><QuestionFilled /></el-icon>
-                        </el-tooltip>
-                      </div>
-                    </template>
-                    <template #default="scope">
-                      <div class="param-display param-display--new">
-                        <template v-if="scope.row.newParamLines.length">
-                          <span v-for="line in scope.row.newParamLines" :key="line" class="param-chip">{{ line }}</span>
-                        </template>
-                        <span v-else class="param-muted">待配置</span>
-                      </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column min-width="180">
-                    <template #header>
-                      <div class="param-column-header">
-                        <span>传统方案扰动参数</span>
-                        <el-tooltip content="传统本地差分隐私机制在相同隐私预算下的扰动概率，用于与新方案进行对比。">
-                          <el-icon><QuestionFilled /></el-icon>
-                        </el-tooltip>
-                      </div>
-                    </template>
-                    <template #default="scope">
-                      <div class="param-display param-display--traditional">
-                        <template v-if="scope.row.traditionalParamLines.length">
-                          <span v-for="line in scope.row.traditionalParamLines" :key="line" class="param-chip">{{ line }}</span>
-                        </template>
-                        <span v-else class="param-muted">待配置</span>
-                      </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="状态" width="90">
-                    <template #default="scope">
-                      <el-tag :type="scope.row.configStatus === '已配置' ? 'success' : 'info'">
-                        {{ scope.row.configStatus }}
+                    </div>
+
+                    <div class="config-card-side">
+                      <el-tag :type="attribute.configStatus === '已配置' ? 'success' : 'info'" effect="light" class="status-tag">
+                        {{ attribute.configStatus }}
                       </el-tag>
-                    </template>
-                  </el-table-column>
-                      <el-table-column label="操作" width="210">
-                        <template #default="scope">
-                          <div class="action-cell">
-                            <el-button type="primary" link @click="handleAttributeClick(scope.row)">
-                              编辑配置
-                            </el-button>
-                            <el-button
-                              type="danger"
-                              link
-                              :disabled="scope.row.configStatus !== '已配置'"
-                              @click="handleDeleteConfig(scope.row)"
-                            >
-                              删除
-                            </el-button>
+                      <div class="card-actions">
+                        <el-button type="primary" @click="handleAttributeClick(attribute)">
+                          编辑配置
+                        </el-button>
                         <el-button
+                          plain
                           type="success"
-                          link
-                          :disabled="scope.row.configStatus !== '已配置'"
-                          @click="openDistributeDialog(scope.row)"
+                          :disabled="attribute.configStatus !== '已配置'"
+                          @click="openDistributeDialog(attribute)"
                         >
                           下发
                         </el-button>
+                        <el-button
+                          circle
+                          plain
+                          class="delete-icon-button"
+                          :icon="Delete"
+                          :disabled="attribute.configStatus !== '已配置'"
+                          @click="handleDeleteConfig(attribute)"
+                        />
                       </div>
-                    </template>
-                  </el-table-column>
-                </el-table>
+                    </div>
+                  </article>
+                </section>
               </div>
             </el-card>
           </div>
@@ -174,48 +200,36 @@
       width="860px"
     >
       <div v-if="currentAttribute" class="attribute-details">
+        <div class="detail-basic-grid">
+          <div class="detail-basic-item">
+            <span>采集属性 A</span>
+            <strong>{{ currentAttribute.name }}</strong>
+          </div>
+          <div class="detail-basic-item">
+            <span>相关敏感属性 S</span>
+            <strong>{{ getSensitiveAttributeLabel(currentAttribute) }}</strong>
+          </div>
+          <div class="detail-basic-item">
+            <span>防护模式</span>
+            <strong>{{ getProtectionModeLabel(currentAttribute) }}</strong>
+          </div>
+          <div class="detail-basic-item">
+            <span>协议</span>
+            <strong>{{ getProtocolLabel(currentAttribute) }}</strong>
+          </div>
+        </div>
+
         <div v-if="currentAttribute.name === '是否触发睡眠异常提醒'" class="attribute-details">
-          <div class="form-item relation-row">
-            <span class="relation-label">相关敏感属性 S：</span>
-            <span class="relation-value">年龄段</span>
-          </div>
-
-          <div class="module-group">
-            <h3 class="module-title">场景说明</h3>
-            <p class="scenario-description">
-              该场景将年龄段作为敏感属性 S，将是否触发睡眠异常提醒作为非敏感采集属性 A。由于不同年龄段用户触发睡眠异常提醒的概率存在差异，系统通过条件分布 P(A|S) 计算内在不确定性参数，并结合 ARR 协议完成二值采集值的本地扰动。
-            </p>
-            <p class="scenario-description">当前数据源模式：{{ arrDataSourceLabel }}</p>
-            <p class="scenario-description">{{ arrDataSourceDescription }}</p>
-            <p class="scenario-description">{{ conditionPresetNotice }}</p>
-            <p class="scenario-description">dataSourceMode：{{ arrPresetSource.dataSourceMode }}；basis：{{ arrPresetSource.basis }}</p>
-          </div>
-
-          <div class="form-item">
-            <label>年龄段分组</label>
-            <div class="boundary-settings">
-              <div class="boundary-group">
-                <div class="boundary-title">年龄段分组</div>
-                <div class="group-display">
-                  <div v-for="group in ageGroupDisplay" :key="group.name" class="group-item">
-                    <span class="group-name">{{ group.name }}</span>
-                    <span class="group-range">{{ group.range }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="module-group">
             <div class="section-header">
               <h3 class="module-title">S 与 A 的条件分布矩阵 Pr(A|S)</h3>
               <el-button type="primary" plain :loading="matrixLoading" @click="recalculateMatrix">
-                {{ fallAlarmMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+                {{ fallAlarmMatrixData ? '重新估计' : '估计条件分布矩阵' }}
               </el-button>
             </div>
 
             <div v-if="matrixLoading" class="matrix-loading">
-              <span>正在根据当前数据源模式重新统计睡眠异常提醒条件分布矩阵...</span>
+              <span>正在基于公开背景数据进行统计估计...</span>
             </div>
             <div v-else-if="fallAlarmMatrixData" class="matrix-container">
               <table class="matrix-table">
@@ -251,7 +265,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将根据当前数据源模式自动统计 P(是否触发睡眠异常提醒 | 年龄段)。</p>
+              <p>点击“估计条件分布矩阵”后，系统将利用公开背景数据统计待采集属性 A 在不同敏感属性 S 分组下的分布差异，得到条件分布矩阵 Pr(A|S)，用于刻画属性间统计相关性。</p>
             </div>
           </div>
 
@@ -262,8 +276,8 @@
                 <thead>
                   <tr>
                     <th>候选列</th>
-                    <th>max</th>
-                    <th>min</th>
+                    <th>α<sub>k</sub></th>
+                    <th>β<sub>k</sub></th>
                     <th>ratio</th>
                     <th>是否选中</th>
                   </tr>
@@ -316,7 +330,7 @@
               </div>
             </div>
             <div v-else class="empty-state-panel">
-              <p>条件分布矩阵计算完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
+              <p>条件分布矩阵估计完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
             </div>
           </div>
 
@@ -351,59 +365,54 @@
               <div class="calibration-status-title">{{ arrPerturbationStatus.title }}</div>
               <div class="calibration-status-desc">{{ arrPerturbationStatus.description }}</div>
             </div>
-            <div class="calibration-tip">由 ε、α、β 自动校准</div>
-            <div class="calibration-tip">满足 p + q = 1</div>
             <div v-if="calibratedParams" class="calibration-info">
-              <p>隐私预算 ε = {{ calibratedParams.epsilon }}</p>
-              <p>域大小 d = {{ calibratedParams.d || calibratedParams.k }}</p>
-              <p>协议 = {{ calibratedParams.protocol }}</p>
-              <p class="formula">p = e^ε / (e^ε + d - 1), q = 1 / (e^ε + d - 1)</p>
-              <p>{{ calibratedParams.description }}</p>
-              <p>数据源：{{ calibratedParams.dataSource }}</p>
+              <div class="calibration-info-section">
+                <div class="calibration-info-title">扰动参数</div>
+                <p class="formula">若 α / β ≤ e<sup>ε</sup>：p = 1，q = 0</p>
+                <p class="formula formula-line">
+                  <span>否则：p =</span>
+                  <span class="formula-fraction">
+                    <span class="formula-fraction__top">(1 - α) - (1 - β)e<sup>ε</sup></span>
+                    <span class="formula-fraction__bottom">(1 - 2α) - (1 - 2β)e<sup>ε</sup></span>
+                  </span>
+                  <span>，q = 1 - p</span>
+                </p>
+                </div>
+                <div class="calibration-info-section">
+                  <div class="calibration-info-title">约束关系</div>
+                  <p>概率归一化约束：ARR 属于二值随机响应类协议。真实值以概率 p 保留，其余 d - 1 个取值各以概率 q 上报，因此满足 p + (d - 1)q = 1。当前 d = 2，因此 p + q = 1。</p>
+                  <p class="formula formula-line">
+                    <span>内在不确定性隐私约束：</span>
+                    <span class="formula-fraction formula-fraction--medium">
+                      <span class="formula-fraction__top">αp + (1 - α)q</span>
+                      <span class="formula-fraction__bottom">βp + (1 - β)q</span>
+                    </span>
+                    <span>≤ e<sup>ε</sup></span>
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
         </div>
 
 
 
         <div v-else-if="currentAttribute.name === '日均站立时长分档'" class="attribute-details">
-          <div class="form-item relation-row">
-            <span class="relation-label">相关敏感属性 S：</span>
-            <span class="relation-value">体重状态</span>
-          </div>
-
-          <div class="form-item">
-            <label>体重状态分组</label>
-            <div class="boundary-settings">
-              <div class="boundary-group">
-                <div class="boundary-title">体重状态分组</div>
-                <div class="group-display">
-                  <div v-for="status in WEIGHT_STATUS_ORDER" :key="status" class="group-item">
-                    <span class="group-name">{{ status }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="module-group">
             <div class="section-header">
               <h3 class="module-title">S 与 A 的条件分布矩阵 Pr(A|S)</h3>
               <el-button type="primary" plain :loading="standMatrixLoading" @click="recalculateMatrix">
-                {{ standMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+                {{ standMatrixData ? '重新估计' : '估计条件分布矩阵' }}
               </el-button>
             </div>
 
-            <p class="scenario-description">{{ conditionPresetNotice }}</p>
-            <p class="scenario-description">dataSourceMode：{{ standPresetSource.dataSourceMode }}；basis：{{ standPresetSource.basis }}</p>
             <div v-if="standMatrixLoading" class="matrix-loading">
-              <span>正在从 conditionDistributionPresets.json 读取内置条件分布矩阵...</span>
+              <span>正在基于公开背景数据进行统计估计...</span>
             </div>
             <div v-else-if="standMatrixData" class="matrix-container">
               <table class="matrix-table">
                 <thead>
                   <tr>
-                    <th>体重状态(S) \ 日均站立时长分档(A)</th>
+                    <th>BMI类别(S) \ 日均站立时长分档(A)</th>
                     <th
                       v-for="header in STAND_BUCKET_ORDER"
                       :key="header"
@@ -433,7 +442,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取内置矩阵 Pr(A|S)。</p>
+              <p>点击“估计条件分布矩阵”后，系统将基于公开背景数据进行统计估计，得到条件分布矩阵 Pr(A|S)，用于刻画属性间统计相关性。</p>
             </div>
           </div>
 
@@ -444,18 +453,30 @@
                 <thead>
                   <tr>
                     <th>候选列</th>
-                    <th>αk</th>
-                    <th>βk</th>
-                    <th>ratio</th>
+                    <th>α<sub>k</sub></th>
+                    <th>β<sub>k</sub></th>
                     <th>是否选中</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="stat in standColumnStats" :key="stat.label">
                     <td>{{ stat.label }}</td>
-                    <td>{{ formatProbability(stat.alpha) }}</td>
-                    <td>{{ formatProbability(stat.beta) }}</td>
-                    <td>{{ formatRatio(stat.ratio) }}</td>
+                    <td>
+                      <div class="support-param-cell">
+                        <strong>{{ formatProbability(stat.alpha) }}</strong>
+                        <span v-if="stat.isEmptySet" class="support-param-formula">
+                          e<sup>ε</sup> / (1 + e<sup>ε</sup>)
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="support-param-cell">
+                        <strong>{{ formatProbability(stat.beta) }}</strong>
+                        <span v-if="stat.isEmptySet" class="support-param-formula">
+                          1 / (1 + e<sup>ε</sup>)
+                        </span>
+                      </div>
+                    </td>
                     <td>
                       <el-tag v-if="standAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">
                         已选
@@ -469,12 +490,12 @@
                 <div class="final-selection-title">最终选择结果</div>
                 <div class="final-selection-line">最终选定列：{{ standAlphaBetaResult?.selectedLabel }}</div>
                 <div class="final-selection-line">
-                  选择原因：系统依据不确定性参数选择规则，从各候选列的 (αk, βk) 中选出最终 α、β；ratio 仅作为辅助展示指标。
+                  选择原因：系统按照专利中的不确定性参数选择规则进行候选对比较。低活动相对中活动满足 α 更大且 β 更小，因此优先于中活动；低活动与高活动比较时，计算 (0.4400 - 0.4200) / (0.2400 - 0.2000) = 0.5000，小于 e^0.5 ≈ 1.6487，因此选择高活动。最终得到 α = 0.4200，β = 0.2000。
                 </div>
               </div>
             </div>
             <div v-else class="empty-state-panel">
-              <p>矩阵尚未计算，暂时无法展示各候选列的 αk / βk / ratio 比较结果。</p>
+              <p>矩阵尚未计算，暂时无法展示各候选列的 αk / βk 比较结果。</p>
             </div>
           </div>
 
@@ -484,21 +505,21 @@
               <div class="result-panel accent-panel">
                 <div class="result-label">选定列</div>
                 <div class="result-value">{{ standAlphaBetaResult.selectedLabel }}</div>
-                <div class="result-subtext">系统按不确定性参数选择规则选中该列，ratio 仅用于辅助展示。</div>
+                <div class="result-subtext">系统按专利中的不确定性参数选择规则选中该列。</div>
               </div>
               <div class="result-panel">
                 <div class="result-label">α（最大条件概率）</div>
                 <div class="result-value">{{ formatProbability(standAlphaBetaResult.alpha) }}</div>
-                <div class="result-subtext">在选定列中，对所有体重状态取最大的 Pr(A=a*|S=s)。</div>
+                <div class="result-subtext">在选定列中，对所有 BMI 类别取最大的 Pr(A=a*|S=s)。</div>
               </div>
               <div class="result-panel">
                 <div class="result-label">β（最小条件概率）</div>
                 <div class="result-value">{{ formatProbability(standAlphaBetaResult.beta) }}</div>
-                <div class="result-subtext">在选定列中，对所有体重状态取最小的 Pr(A=a*|S=s)。</div>
+                <div class="result-subtext">在选定列中，对所有 BMI 类别取最小的 Pr(A=a*|S=s)。</div>
               </div>
             </div>
             <div v-else class="empty-state-panel">
-              <p>条件分布矩阵计算完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
+              <p>条件分布矩阵估计完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
             </div>
           </div>
 
@@ -533,60 +554,56 @@
               <div class="calibration-status-title">{{ agrrPerturbationStatus.title }}</div>
               <div class="calibration-status-desc">{{ agrrPerturbationStatus.description }}</div>
             </div>
-            <div class="calibration-tip">由 ε、α、β 自动校准</div>
-            <div class="calibration-tip">d = 3 表示 A 的域大小</div>
-            <div class="calibration-tip">满足 p + (d-1)q = 1</div>
-            <div class="calibration-tip">固定分档顺序：低活动 0-119，中活动 120-239，高活动 240+</div>
             <div v-if="standCalibratedParams" class="calibration-info">
-              <p>隐私预算 ε = {{ standCalibratedParams.epsilon }}</p>
-              <p>域大小 d = {{ standCalibratedParams.d || standCalibratedParams.k }}</p>
-              <p>协议 = {{ standCalibratedParams.protocol }}</p>
-              <p class="formula">当 α / β ≤ e^ε 时，直接取 p = 1, q = 0；否则 p = ((1 - α) - (1 - β)e^ε) / ((1 - dα) - (1 - dβ)e^ε)，q = (1 - p)/(d - 1)</p>
-              <p>{{ standCalibratedParams.description }}</p>
-              <p>数据源：{{ standCalibratedParams.dataSource }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div v-else-if="currentAttribute.name === '每日步数分桶'" class="attribute-details">
-          <div class="form-item relation-row">
-            <span class="relation-label">相关敏感属性 S：</span>
-            <span class="relation-value">体重状态</span>
-          </div>
-
-          <div class="form-item">
-            <label>体重状态分组</label>
-            <div class="boundary-settings">
-              <div class="boundary-group">
-                <div class="boundary-title">体重状态分组</div>
-                <div class="group-display">
-                  <div v-for="status in WEIGHT_STATUS_ORDER" :key="status" class="group-item">
-                    <span class="group-name">{{ status }}</span>
-                  </div>
+              <div class="calibration-info-section">
+                <div class="calibration-info-title">扰动参数</div>
+                <p class="formula">若 α / β ≤ e<sup>ε</sup>：p = 1，q = 0</p>
+                <p class="formula formula-line">
+                  <span>否则：p =</span>
+                  <span class="formula-fraction">
+                    <span class="formula-fraction__top">(1 - α) - (1 - β)e<sup>ε</sup></span>
+                    <span class="formula-fraction__bottom">(1 - dα) - (1 - dβ)e<sup>ε</sup></span>
+                  </span>
+                  <span>，q =</span>
+                  <span class="formula-fraction formula-fraction--compact">
+                    <span class="formula-fraction__top">1 - p</span>
+                    <span class="formula-fraction__bottom">d - 1</span>
+                  </span>
+                </p>
+                </div>
+                <div class="calibration-info-section">
+                  <div class="calibration-info-title">约束关系</div>
+                  <p>概率归一化约束：AGRR 属于多值随机响应类协议。真实值以概率 p 保留，其余 d - 1 个取值各以概率 q 上报，因此满足 p + (d - 1)q = 1。当前示例属性域大小 d = 3，因此 p + 2q = 1。</p>
+                  <p class="formula formula-line">
+                    <span>内在不确定性隐私约束：</span>
+                    <span class="formula-fraction formula-fraction--medium">
+                      <span class="formula-fraction__top">αp + (1 - α)q</span>
+                      <span class="formula-fraction__bottom">βp + (1 - β)q</span>
+                    </span>
+                    <span>≤ e<sup>ε</sup></span>
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
+        </div>
 
+        <div v-else-if="currentAttribute.name === '每日步数分桶'" class="attribute-details">
           <div class="module-group">
             <div class="section-header">
               <h3 class="module-title">S 与 A 的条件分布矩阵 Pr(A|S)</h3>
               <el-button type="primary" plain :loading="stepsMatrixLoading" @click="recalculateMatrix">
-                {{ stepsMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+                {{ stepsMatrixData ? '重新估计' : '估计条件分布矩阵' }}
               </el-button>
             </div>
 
-            <p class="scenario-description">{{ conditionPresetNotice }}</p>
-            <p class="scenario-description">dataSourceMode：{{ stepsPresetSource.dataSourceMode }}；basis：{{ stepsPresetSource.basis }}</p>
-            <p class="scenario-description">每日步数分布主要参考 Kaggle Daily Steps 字段，并结合 NHANES 中 BMI 与身体活动水平趋势校准。由于 Kaggle 肥胖组样本较少，未直接采用原始极端分布。</p>
             <div v-if="stepsMatrixLoading" class="matrix-loading">
-              <span>正在从 conditionDistributionPresets.json 读取内置条件分布矩阵...</span>
+              <span>正在基于公开背景数据进行统计估计...</span>
             </div>
             <div v-else-if="stepsMatrixData" class="matrix-container">
               <table class="matrix-table">
                 <thead>
                   <tr>
-                    <th>体重状态(S) \ 每日步数分桶(A)</th>
+                    <th>BMI类别(S) \ 每日步数分桶(A)</th>
                     <th
                       v-for="header in STEP_BUCKET_ORDER"
                       :key="header"
@@ -623,7 +640,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取内置矩阵 Pr(A|S)。</p>
+              <p>点击“估计条件分布矩阵”后，系统将基于公开背景数据进行统计估计，得到条件分布矩阵 Pr(A|S)，用于刻画属性间统计相关性。</p>
             </div>
           </div>
 
@@ -648,10 +665,10 @@
               </el-button>
             </div>
             <div v-if="!privacyBudgetSaved" class="empty-state-panel">
-              <p>请先设置并保存隐私预算 ε，AOUE 才能按当前 ε 构造支持集 C_ij 并计算 α、β。</p>
+              <p>请先设置并保存隐私预算 ε，AOUE 才能按当前 ε 构造支持集 C<sub>ij</sub> 并计算 α、β。</p>
             </div>
             <div v-else-if="!stepsMatrixData" class="empty-state-panel">
-              <p>请先计算条件分布矩阵，再基于当前 ε 构造支持集与内在不确定性参数。</p>
+              <p>请先估计条件分布矩阵，再基于当前 ε 构造支持集与内在不确定性参数。</p>
             </div>
             <template v-else>
             <h3 class="module-title">计算依据</h3>
@@ -662,20 +679,32 @@
                     <th>敏感状态对</th>
                     <th>支持集</th>
                     <th>覆盖桶</th>
-                    <th>α_ij</th>
-                    <th>β_ij</th>
-                    <th>ratio</th>
+                    <th>α<sub>ij</sub></th>
+                    <th>β<sub>ij</sub></th>
                     <th>是否选中</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="stat in stepsSupportStats" :key="stat.label">
                     <td>{{ stat.label }}</td>
-                    <td>{{ `C_${stat.sourcePair[0]}${stat.sourcePair[1]}` }}</td>
+                    <td>C<sub>{{ supportPairKey(stat) }}</sub></td>
                     <td>{{ stat.bucketText }}</td>
-                    <td>{{ formatProbability(stat.alpha) }}</td>
-                    <td>{{ formatProbability(stat.beta) }}</td>
-                    <td>{{ formatRatio(stat.ratio) }}</td>
+                    <td>
+                      <div class="support-param-cell">
+                        <strong>{{ formatProbability(stat.alpha) }}</strong>
+                        <span v-if="stat.isEmptySet" class="support-param-formula">
+                          e<sup>ε</sup> / (1 + e<sup>ε</sup>)
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="support-param-cell">
+                        <strong>{{ formatProbability(stat.beta) }}</strong>
+                        <span v-if="stat.isEmptySet" class="support-param-formula">
+                          1 / (1 + e<sup>ε</sup>)
+                        </span>
+                      </div>
+                    </td>
                     <td>
                       <el-tag v-if="stepsAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">
                         已选
@@ -690,7 +719,7 @@
                 <div class="final-selection-line">最终选中的敏感状态对：{{ stepsAlphaBetaResult?.selectedLabel }}</div>
                 <div class="final-selection-line">最终支持集：{{ stepsAlphaBetaResult?.selectedSupportSet?.bucketText }}</div>
                 <div class="final-selection-line">最终 α = {{ formatProbability(stepsAlphaBetaResult?.alpha) }}，β = {{ formatProbability(stepsAlphaBetaResult?.beta) }}</div>
-                <div class="final-selection-line">系统先按论文中的支持集规则构造各个 C_ij，再计算每个 (α_ij, β_ij)，最后按不确定性参数选择规则选出最终结果；ratio 仅作辅助展示。</div>
+                <div class="final-selection-line">系统先按论文中的支持集规则构造各个 C<sub>ij</sub>，再计算每个 (α<sub>ij</sub>, β<sub>ij</sub>)，最后按专利中的不确定性参数选择规则进行候选对比较并选出最终结果。</div>
               </div>
 
               <div class="support-detail-list">
@@ -699,32 +728,92 @@
                   :key="`${stat.label}-detail`"
                   :class="['support-detail-card', { 'selected-support-card': stepsAlphaBetaResult?.selectedLabel === stat.label }]"
                 >
-                  <div class="support-detail-header">
-                    <div class="support-detail-title">{{ stat.label }}</div>
-                    <el-tag v-if="stepsAlphaBetaResult?.selectedLabel === stat.label" type="success" effect="light">最终选中</el-tag>
-                  </div>
-                  <div class="support-detail-line">敏感状态对：{{ stat.sourcePair[0] }} vs {{ stat.sourcePair[1] }}</div>
-                  <div class="support-detail-line">支持集：{{ `C_${stat.sourcePair[0]}${stat.sourcePair[1]}` }} = {{ stat.bucketText }}</div>
-                  <div class="support-detail-line">选取依据：{{ stat.supportRule }}</div>
-                  <div class="support-detail-line">当前规则：{{ stat.localRule }}</div>
+                  <button
+                    type="button"
+                    class="support-summary-row"
+                    :aria-expanded="isStepsSupportExpanded(stat.label)"
+                    @click="toggleStepsSupportDetail(stat.label)"
+                  >
+                    <el-icon :class="['support-toggle-icon', { 'is-expanded': isStepsSupportExpanded(stat.label) }]">
+                      <ArrowRight />
+                    </el-icon>
+                    <div class="support-summary-main">
+                      <div class="support-summary-title">{{ stat.label }}</div>
+                      <div class="support-summary-meta">
+                        <span>支持集：{{ stat.bucketText }}</span>
+                        <span>α = {{ formatProbability(stat.alpha) }}，β = {{ formatProbability(stat.beta) }}</span>
+                      </div>
+                    </div>
+                    <el-tag
+                      v-if="stepsAlphaBetaResult?.selectedLabel === stat.label"
+                      type="success"
+                      effect="light"
+                      class="support-summary-tag"
+                    >
+                      已选
+                    </el-tag>
+                    <span v-else class="support-summary-status">未选</span>
+                  </button>
 
-                  <div class="support-detail-subtitle">支持集选取过程</div>
-                  <div v-for="decision in stat.bucketDecisions" :key="`${stat.label}-${decision.bucket}`" class="support-detail-line mono-line">
-                    {{ decision.bucket }}：Pr(A={{ decision.bucket }}|{{ decision.leftStatus }}) = {{ formatProbability(decision.leftProb) }}，
-                    Pr(A={{ decision.bucket }}|{{ decision.rightStatus }}) = {{ formatProbability(decision.rightProb) }}，
-                    {{ decision.reason }}
-                  </div>
+                  <div v-show="isStepsSupportExpanded(stat.label)" class="support-detail-body">
+                    <div class="support-detail-line">敏感状态对：{{ stat.sourcePair[0] }} vs {{ stat.sourcePair[1] }}</div>
+                    <div class="support-detail-line">支持集：C<sub>{{ supportPairKey(stat) }}</sub> = {{ stat.bucketText }}</div>
+                    <div class="support-detail-line">
+                      选取依据：按论文规则构造 C<sub>ij</sub> = { a | Pr(A=a|s<sub>i</sub>) / Pr(A=a|s<sub>j</sub>) >= e<sup>ε</sup> }。
+                    </div>
+                    <div class="support-detail-line">
+                      当前规则：对 {{ stat.sourcePair[0] }} vs {{ stat.sourcePair[1] }}，仅保留满足 Pr(A=a|S={{ stat.sourcePair[0] }}) / Pr(A=a|S={{ stat.sourcePair[1] }}) >= e<sup>ε</sup> 的桶。
+                    </div>
 
-                  <div class="support-detail-subtitle">α、β 计算算式</div>
-                  <div class="support-detail-line mono-line">{{ stat.alphaFormula }}</div>
-                  <div class="support-detail-line mono-line">{{ stat.betaFormula }}</div>
-                  <div class="support-detail-line mono-line">{{ stat.compareFormula }}</div>
-                  <div v-if="stat.isEmptySet" class="support-detail-line">由于支持集为空，页面已按默认初始化展示 α_ij 与 β_ij。</div>
+                    <div class="support-detail-subtitle">支持集选取过程</div>
+                    <div v-for="decision in stat.bucketDecisions" :key="`${stat.label}-${decision.bucket}`" class="support-detail-line mono-line">
+                      {{ decision.bucket }}：Pr(A={{ decision.bucket }}|{{ decision.leftStatus }}) = {{ formatProbability(decision.leftProb) }}，
+                      Pr(A={{ decision.bucket }}|{{ decision.rightStatus }}) = {{ formatProbability(decision.rightProb) }}，
+                      因 Pr({{ decision.bucket }}|{{ decision.leftStatus }}) / Pr({{ decision.bucket }}|{{ decision.rightStatus }})
+                      = {{ formatDecisionRatio(decision.ratio) }}
+                      <span v-if="decision.included"> >= e<sup>ε</sup> = {{ formatProbability(stat.expEpsilon) }}，纳入 C<sub>ij</sub></span>
+                      <span v-else> &lt; e<sup>ε</sup> = {{ formatProbability(stat.expEpsilon) }}，不纳入 C<sub>ij</sub></span>
+                    </div>
+
+                    <div class="support-detail-subtitle">α、β 计算算式</div>
+                    <div class="support-detail-line mono-line">
+                      α<sub>{{ supportPairKey(stat) }}</sub>
+                      <template v-if="stat.isEmptySet">
+                        = e<sup>ε</sup> / (1 + e<sup>ε</sup>) = {{ formatProbability(stat.alpha) }}
+                      </template>
+                      <template v-else>
+                        = {{ formatTermSum(stat.alphaTerms) }} = {{ formatProbability(stat.alpha) }}
+                      </template>
+                    </div>
+                    <div class="support-detail-line mono-line">
+                      β<sub>{{ supportPairKey(stat) }}</sub>
+                      <template v-if="stat.isEmptySet">
+                        = 1 / (1 + e<sup>ε</sup>) = {{ formatProbability(stat.beta) }}
+                      </template>
+                      <template v-else>
+                        = {{ formatTermSum(stat.betaTerms) }} = {{ formatProbability(stat.beta) }}
+                      </template>
+                    </div>
+                    <div class="support-detail-line mono-line">
+                      <template v-if="stat.isEmptySet">
+                        由于 C<sub>{{ supportPairKey(stat) }}</sub> = ∅，按默认初始化取 α = {{ formatProbability(stat.alpha) }}，β = {{ formatProbability(stat.beta) }}
+                      </template>
+                      <template v-else>
+                        α = {{ formatProbability(stat.alpha) }}，β = {{ formatProbability(stat.beta) }}
+                      </template>
+                    </div>
+                    <div v-if="stat.isEmptySet" class="support-detail-line">由于支持集为空，页面已按默认初始化展示 α<sub>ij</sub> 与 β<sub>ij</sub>。</div>
+                    <div class="support-detail-line">
+                      选择状态：
+                      <template v-if="stepsAlphaBetaResult?.selectedLabel === stat.label">该敏感状态对为最终选中项。</template>
+                      <template v-else>该敏感状态对未被最终选择。</template>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
             <div v-else class="empty-state-panel">
-              <p>点击“计算支持集与 α/β”后，将按当前 ε 构造 C_ij，并展示 α_ij、β_ij 及其计算过程。</p>
+              <p>点击“计算支持集与 α/β”后，将按当前 ε 构造 C<sub>ij</sub>，并展示 α<sub>ij</sub>、β<sub>ij</sub> 及其计算过程。</p>
             </div>
             </template>
           </div>
@@ -769,68 +858,61 @@
               </el-button>
             </div>
             <div class="result-grid compact-grid">
-              <div class="result-panel">
-                <div class="result-label">p（真实位保留为 1 的概率）</div>
-                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.p : '--' }}</div>
-              </div>
-              <div class="result-panel">
-                <div class="result-label">q（非真实位翻转为 1 的概率）</div>
-                <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.q : '--' }}</div>
-              </div>
+                <div class="result-panel">
+                  <div class="result-label">p：真实位 1 保留为 1 的概率</div>
+                  <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.p : '--' }}</div>
+                </div>
+                <div class="result-panel">
+                  <div class="result-label">q：非真实位 0 翻转为 1 的概率</div>
+                  <div class="result-value">{{ stepsCalibratedParams ? stepsCalibratedParams.q : '--' }}</div>
+                </div>
             </div>
-            <div class="calibration-tip">先对 A 生成初始编码向量，再逐位扰动。</div>
-            <div class="calibration-tip">AOUE 中真实位的 p 固定为 0.5，q 由 ε、α、β 自动校准。</div>
+            <div class="calibration-tip">先对待采集属性 A 生成初始编码向量，再逐位扰动。</div>
+            <div class="calibration-tip">AOUE 中 p、q 表示 one-hot 编码向量每一位的独立扰动概率。</div>
             <div v-if="!privacyBudgetSaved" class="calibration-tip">请先设置并保存隐私预算 ε。</div>
             <div v-else-if="!stepsAlphaBetaResult" class="calibration-tip">请先基于当前 ε 计算支持集与内在不确定性参数。</div>
             <div v-if="stepsCalibratedParams" class="calibration-info">
-              <p>隐私预算 ε = {{ stepsCalibratedParams.epsilon }}</p>
-              <p>域大小 d = {{ stepsCalibratedParams.d }}</p>
-              <p>协议 = {{ stepsCalibratedParams.protocol }}</p>
-              <p class="formula">调用 calculateAOUEParameters(α, β, ε) 计算 q，且 p 固定为 0.5。</p>
-              <p>{{ stepsCalibratedParams.description }}</p>
-              <p>数据源：{{ stepsCalibratedParams.dataSource }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div v-else-if="currentAttribute.name === '睡眠质量评分'" class="attribute-details">
-          <div class="form-item relation-row">
-            <span class="relation-label">防护模式：</span>
-            <span class="relation-value">混合隐私风险</span>
-          </div>
-
-          <div class="form-item relation-row">
-            <span class="relation-label">相关敏感属性 S：</span>
-            <span class="relation-value">年龄段</span>
-          </div>
-
-          <div class="form-item">
-            <label>年龄段分组</label>
-            <div class="boundary-settings">
-              <div class="boundary-group">
-                <div class="boundary-title">年龄段分组</div>
-                <div class="group-display">
-                  <div v-for="group in ageGroupDisplay" :key="group.name" class="group-item">
-                    <span class="group-name">{{ group.name }}</span>
-                    <span class="group-range">{{ group.range }}</span>
+              <div class="calibration-info-section">
+                <div class="calibration-info-title">扰动参数</div>
+                  <p class="formula">若 α / β ≤ e<sup>ε</sup>：p = 1，q = 0</p>
+                  <p class="formula formula-line">
+                    <span>否则：p =</span>
+                    <span class="formula-inline-value">1/2</span>
+                    <span>，q =</span>
+                    <span class="formula-fraction">
+                      <span class="formula-fraction__top">α - βe<sup>ε</sup></span>
+                      <span class="formula-fraction__bottom">(e<sup>ε</sup> - 1) + 2(α - βe<sup>ε</sup>)</span>
+                  </span>
+                </p>
                   </div>
+                  <div class="calibration-info-section">
+                    <div class="calibration-info-title">约束关系</div>
+                  <p>AOUE 对 one-hot 编码向量逐位独立扰动，其中 p = Pr(B<sub>i</sub>'=1 | B<sub>i</sub>=1)，q = Pr(B<sub>i</sub>'=1 | B<sub>i</sub>=0)。</p>
+                  <p>逐位概率归一化为 p + (1 - p) = 1、q + (1 - q) = 1。</p>
+                  <p class="formula formula-line">
+                    <span>内在不确定性约束为：</span>
+                    <span class="formula-fraction">
+                      <span class="formula-fraction__top">αp(1 - q) + (1 - α)(1 - p)q</span>
+                      <span class="formula-fraction__bottom">βp(1 - q) + (1 - β)(1 - p)q</span>
+                    </span>
+                    <span>≤ e<sup>ε</sup></span>
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
+        </div>
 
+        <div v-else-if="currentAttribute.name === '睡眠质量评分'" class="attribute-details">
           <div class="module-group">
             <div class="section-header">
               <h3 class="module-title">年龄段 -> 睡眠质量评分缺失状态 Pr(M|S)</h3>
               <el-button type="primary" plain :loading="sleepMissingMatrixLoading" @click="recalculateMatrix">
-                {{ sleepMissingMatrixData ? '重新计算' : '计算条件分布矩阵' }}
+                {{ sleepMissingMatrixData ? '重新估计' : '估计条件分布矩阵' }}
               </el-button>
             </div>
 
-            <p class="scenario-description">该场景属于混合隐私风险：睡眠质量评分有效值本身具有直接隐私风险，而评分缺失状态虽然不是评分值本身，但可能与年龄段相关，从而产生间接隐私风险。系统先基于 P(M|S) 计算缺失状态的内在不确定性，再向有效评分值注入等量不确定性，最后对缺失值与有效值统一扰动，以满足 ε-LDP。</p>
-            <p class="scenario-description">dataSourceMode：{{ sleepMissingPresetSource.dataSourceMode }}；basis：{{ sleepMissingPresetSource.basis }}</p>
             <div v-if="sleepMissingMatrixLoading" class="matrix-loading">
-              <span>正在从 conditionDistributionPresets.json 读取内置 Pr(M|S)...</span>
+              <span>正在基于公开背景数据进行统计估计...</span>
             </div>
             <div v-else-if="sleepMissingMatrixData" class="matrix-container">
               <table class="matrix-table">
@@ -866,7 +948,7 @@
               </table>
             </div>
             <div v-else class="matrix-placeholder">
-              <p>点击“计算条件分布矩阵”后，将从 conditionDistributionPresets.json 读取内置矩阵 Pr(M|S)。</p>
+              <p>点击“估计条件分布矩阵”后，系统将基于公开背景数据进行统计估计，得到缺失状态条件分布矩阵 Pr(M|S)，用于刻画缺失状态与敏感属性之间的统计相关性。</p>
             </div>
           </div>
 
@@ -875,35 +957,37 @@
             <div v-if="sleepMissingColumnStats.length" class="basis-card">
               <table class="basis-table">
                 <thead>
-                  <tr>
-                    <th>候选列</th>
-                    <th>max</th>
-                    <th>min</th>
-                    <th>ratio</th>
-                    <th>是否选中</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="stat in sleepMissingColumnStats" :key="stat.label">
-                    <td>{{ stat.label }}</td>
-                    <td>{{ formatProbability(stat.max) }}</td>
-                    <td>{{ formatProbability(stat.min) }}</td>
-                    <td>{{ formatRatio(stat.ratio) }}</td>
-                    <td>
-                      <el-tag v-if="sleepMissingAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">已选</el-tag>
-                      <span v-else class="muted-text">未选</span>
+                    <tr>
+                      <th>候选列</th>
+                      <th>α<sub>k</sub></th>
+                      <th>β<sub>k</sub></th>
+                      <th>α<sub>k</sub> / β<sub>k</sub></th>
+                      <th>是否选中</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="stat in sleepMissingColumnStats" :key="stat.label">
+                      <td>{{ stat.label }}</td>
+                      <td>{{ formatProbability(stat.max) }}</td>
+                      <td>{{ formatProbability(stat.min) }}</td>
+                      <td>{{ formatRatio(stat.ratio) }}</td>
+                      <td>
+                        <el-tag v-if="sleepMissingAlphaBetaResult?.selectedLabel === stat.label" size="small" type="success" effect="light">已选</el-tag>
+                        <span v-else class="muted-text">未选</span>
                     </td>
                   </tr>
                 </tbody>
-              </table>
-              <div class="final-selection-card">
-                <div class="final-selection-title">最终选择结果</div>
-                <div class="final-selection-line">最终选定列：{{ sleepMissingAlphaBetaResult?.selectedLabel }}</div>
-                <div class="final-selection-line">系统根据缺失状态两列的区分度比较结果，选出 α、β 来源列。</div>
+                </table>
+                <div class="final-selection-card">
+                  <div class="final-selection-title">最终选择结果</div>
+                  <div class="final-selection-line">缺失状态本身不敏感，但其分布可能泄露年龄段。</div>
+                  <div class="final-selection-line">系统分别计算“未缺失”和“缺失”两列的 α<sub>k</sub>/β<sub>k</sub> 比值，用于衡量该状态在不同年龄段之间的区分度。</div>
+                  <div class="final-selection-line">未缺失列：0.9600 / 0.8200 = 1.1707；缺失列：0.1800 / 0.0400 = 4.5000。</div>
+                  <div class="final-selection-line">由于缺失列的比值更大，说明评分缺失状态对年龄段的区分度更高，因此选取“缺失”列作为 α、β 来源，最终 α = 0.1800，β = 0.0400。</div>
+                </div>
               </div>
-            </div>
             <div v-else class="empty-state-panel">
-              <p>矩阵尚未计算，暂时无法展示缺失状态列的 max / min / ratio 比较。</p>
+              <p>矩阵尚未计算，暂时无法展示缺失状态列的 αk / βk 比较。</p>
             </div>
           </div>
 
@@ -925,7 +1009,7 @@
               </div>
             </div>
             <div v-else class="empty-state-panel">
-              <p>缺失状态条件分布矩阵计算完成后，这里会自动展示 α、β。</p>
+              <p>缺失状态条件分布矩阵估计完成后，这里会自动展示 α、β。</p>
             </div>
           </div>
 
@@ -943,61 +1027,122 @@
 
           <div class="module-group">
             <div class="section-header">
-              <h3 class="module-title">扰动参数重校准</h3>
-              <el-button type="primary" :loading="sleepMissingCalibrationLoading" @click="calibrateParams">校准扰动参数</el-button>
+              <h3 class="module-title">两阶段扰动参数校准</h3>
+              <div class="calibration-actions">
+                <el-tag v-if="sleepMissingCalibratedParams" type="success" effect="light">已校准</el-tag>
+                <el-button type="primary" :loading="sleepMissingCalibrationLoading" @click="calibrateParams">校准扰动参数</el-button>
+              </div>
             </div>
-            <div class="stage-panel-group">
-              <div class="stage-panel">
-                <div class="stage-title">第一阶段：有效评分值扰动参数</div>
-                <div class="stage-desc">仅对非缺失样本的有效评分值 {1,2,3,4,5} 执行多值扰动</div>
+
+            <div class="tsp-param-layout">
+              <div class="tsp-stage-card">
+                <div class="stage-title">第一阶段：有效评分域内扰动参数</div>
+                <div class="stage-desc">仅对非缺失样本的有效评分值 {1,2,3,4,5} 执行多值扰动。</div>
                 <div class="result-grid compact-grid">
                   <div class="result-panel stage-result-panel">
-                    <div class="result-label">p1</div>
+                    <div class="result-label">p<sub>1</sub></div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.p1 : '--' }}</div>
-                    <div class="result-subtext">保留第一阶段原始有效评分值的概率</div>
+                    <div class="result-subtext">有效评分值保持不变的概率</div>
                   </div>
                   <div class="result-panel stage-result-panel">
-                    <div class="result-label">q1</div>
+                    <div class="result-label">q<sub>1</sub></div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.q1 : '--' }}</div>
-                    <div class="result-subtext">扰动到其他有效评分值的概率</div>
+                    <div class="result-subtext">有效评分值扰动为其他有效评分值的概率</div>
                   </div>
                 </div>
-                <div class="stage-check-line">满足 p1 + (d - 1)q1 = 1；这里 d = 5，因为第一阶段只在有效评分域 {1,2,3,4,5} 上扰动，真值之外只有 4 个错误候选。</div>
               </div>
 
-              <div class="stage-panel">
-                <div class="stage-title">第二阶段：统一域扰动参数</div>
-                <div class="stage-desc">对缺失值 0 与第一阶段后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动</div>
+              <div class="tsp-stage-card">
+                <div class="stage-title">第二阶段：缺失值与有效值统一域扰动参数</div>
+                <div class="stage-desc">对缺失值 0 与第一阶段后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动。</div>
                 <div class="result-grid compact-grid">
                   <div class="result-panel stage-result-panel">
-                    <div class="result-label">p2</div>
+                    <div class="result-label">p<sub>2</sub></div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.p2 : '--' }}</div>
-                    <div class="result-subtext">保留第二阶段输入值的概率</div>
+                    <div class="result-subtext">输入值保持不变的概率</div>
                   </div>
                   <div class="result-panel stage-result-panel">
-                    <div class="result-label">q2</div>
+                    <div class="result-label">q<sub>2</sub></div>
                     <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.q2 : '--' }}</div>
-                    <div class="result-subtext">扰动到统一域其他取值的概率</div>
+                    <div class="result-subtext">输入值扰动为统一域内其他取值的概率</div>
                   </div>
                 </div>
-                <div class="stage-check-line">满足 p2 + dq2 = 1；这里 d = 5、统一域总大小是 d + 1 = 6，因为第二阶段在 {0,1,2,3,4,5} 上扰动时，真值之外只有 5 个错误候选。</div>
+              </div>
+
+              <div class="tsp-stage-card">
+                <div class="stage-title">组合恢复参数</div>
+                <div class="stage-desc">服务端聚合时使用 p<sup>*</sup>、q<sup>*</sup> 将两阶段扰动效果合成为最终恢复参数。</div>
+                <div class="result-grid compact-grid">
+                  <div class="result-panel stage-result-panel">
+                    <div class="result-label">p<sup>*</sup></div>
+                    <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.pStar : '--' }}</div>
+                    <div class="result-subtext">真实有效评分经两阶段后仍被恢复为原值的组合概率</div>
+                  </div>
+                  <div class="result-panel stage-result-panel">
+                    <div class="result-label">q<sup>*</sup></div>
+                    <div class="result-value">{{ sleepMissingCalibratedParams ? sleepMissingCalibratedParams.qStar : '--' }}</div>
+                    <div class="result-subtext">其他有效评分经两阶段后被恢复为目标值的组合概率</div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div v-if="sleepMissingCalibratedParams" class="calibration-summary-bar">
-              已完成两阶段扰动参数校准
-            </div>
-            <div v-if="sleepMissingCalibratedParams" class="light-summary-card">
-              <div class="light-summary-item">隐私预算 ε：{{ sleepMissingCalibratedParams.epsilon }}</div>
-              <div class="light-summary-item">TSP 版本：{{ sleepMissingCalibratedParams.versionLabel }}</div>
-              <div class="light-summary-item">α / β：{{ sleepMissingCalibratedParams.alpha }} / {{ sleepMissingCalibratedParams.beta }}</div>
-              <div class="light-summary-item">第一阶段有效值域：d = 5，对应 {1,2,3,4,5}</div>
-              <div class="light-summary-item">第二阶段统一域：d + 1 = 6，对应 {0,1,2,3,4,5}</div>
-              <div class="light-summary-item">组合恢复参数 p*：{{ sleepMissingCalibratedParams.pStar }}</div>
-              <div class="light-summary-item">组合恢复参数 q*：{{ sleepMissingCalibratedParams.qStar }}</div>
-              <div class="light-summary-item">协议：{{ sleepMissingCalibratedParams.protocol }}</div>
-              <div class="light-summary-item">数据源：{{ sleepMissingCalibratedParams.dataSource }}</div>
-              <div class="light-summary-item">机制说明：{{ sleepMissingCalibratedParams.budgetExplanation || sleepMissingCalibratedParams.description }}</div>
-              <div class="light-summary-item">组合恢复参数：p* = p1 × p2 + (1 - p1) × q2，q* = q1 × p2 + (1 - q1) × q2</div>
+
+            <div v-if="sleepMissingCalibratedParams" class="calibration-info tsp-calibration-info">
+              <div class="calibration-info-section">
+                <div class="calibration-info-title">扰动参数</div>
+                <p>第一阶段只对有效评分域 {1,2,3,4,5} 执行多值扰动，并在已知 p<sub>2</sub>、q<sub>2</sub> 的基础上计算。</p>
+                <p class="formula formula-line tsp-formula-line">
+                  <span>p<sub>1</sub> =</span>
+                  <span class="formula-fraction">
+                    <span class="formula-fraction__top">e<sup>ε</sup>p<sub>2</sub> + ((d - 2)e<sup>ε</sup> - (d - 1))q<sub>2</sub></span>
+                    <span class="formula-fraction__bottom">(d - 1 + e<sup>ε</sup>)(p<sub>2</sub> - q<sub>2</sub>)</span>
+                  </span>
+                  <span>，q<sub>1</sub> =</span>
+                  <span class="formula-fraction formula-fraction--compact">
+                    <span class="formula-fraction__top">1 - p<sub>1</sub></span>
+                    <span class="formula-fraction__bottom">d - 1</span>
+                  </span>
+                </p>
+                <p>第二阶段针对缺失值 0 与第一阶段后的有效评分值组成的统一域 {0,1,2,3,4,5} 执行多值扰动。</p>
+                <p class="formula formula-line tsp-formula-line">
+                  <span>p<sub>2</sub> =</span>
+                  <span class="formula-fraction">
+                    <span class="formula-fraction__top">(1 - α) - (1 - β)e<sup>ε</sup></span>
+                    <span class="formula-fraction__bottom">(1 - (d + 1)α) - (1 - (d + 1)β)e<sup>ε</sup></span>
+                  </span>
+                  <span>，q<sub>2</sub> =</span>
+                  <span class="formula-fraction formula-fraction--compact">
+                    <span class="formula-fraction__top">1 - p<sub>2</sub></span>
+                    <span class="formula-fraction__bottom">d</span>
+                  </span>
+                </p>
+              </div>
+              <div class="calibration-info-section">
+                <div class="calibration-info-title">约束关系</div>
+                <div class="tsp-constraint-title">概率归一化约束</div>
+                <p class="formula tsp-compact-formula">第一阶段：p<sub>1</sub> + 4q<sub>1</sub> = 1</p>
+                <p class="formula tsp-compact-formula">第二阶段：p<sub>2</sub> + 5q<sub>2</sub> = 1</p>
+                <div class="tsp-constraint-title">隐私约束</div>
+                <p class="formula formula-line tsp-formula-line">
+                  <span>第二阶段：</span>
+                  <span class="formula-fraction">
+                    <span class="formula-fraction__top">αp<sub>2</sub> + (1 - α)q<sub>2</sub></span>
+                    <span class="formula-fraction__bottom">βp<sub>2</sub> + (1 - β)q<sub>2</sub></span>
+                  </span>
+                  <span>≤ e<sup>ε</sup></span>
+                </p>
+                <p class="formula formula-line tsp-formula-line">
+                  <span>两阶段整体：</span>
+                  <span class="formula-fraction">
+                    <span class="formula-fraction__top">p<sub>1</sub>p<sub>2</sub> + (1 - p<sub>1</sub>)q<sub>2</sub></span>
+                    <span class="formula-fraction__bottom">q<sub>1</sub>p<sub>2</sub> + (1 - q<sub>1</sub>)q<sub>2</sub></span>
+                  </span>
+                  <span>≤ e<sup>ε</sup></span>
+                </p>
+                <div class="tsp-constraint-title">组合恢复参数</div>
+                <p class="formula tsp-compact-formula">p<sup>*</sup> = p<sub>1</sub>p<sub>2</sub> + (1 - p<sub>1</sub>)q<sub>2</sub> = {{ sleepMissingCalibratedParams.pStar }}</p>
+                <p class="formula tsp-compact-formula">q<sup>*</sup> = q<sub>1</sub>p<sub>2</sub> + (1 - q<sub>1</sub>)q<sub>2</sub> = {{ sleepMissingCalibratedParams.qStar }}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1093,7 +1238,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowDown, DataAnalysis, Delete, Document, House, Monitor, QuestionFilled, Setting } from '@element-plus/icons-vue';
+import { ArrowDown, ArrowRight, DataAnalysis, Delete, Document, House, Monitor, QuestionFilled, Setting } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useAttributeConfigStore } from '../../store/attributeConfig';
 import { useTaskStore } from '../../store/task';
@@ -1106,7 +1251,7 @@ import {
   calculateAlphaBeta,
   loadFallAlarmMatrixFromCSV
 } from '../../utils/fallAlarmMatrix.js';
-import { AGE_GROUP_DISPLAY, FALL_ALARM_ORDER, STEP_BUCKET_ORDER, WEIGHT_STATUS_ORDER } from '../../utils/constants.js';
+import { FALL_ALARM_ORDER, STEP_BUCKET_ORDER } from '../../utils/constants.js';
 import {
   STAND_DURATION_DATA_PATH,
   STAND_BUCKET_ORDER,
@@ -1179,7 +1324,7 @@ const attributes = ref([
     algorithm: 'agrr',
     status: '已配置',
     fixed: true,
-    tooltip: '日均站立时长分档与体重状态存在关联关系，使用间接隐私风险 + AGRR协议。'
+    tooltip: '日均站立时长分档与 BMI 类别存在关联关系，使用间接隐私风险 + AGRR协议。'
   },
   {
     id: 3,
@@ -1189,7 +1334,7 @@ const attributes = ref([
     algorithm: 'aoue',
     status: '未配置',
     fixed: true,
-    tooltip: '每日步数分桶与体重状态存在关联关系，使用间接隐私风险 + AOUE协议。'
+    tooltip: '每日步数分桶与 BMI 类别存在关联关系，使用间接隐私风险 + AOUE协议。'
   },
   {
     id: 4,
@@ -1203,7 +1348,6 @@ const attributes = ref([
   }
 ]);
 
-const ageGroupDisplay = AGE_GROUP_DISPLAY;
 const matrixHeaders = FALL_ALARM_ORDER;
 
 function formatParamNumber(value) {
@@ -1217,6 +1361,23 @@ function getAttributeDomainSize(attribute) {
   if (attribute.name === '每日步数分桶') return STEP_BUCKET_ORDER.length;
   if (attribute.name === '睡眠质量评分') return 5;
   return 2;
+}
+
+function getSensitiveAttributeLabel(attribute) {
+  if (!attribute) return '--';
+  if (attribute.name === '日均站立时长分档' || attribute.name === '每日步数分桶') {
+    return 'BMI类别';
+  }
+  return '年龄段';
+}
+
+function getProtectionModeLabel(attribute) {
+  const mode = String(attribute?.protectionMode || '').toLowerCase();
+  return mode === 'hybrid' ? '混合隐私风险' : '间接隐私风险';
+}
+
+function getProtocolLabel(attribute) {
+  return String(attribute?.algorithm || '--').toUpperCase();
 }
 
 function calculateDisplayParams(attribute, config) {
@@ -1268,21 +1429,41 @@ function calculateDisplayParams(attribute, config) {
   return null;
 }
 
-function buildNewParamLines(attribute, config) {
+function buildNewParamGroups(attribute, config) {
   const params = calculateDisplayParams(attribute, config);
   if (!params) return [];
-  if (attribute.algorithm === 'tsp') {
-    return [
-      `p1=${params.p1 ?? '--'}，q1=${params.q1 ?? '--'}`,
-      `p2=${params.p2 ?? '--'}，q2=${params.q2 ?? '--'}`
+    if (attribute.algorithm === 'tsp') {
+      return [
+        {
+          title: '第一阶段：有效评分域内扰动参数',
+          params: [
+            { name: 'p₁', value: params.p1 ?? '--' },
+            { name: 'q₁', value: params.q1 ?? '--' }
+          ]
+        },
+        {
+          title: '第二阶段：缺失值与有效值统一域扰动参数',
+          params: [
+            { name: 'p₂', value: params.p2 ?? '--' },
+            { name: 'q₂', value: params.q2 ?? '--' }
+        ]
+      }
     ];
   }
-  return [`p=${params.p ?? '--'}，q=${params.q ?? '--'}`];
+  return [
+    {
+      title: '',
+      params: [
+        { name: 'p', value: params.p ?? '--' },
+        { name: 'q', value: params.q ?? '--' }
+      ]
+    }
+  ];
 }
 
-function buildTraditionalParamLines(attribute, config) {
+function buildTraditionalParamGroups(attribute, config) {
   if (attribute.algorithm === 'tsp') {
-    return ['暂未配置'];
+    return [];
   }
 
   const epsilon = Number(config?.epsilon ?? config?.epsilonDraft);
@@ -1293,14 +1474,28 @@ function buildTraditionalParamLines(attribute, config) {
   const expEpsilon = Math.exp(epsilon);
   if (attribute.algorithm === 'aoue') {
     return [
-      `p=${formatParamNumber(0.5)}，q=${formatParamNumber(1 / (expEpsilon + 1))}`
+      {
+        title: '',
+        params: [
+          { name: 'p', value: formatParamNumber(0.5) },
+          { name: 'q', value: formatParamNumber(1 / (expEpsilon + 1)) }
+        ]
+      }
     ];
   }
 
   const domainSize = getAttributeDomainSize(attribute);
   const p = expEpsilon / (expEpsilon + domainSize - 1);
   const q = 1 / (expEpsilon + domainSize - 1);
-  return [`p=${formatParamNumber(p)}，q=${formatParamNumber(q)}`];
+  return [
+    {
+      title: '',
+      params: [
+        { name: 'p', value: formatParamNumber(p) },
+        { name: 'q', value: formatParamNumber(q) }
+      ]
+    }
+  ];
 }
 
 const tableAttributes = computed(() =>
@@ -1309,8 +1504,8 @@ const tableAttributes = computed(() =>
     return {
       ...attribute,
       configStatus: config ? '已配置' : '未配置',
-      newParamLines: buildNewParamLines(attribute, config),
-      traditionalParamLines: buildTraditionalParamLines(attribute, config)
+      newParamGroups: buildNewParamGroups(attribute, config),
+      traditionalParamGroups: buildTraditionalParamGroups(attribute, config)
     };
   })
 );
@@ -1323,7 +1518,7 @@ const calibrationLoading = ref(false);
 const calibratedParams = ref(null);
 const arrDataSourceMode = ref(ARR_DEFAULT_DATA_SOURCE_MODE);
 const arrDataSourceLabel = computed(() => (
-  ARR_DATA_SOURCE_MODES[arrDataSourceMode.value]?.label || '内置多源校准矩阵'
+  ARR_DATA_SOURCE_MODES[arrDataSourceMode.value]?.label || '基于公开背景数据估计的 Pr(A|S) 条件分布矩阵'
 ));
 const arrDataSourceDescription = computed(() => (
   ARR_DATA_SOURCE_MODES[arrDataSourceMode.value]?.description || CONDITION_PRESET_RUNTIME_NOTICE
@@ -1343,6 +1538,7 @@ const stepsMatrixLoading = ref(false);
 const stepsMatrixData = ref(null);
 const stepsAlphaBetaResult = ref(null);
 const stepsSupportStats = ref([]);
+const expandedStepsSupportLabels = ref(new Set());
 const stepsCalibrationLoading = ref(false);
 const stepsCalibratedParams = ref(null);
 
@@ -1447,7 +1643,7 @@ const distributeSummary = computed(() => {
       ]
     },
     '日均站立时长分档': {
-      sensitiveAttribute: '体重状态',
+      sensitiveAttribute: 'BMI类别',
       userProcessSummary: 'AGRR：分档后多值扰动',
       parameterSummary: [
         `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
@@ -1457,7 +1653,7 @@ const distributeSummary = computed(() => {
       ]
     },
     '每日步数分桶': {
-      sensitiveAttribute: '体重状态',
+      sensitiveAttribute: 'BMI类别',
       userProcessSummary: 'AOUE：分桶 + 初始编码向量 + 逐位扰动',
       parameterSummary: [
         `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
@@ -1472,10 +1668,10 @@ const distributeSummary = computed(() => {
       parameterSummary: [
         `α=${config?.alphaBetaResult?.alpha != null ? formatProbability(config.alphaBetaResult.alpha) : '--'}`,
         `β=${config?.alphaBetaResult?.beta != null ? formatProbability(config.alphaBetaResult.beta) : '--'}`,
-        `p1=${calibratedParams.p1 ?? '--'}`,
-        `q1=${calibratedParams.q1 ?? '--'}`,
-        `p2=${calibratedParams.p2 ?? '--'}`,
-        `q2=${calibratedParams.q2 ?? '--'}`
+        `p₁=${calibratedParams.p1 ?? '--'}`,
+        `q₁=${calibratedParams.q1 ?? '--'}`,
+        `p₂=${calibratedParams.p2 ?? '--'}`,
+        `q₂=${calibratedParams.q2 ?? '--'}`
       ]
     }
   };
@@ -1513,6 +1709,38 @@ function formatProbability(value) {
 function formatRatio(value) {
   if (!Number.isFinite(value)) return 'Infinity';
   return Number(value).toFixed(4);
+}
+
+function formatDecisionRatio(value) {
+  return Number.isFinite(value) ? Number(value).toFixed(4) : 'Infinity';
+}
+
+function formatTermSum(terms = []) {
+  return Array.isArray(terms) && terms.length
+    ? terms.map(value => Number(value).toFixed(4)).join(' + ')
+    : '0.0000';
+}
+
+function supportPairKey(stat) {
+  return Array.isArray(stat?.sourcePair) ? stat.sourcePair.join('') : 'ij';
+}
+
+function resetStepsSupportExpansion(result = stepsAlphaBetaResult.value) {
+  expandedStepsSupportLabels.value = new Set(result?.selectedLabel ? [result.selectedLabel] : []);
+}
+
+function isStepsSupportExpanded(label) {
+  return expandedStepsSupportLabels.value.has(label);
+}
+
+function toggleStepsSupportDetail(label) {
+  const nextLabels = new Set(expandedStepsSupportLabels.value);
+  if (nextLabels.has(label)) {
+    nextLabels.delete(label);
+  } else {
+    nextLabels.add(label);
+  }
+  expandedStepsSupportLabels.value = nextLabels;
 }
 
 function rowSum(row) {
@@ -1569,6 +1797,7 @@ function savePrivacyBudget() {
     const nextStepsResult = calculateStepsAlphaBeta(stepsMatrixData.value, nextValue);
     stepsAlphaBetaResult.value = nextStepsResult;
     stepsSupportStats.value = nextStepsResult.supportStats;
+    resetStepsSupportExpansion(nextStepsResult);
   }
   if (sleepMissingMatrixData.value) {
     const nextTspResult = calculateSleepMissingAlphaBeta(sleepMissingMatrixData.value, nextValue);
@@ -1582,6 +1811,7 @@ function savePrivacyBudget() {
       const nextStepsResult = calculateStepsAlphaBeta(stepsMatrixData.value, nextValue);
       stepsAlphaBetaResult.value = nextStepsResult;
       stepsSupportStats.value = nextStepsResult.supportStats;
+      resetStepsSupportExpansion(nextStepsResult);
     }
   }
   ElMessage.success('隐私预算已保存');
@@ -1599,6 +1829,7 @@ function resetMatrixState() {
   stepsMatrixData.value = null;
   stepsAlphaBetaResult.value = null;
   stepsSupportStats.value = [];
+  expandedStepsSupportLabels.value = new Set();
   stepsCalibratedParams.value = null;
   sleepMissingMatrixData.value = null;
   sleepMissingAlphaBetaResult.value = null;
@@ -1712,6 +1943,7 @@ function applySavedConfig(config) {
     stepsMatrixData.value = config?.matrixData || null;
     stepsAlphaBetaResult.value = config?.alphaBetaResult || null;
     stepsSupportStats.value = config?.supportStats || config?.alphaBetaResult?.supportStats || [];
+    resetStepsSupportExpansion(stepsAlphaBetaResult.value);
     stepsCalibratedParams.value = config?.calibratedParams || null;
     hasGeneratedMatrix.value = Boolean(config?.matrixData && config?.alphaBetaResult);
     privacyBudgetSaved.value = Boolean(config?.privacyBudgetSaved);
@@ -1805,6 +2037,7 @@ async function recalculateMatrix() {
     stepsMatrixLoading.value = true;
     stepsAlphaBetaResult.value = null;
     stepsSupportStats.value = [];
+    expandedStepsSupportLabels.value = new Set();
     stepsCalibratedParams.value = null;
 
     try {
@@ -1844,7 +2077,7 @@ async function recalculateMatrix() {
 
 function calculateStepsSupportAndAlphaBeta() {
   if (!stepsMatrixData.value) {
-    ElMessage.warning('请先计算条件分布矩阵');
+    ElMessage.warning('请先估计条件分布矩阵');
     return;
   }
 
@@ -1859,6 +2092,7 @@ function calculateStepsSupportAndAlphaBeta() {
   );
   stepsAlphaBetaResult.value = alphaBetaResultData;
   stepsSupportStats.value = alphaBetaResultData.supportStats;
+  resetStepsSupportExpansion(alphaBetaResultData);
   stepsCalibratedParams.value = null;
   ElMessage.success('支持集与内在不确定性参数已更新');
 }
@@ -1906,7 +2140,7 @@ function calibrateParams() {
 
   if (currentAttribute.value.name === '是否触发睡眠异常提醒') {
     if (!alphaBetaResult.value) {
-      ElMessage.warning('请先计算条件分布矩阵');
+      ElMessage.warning('请先估计条件分布矩阵');
       return;
     }
 
@@ -1928,8 +2162,8 @@ function calibrateParams() {
         epsilon,
         d,
         protocol: 'ARR (Adaptive Randomized Response)',
-        description: `基于 ${alphaBetaResult.value.selectedLabel} 列自动校准扰动参数。`,
-        dataSource: fallAlarmMatrixData.value?.source?.label || '内置多源校准矩阵'
+        description: '系统基于公开背景数据估计条件分布矩阵 Pr(A|S)，计算内在不确定性参数 α、β，并据此校准扰动参数。',
+        dataSource: '基于公开背景数据估计的 Pr(A|S) 条件分布矩阵'
       };
 
       ElMessage.success('扰动参数校准完成');
@@ -1941,7 +2175,7 @@ function calibrateParams() {
     }
   } else if (currentAttribute.value.name === '日均站立时长分档') {
     if (!standAlphaBetaResult.value) {
-      ElMessage.warning('请先计算条件分布矩阵');
+      ElMessage.warning('请先估计条件分布矩阵');
       return;
     }
 
@@ -1970,8 +2204,8 @@ function calibrateParams() {
         protocol: 'AGRR (Adaptive Generalized Randomized Response)',
         description: triggeredByThreshold
           ? `由于 α / β <= e^ε，系统直接取 p = 1、q = 0。当前 α = ${standAlphaBetaResult.value.alpha.toFixed(4)}，β = ${standAlphaBetaResult.value.beta.toFixed(4)}，ε = ${epsilon}。`
-          : `系统依据不确定性参数选择规则选中 ${standAlphaBetaResult.value.selectedLabel} 列，并基于该列的 α、β 自动校准扰动参数。`,
-        dataSource: standMatrixData.value?.source?.label || '内置多源校准矩阵'
+          : '系统基于公开背景数据估计条件分布矩阵 Pr(A|S)，计算内在不确定性参数 α、β，并据此校准扰动参数。',
+        dataSource: '基于公开背景数据估计的 Pr(A|S) 条件分布矩阵'
       };
 
       ElMessage.success('扰动参数校准完成');
@@ -1983,7 +2217,7 @@ function calibrateParams() {
     }
   } else if (currentAttribute.value.name === '每日步数分桶') {
     if (!stepsAlphaBetaResult.value) {
-      ElMessage.warning('请先计算条件分布矩阵');
+      ElMessage.warning('请先估计条件分布矩阵');
       return;
     }
 
@@ -2011,7 +2245,7 @@ function calibrateParams() {
         description: clamped
           ? `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}。AOUE 先对每日步数分桶生成初始编码向量，再逐位扰动；本次原始 q = ${rawQ.toFixed(4)}，已按有效区间裁剪为 ${q.toFixed(4)}。`
           : `系统依据不确定性参数选择规则选中支持集 ${stepsAlphaBetaResult.value.selectedLabel}，先对每日步数分桶生成初始编码向量，再按 AOUE 逐位扰动。`,
-        dataSource: stepsMatrixData.value?.source?.label || '内置多源校准矩阵'
+        dataSource: '基于公开背景数据估计的 Pr(A|S) 条件分布矩阵'
       };
 
       ElMessage.success('扰动参数校准完成');
@@ -2060,8 +2294,8 @@ function calibrateParams() {
         unifiedDomainSize,
         protocol: 'TSP (Two-Stage Perturbation)',
         description: `基于缺失状态矩阵 P(M|S) 计算内在不确定性参数，本次来源为 ${sleepMissingAlphaBetaResult.value.selectedSource || sleepMissingAlphaBetaResult.value.selectedLabel}；第一阶段向非缺失样本的有效评分值 {1,2,3,4,5} 注入等量不确定性，第二阶段再将缺失值 0 与第一阶段处理后的有效评分值统一在 {0,1,2,3,4,5} 上执行扰动并上报。`,
-        budgetExplanation: 'TSP 使用统一的总隐私预算 ε。记有效值域大小 d = 5、统一域总大小 d + 1 = 6。第二阶段先在统一域 {0,1,2,3,4,5} 上求得 p2 / q2，其中满足 p2 + dq2 = 1；第一阶段再在有效评分域 {1,2,3,4,5} 上求得 p1 / q1，其中满足 p1 + (d - 1)q1 = 1。整体满足论文中的统一 ε-LDP 约束。',
-        dataSource: sleepMissingMatrixData.value?.source?.label || '内置多源校准矩阵'
+        budgetExplanation: 'TSP 使用统一的总隐私预算 ε。第一阶段在有效评分域上校准 p₁ / q₁，第二阶段在缺失值 0 与有效评分值组成的统一域上校准 p₂ / q₂。整体满足论文中的统一 ε-LDP 约束。',
+        dataSource: '基于公开背景数据估计的 Pr(M|S) 条件分布矩阵'
       };
 
       ElMessage.success('两阶段扰动参数校准完成');
@@ -2108,6 +2342,29 @@ function handleDeleteConfig(attribute) {
       }
 
       ElMessage.success('配置已删除');
+    })
+    .catch(() => {});
+}
+
+function handleClearAllTaskIds() {
+  if (!taskStore.taskList.length) {
+    ElMessage.info('当前没有可清空的任务 ID');
+    return;
+  }
+
+  ElMessageBox.confirm(
+    `确认清空当前 ${taskStore.taskList.length} 个任务 ID 吗？该操作不会删除采集属性配置。`,
+    '清空任务ID确认',
+    {
+      confirmButtonText: '清空',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger'
+    }
+  )
+    .then(() => {
+      taskStore.clearTasks();
+      ElMessage.success('任务 ID 已清空');
     })
     .catch(() => {});
 }
@@ -2243,19 +2500,186 @@ onMounted(() => {
   border-right: none;
 }
 
+.el-main {
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: #f5f7fa;
+}
+
 .config-content {
   padding: 20px;
+  padding-bottom: 40px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.card-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-header-copy > span {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.card-header-copy p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.clear-task-button {
+  flex: 0 0 auto;
+  color: #64748b;
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+.clear-task-button:hover,
+.clear-task-button:focus {
+  color: #475569;
+  border-color: #cbd5e1;
+  background: #f8fafc;
 }
 
 .basic-config,
 .attr-config {
   padding: 20px 0;
+}
+
+.config-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-card-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid #e8eef5;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.config-card-item:hover {
+  border-color: #cfe0f5;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+  transform: translateY(-1px);
+}
+
+.config-card-main {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.76fr) minmax(0, 1.6fr);
+  gap: 18px;
+  min-width: 0;
+}
+
+.config-card-head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.config-attr-name {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.scheme-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.param-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.param-panel {
+  min-width: 0;
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 148px;
+}
+
+.param-panel--new {
+  border: 1px solid #b7ebc6;
+  background: #f3fdf6;
+}
+
+.param-panel--traditional {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.param-panel-title {
+  margin-bottom: 4px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.param-panel-subtitle {
+  margin-bottom: 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.config-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  border-left: 1px solid #eef2f7;
+  padding-left: 18px;
+}
+
+.status-tag {
+  font-weight: 700;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.delete-icon-button {
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+.delete-icon-button:hover,
+.delete-icon-button:focus {
+  color: #f56c6c;
+  border-color: #fbc4c4;
+  background: #fff5f5;
 }
 
 .config-section {
@@ -2294,19 +2718,100 @@ onMounted(() => {
 
 .param-display {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 6px;
+  gap: 10px;
   line-height: 1.35;
+}
+
+.param-display--tsp {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.param-group {
+  min-width: 0;
+}
+
+.param-group-title {
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.param-block-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.param-block {
+  min-width: 78px;
+  border-radius: 10px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.param-name {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.param-value {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.param-display--new .param-block {
+  border: 1px solid #bbf7d0;
+  background: #ecfdf3;
+}
+
+.param-display--new .param-value {
+  color: #047857;
+}
+
+.param-display--traditional .param-block {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.param-display--traditional .param-name,
+.param-display--traditional .param-value {
+  color: #64748b;
+}
+
+.not-applicable {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.not-applicable strong {
+  color: #475569;
+  font-size: 15px;
 }
 
 .param-chip {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 13px;
   font-weight: 600;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -2411,6 +2916,35 @@ onMounted(() => {
   gap: 20px;
 }
 
+.detail-basic-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-basic-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.detail-basic-item span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.detail-basic-item strong {
+  display: block;
+  color: #303133;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
 .scenario-description {
   margin: 0 0 8px;
   color: #425466;
@@ -2437,6 +2971,26 @@ onMounted(() => {
 .relation-label,
 .relation-value {
   font-weight: 700;
+}
+
+.grouping-brief {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.grouping-brief .relation-label {
+  color: #64748b;
+}
+
+.grouping-brief .relation-value {
+  color: #303133;
+  line-height: 1.6;
 }
 
 .boundary-settings {
@@ -2621,6 +3175,19 @@ onMounted(() => {
   font-weight: 700;
 }
 
+.support-param-cell {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.25;
+}
+
+.support-param-formula {
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .basis-row {
   display: flex;
   gap: 16px;
@@ -2669,15 +3236,92 @@ onMounted(() => {
 }
 
 .support-detail-card {
-  padding: 14px;
+  overflow: hidden;
+  padding: 0;
   border: 1px solid #dfe6ee;
   border-radius: 8px;
   background: #ffffff;
 }
 
 .selected-support-card {
-  border-color: #bfd7ff;
-  background: #eef5ff;
+  border-color: #c7e8b5;
+  background: #f6fff2;
+}
+
+.support-summary-row {
+  width: 100%;
+  border: 0;
+  padding: 12px 14px;
+  background: transparent;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.support-summary-row:hover,
+.support-summary-row:focus-visible {
+  background: rgba(64, 158, 255, 0.06);
+  outline: none;
+}
+
+.selected-support-card .support-summary-row:hover,
+.selected-support-card .support-summary-row:focus-visible {
+  background: rgba(103, 194, 58, 0.08);
+}
+
+.support-toggle-icon {
+  color: #64748b;
+  font-size: 16px;
+  transition: transform 0.18s ease;
+}
+
+.support-toggle-icon.is-expanded {
+  transform: rotate(90deg);
+}
+
+.support-summary-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.support-summary-title {
+  color: #1f2d3d;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.support-summary-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: #425466;
+  font-size: 13px;
+}
+
+.support-summary-tag {
+  font-weight: 700;
+}
+
+.support-summary-status {
+  color: #94a3b8;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.support-detail-body {
+  border-top: 1px solid #e7edf4;
+  padding: 12px 14px 14px 40px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .support-detail-header {
@@ -2714,6 +3358,26 @@ onMounted(() => {
   gap: 14px;
 }
 
+.calibration-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tsp-param-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tsp-stage-card {
+  padding: 14px;
+  border: 1px solid #dfe6ee;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
 .stage-panel {
   padding: 16px;
   border: 1px solid #dfe6ee;
@@ -2736,13 +3400,37 @@ onMounted(() => {
 
 .stage-result-panel {
   background: #ffffff;
-  min-height: 132px;
+  min-height: 116px;
 }
 
 .stage-check-line {
   margin-top: 10px;
   color: #6b7785;
   font-size: 13px;
+}
+
+.tsp-calibration-info {
+  margin-top: 12px;
+}
+
+.tsp-calibration-info .tsp-formula-line {
+  justify-content: center;
+  margin: 8px 0 10px;
+}
+
+.tsp-constraint-title {
+  margin: 10px 0 4px;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tsp-constraint-title:first-of-type {
+  margin-top: 0;
+}
+
+.tsp-compact-formula {
+  text-align: center;
 }
 
 .calibration-summary-bar {
@@ -2839,21 +3527,91 @@ onMounted(() => {
 
 .calibration-info {
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: 14px;
   background-color: #f0fff4;
   border-left: 4px solid #67c23a;
   border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calibration-info-section {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d9f2df;
+}
+
+.calibration-info-section:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.calibration-info-title {
+  margin-bottom: 6px;
+  color: #166534;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .calibration-info p {
   margin: 5px 0;
   color: #303133;
+  line-height: 1.7;
 }
 
 .calibration-info .formula {
   font-family: 'Courier New', monospace;
   color: #606266;
   font-style: italic;
+}
+
+.calibration-info .formula-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.formula-fraction {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  min-width: 260px;
+  font-style: italic;
+}
+
+.formula-fraction--compact {
+  min-width: 56px;
+}
+
+.formula-fraction--medium {
+  min-width: 170px;
+}
+
+.formula-inline-value {
+  display: inline-block;
+  min-width: 34px;
+  text-align: center;
+  font-style: italic;
+}
+
+.formula-fraction__top,
+.formula-fraction__bottom {
+  display: block;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.formula-fraction__top {
+  padding: 0 8px 3px;
+  border-bottom: 1px solid #606266;
+}
+
+.formula-fraction__bottom {
+  padding: 3px 8px 0;
 }
 
 .fixed-value {
@@ -2873,6 +3631,21 @@ onMounted(() => {
   gap: 12px;
 }
 
+@media (max-width: 1180px) {
+  .config-card-item {
+    grid-template-columns: 1fr;
+  }
+
+  .config-card-side {
+    flex-direction: row;
+    align-items: center;
+    border-left: none;
+    border-top: 1px solid #eef2f7;
+    padding-left: 0;
+    padding-top: 14px;
+  }
+}
+
 @media (max-width: 768px) {
   .section-header,
   .epsilon-card,
@@ -2883,13 +3656,25 @@ onMounted(() => {
 
   .result-grid,
   .compact-grid,
-  .overview-grid {
+  .overview-grid,
+  .config-card-main,
+  .param-panel-grid {
     grid-template-columns: 1fr;
   }
 
   .action-cell,
-  .dialog-footer {
+  .dialog-footer,
+  .card-actions {
     justify-content: flex-start;
+  }
+
+  .card-header {
+    flex-direction: column;
+  }
+
+  .config-card-side {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

@@ -49,7 +49,7 @@
                 <span>演示与验证</span>
               </template>
               <el-menu-item index="/admin/demo/arr-experiment-comparison">
-                实验效果对比
+                误差评估
               </el-menu-item>
             </el-sub-menu>
           </el-menu>
@@ -59,7 +59,7 @@
           <div class="scenario-content">
             <el-card shadow="hover" class="hero-card">
               <div class="hero-copy">
-                <div class="page-title">健康手环数据采集场景说明</div>
+                <div class="page-title">数据属性与协议选择总览</div>
                 <p class="page-desc">
                   本系统面向智能手环健康数据采集场景。平台需要收集部分健康行为或状态数据，用于群体统计分析、异常提醒评估和健康趋势观察。但部分待采集属性与用户敏感状态之间存在统计相关性，直接采集可能导致敏感属性被推断。因此，本系统在客户端本地完成编码与随机扰动，服务器仅接收扰动后的上报值，并在聚合端进行统计估计。
                 </p>
@@ -75,29 +75,44 @@
               </el-card>
             </section>
 
-            <el-card shadow="hover" class="section-card">
-              <template #header>
-                <div class="section-title">数据属性总览</div>
+            <el-alert
+              class="protocol-summary"
+              type="info"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                本页面将采集属性、敏感属性关系与协议选择合并展示。待采集属性在客户端完成编码与本地扰动，服务器仅接收扰动后的上报结果；年龄段和 BMI 类别不作为直接采集对象，而是用于条件分布风险建模的相关敏感属性。
               </template>
-              <el-table :data="attributeRows" border style="width: 100%">
-                <el-table-column prop="name" label="属性名称" min-width="180" />
-                <el-table-column prop="role" label="属性角色" width="140">
-                  <template #default="scope">
-                    <el-tag :type="roleTagType(scope.row.role)">{{ scope.row.role }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="type" label="属性类型" min-width="150" />
-                <el-table-column prop="isCollected" label="待采集属性" width="120" />
-                <el-table-column prop="sensitive" label="相关敏感属性" min-width="170" />
-                <el-table-column prop="risk" label="隐私风险说明" min-width="260" />
-                <el-table-column prop="protocol" label="采用协议" width="110">
-                  <template #default="scope">
-                    <el-tag v-if="scope.row.protocol !== '--'" type="success">{{ scope.row.protocol }}</el-tag>
-                    <span v-else>--</span>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="note" label="说明" min-width="230" />
-              </el-table>
+            </el-alert>
+
+            <el-card shadow="hover" class="section-card grouping-standard-card">
+              <template #header>
+                <div class="section-title">相关敏感属性分组说明</div>
+              </template>
+              <p class="grouping-standard-desc">
+                以下分组用于构建条件分布矩阵 Pr(A|S)，并作为内在不确定性参数 α、β 的计算基础。
+              </p>
+              <div class="grouping-standard-grid">
+                <div
+                  v-for="group in sensitiveGroupingCards"
+                  :key="group.title"
+                  class="grouping-standard-panel"
+                >
+                  <div class="grouping-standard-title">{{ group.title }}</div>
+                  <div class="grouping-standard-role">{{ group.role }}</div>
+                  <div class="grouping-standard-items">
+                    <span
+                      v-for="item in group.items"
+                      :key="item.name"
+                      class="grouping-standard-item"
+                    >
+                      <strong>{{ item.name }}</strong>
+                      <span v-if="item.desc">{{ item.desc }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
             </el-card>
 
             <section class="relation-grid">
@@ -105,27 +120,50 @@
                 <div class="relation-head">
                   <div>
                     <div class="relation-title">{{ card.attribute }}</div>
-                    <div class="relation-protocol">{{ card.protocol }}</div>
+                    <div class="relation-subtitle">{{ card.subtitle }}</div>
                   </div>
-                  <el-tag :type="card.modeType">{{ card.mode }}</el-tag>
+                  <div class="tag-group">
+                    <el-tag type="primary">{{ card.protocol }}</el-tag>
+                    <el-tag :type="card.modeType">{{ card.mode }}</el-tag>
+                  </div>
+                </div>
+                <div v-if="card.composition" class="relation-row">
+                  <span>属性组成</span>
+                  <p>{{ card.composition }}</p>
+                </div>
+                <div v-if="card.valueRole || card.missingRole" class="role-split">
+                  <div v-if="card.valueRole">
+                    <span>有效值角色</span>
+                    <p>{{ card.valueRole }}</p>
+                  </div>
+                  <div v-if="card.missingRole">
+                    <span>缺失状态角色</span>
+                    <p>{{ card.missingRole }}</p>
+                  </div>
                 </div>
                 <div class="relation-row">
                   <span>可能泄露的敏感属性</span>
                   <strong>{{ card.sensitive }}</strong>
                 </div>
                 <div class="relation-row">
-                  <span>相关性描述</span>
-                  <p>{{ card.correlation }}</p>
+                  <span>隐私风险</span>
+                  <p v-html="formatRiskText(card.risk)"></p>
                 </div>
                 <div class="relation-row">
                   <span>本地处理方式</span>
                   <p>{{ card.localProcess }}</p>
                 </div>
-                <div class="server-visible">
-                  服务器不直接获得用户原始采集值，也不直接获得用户敏感属性，只接收经过本地扰动后的上报值。
-                </div>
               </el-card>
             </section>
+
+            <el-card shadow="hover" class="section-card sensitive-note-card">
+              <template #header>
+                <div class="section-title">敏感属性说明</div>
+              </template>
+              <p>
+                年龄段和 BMI 类别是系统重点建模和保护的相关敏感属性。年龄段可能由睡眠异常提醒或睡眠质量评分缺失状态间接推断；BMI 类别可能由站立时长分档或每日步数分布间接推断。
+              </p>
+            </el-card>
 
             <el-card shadow="hover" class="section-card">
               <template #header>
@@ -174,7 +212,7 @@ const overviewCards = [
   {
     label: '隐私风险',
     value: '统计相关性泄露',
-    desc: '待采集属性可能与年龄段、BMI、健康状态等敏感属性相关。'
+    desc: '待采集属性可能与年龄段、BMI类别、缺失状态等建模属性相关。'
   },
   {
     label: '保护方式',
@@ -183,115 +221,70 @@ const overviewCards = [
   }
 ];
 
-const attributeRows = [
-  {
-    name: '是否触发睡眠异常提醒',
-    role: '待采集属性',
-    type: '二元属性',
-    isCollected: '是',
-    sensitive: '年龄段、健康状态',
-    risk: '异常提醒触发情况可能与年龄、健康状态等敏感属性存在相关性。',
-    protocol: 'ARR',
-    note: '适合用 ARR 对 0/1 二值事件进行本地随机响应。'
-  },
-  {
-    name: '日均站立时长分档',
-    role: '待采集属性',
-    type: '多分类属性',
-    isCollected: '是',
-    sensitive: 'BMI / 体重状态',
-    risk: '站立时长或活动水平可能泄露用户体重状态。',
-    protocol: 'AGRR',
-    note: '先映射为活动分档，再进行多值随机扰动。'
-  },
-  {
-    name: '每日步数分桶',
-    role: '待采集属性',
-    type: '多分类 / 向量编码属性',
-    isCollected: '是',
-    sensitive: 'BMI / 体重状态',
-    risk: '步数分布可能与用户体重状态、活动能力有关。',
-    protocol: 'AOUE',
-    note: '先生成 one-hot 编码向量，再进行逐位扰动。'
-  },
-  {
-    name: '睡眠质量评分',
-    role: '待采集属性',
-    type: '混合属性',
-    isCollected: '是',
-    sensitive: '缺失状态、健康状态',
-    risk: '睡眠质量评分及缺失情况可能反映用户健康状态或作息状况。',
-    protocol: 'TSP',
-    note: '先处理缺失状态，再对有效值与缺失值执行两阶段扰动。'
-  },
-  {
-    name: '年龄段',
-    role: '相关敏感属性',
-    type: '分组属性',
-    isCollected: '否',
-    sensitive: '自身作为敏感属性',
-    risk: '年龄段可能被睡眠异常提醒或评分缺失状态间接推断。',
-    protocol: '--',
-    note: '用于 ARR 与 TSP 的条件分布风险建模。'
-  },
-  {
-    name: 'BMI / 体重状态',
-    role: '相关敏感属性',
-    type: '分组属性',
-    isCollected: '否',
-    sensitive: '自身作为敏感属性',
-    risk: 'BMI 或体重状态可能由活动水平、站立时长、步数分布间接泄露。',
-    protocol: '--',
-    note: '用于 AGRR 与 AOUE 的条件分布风险建模。'
-  },
-  {
-    name: '睡眠质量评分缺失状态',
-    role: '辅助背景属性',
-    type: '二元状态',
-    isCollected: '随 TSP 本地处理',
-    sensitive: '年龄段、健康状态',
-    risk: '缺失状态本身可能与年龄段或健康状况存在统计相关性。',
-    protocol: 'TSP',
-    note: '作为 TSP 混合隐私风险中的缺失状态 M 进行建模。'
-  }
-];
-
 const relationCards = [
   {
     protocol: 'ARR',
     attribute: '是否触发睡眠异常提醒',
-    sensitive: '年龄段、健康状态',
+    subtitle: '二值事件采集',
+    sensitive: '年龄段',
     mode: '间接隐私风险',
     modeType: 'primary',
-    correlation: '不同年龄段或健康状态用户触发睡眠异常提醒的概率可能不同，二值采集值可能间接泄露敏感属性。',
-    localProcess: '客户端将未触发提醒编码为 0、触发提醒编码为 1，并在本地执行 ARR 二元随机扰动。'
+    risk: '本身不敏感，但触发情况可能与年龄段存在统计相关性，从而泄露敏感属性年龄段。',
+    localProcess: '适合用 ARR 对 0/1 二值事件进行本地随机响应。'
   },
   {
     protocol: 'AGRR',
     attribute: '日均站立时长分档',
-    sensitive: 'BMI / 体重状态',
+    subtitle: '多值分档采集',
+    sensitive: 'BMI 类别',
     mode: '间接隐私风险',
     modeType: 'primary',
-    correlation: '活动水平与 BMI 或体重状态存在统计相关性，站立时长分档可能成为敏感状态的推断线索。',
-    localProcess: '客户端先将原始站立时长映射为活动分档，再按 AGRR 协议对分档值进行扰动。'
+    risk: '本身不敏感，但站立时长或活动水平分档可能与 BMI 类别存在统计相关性，从而泄露敏感属性 BMI 类别。',
+    localProcess: '先映射为活动分档，再进行多值随机扰动。'
   },
   {
     protocol: 'AOUE',
     attribute: '每日步数分桶',
-    sensitive: 'BMI / 体重状态、活动能力',
+    subtitle: 'one-hot 向量编码采集',
+    sensitive: 'BMI 类别',
     mode: '间接隐私风险',
     modeType: 'primary',
-    correlation: '每日步数分布可能反映用户活动能力，也可能与 BMI 或体重状态相关。',
-    localProcess: '客户端先将步数分桶编码为 one-hot 向量，再对向量每一位进行 AOUE 扰动。'
+    risk: '本身不敏感，但步数分布可能与 BMI 类别存在统计相关性，从而泄露敏感属性 BMI 类别。',
+    localProcess: '先生成 one-hot 编码向量，再对向量每一位进行 AOUE 扰动。'
   },
   {
     protocol: 'TSP',
     attribute: '睡眠质量评分',
-    sensitive: '缺失状态、健康状态、年龄段',
+    subtitle: '含缺失状态的混合属性采集',
+    composition: '睡眠质量评分有效值 + 睡眠质量评分缺失状态',
+    valueRole: '本身敏感，需要扰动上报',
+    missingRole: '本身不敏感，但可能泄露敏感属性年龄段',
+    sensitive: '年龄段',
     mode: '混合隐私风险',
     modeType: 'warning',
-    correlation: '评分有效值本身具有直接隐私风险，评分缺失状态也可能与年龄段或健康状态相关。',
-    localProcess: '客户端先将本地采集结果编码为缺失/非缺失状态及对应取值，再执行第一阶段有效值扰动和第二阶段统一域扰动。'
+    risk: '评分有效值可能直接反映用户睡眠健康状态，因此本身具有敏感性；评分是否缺失本身不敏感，但可能与年龄段存在统计相关性，从而泄露敏感属性年龄段。',
+    localProcess: 'TSP 先处理评分缺失状态，再对有效评分取值进行本地扰动上报，并结合年龄段相关性进行风险建模。'
+  }
+];
+
+const sensitiveGroupingCards = [
+  {
+    title: '年龄段',
+    role: '用于 ARR 与 TSP 的相关敏感属性 S',
+    items: [
+      { name: '青年', desc: '18-44岁' },
+      { name: '中年', desc: '45-59岁' },
+      { name: '老年', desc: '60岁及以上' }
+    ]
+  },
+  {
+    title: 'BMI类别',
+    role: '用于 AGRR 与 AOUE 的相关敏感属性 S',
+    items: [
+      { name: '正常' },
+      { name: '超重' },
+      { name: '肥胖' }
+    ]
   }
 ];
 
@@ -305,10 +298,11 @@ const processSteps = [
   '聚合端统计估计'
 ];
 
-function roleTagType(role) {
-  if (role === '待采集属性') return 'success';
-  if (role === '相关敏感属性') return 'warning';
-  return 'info';
+function formatRiskText(text) {
+  return String(text)
+    .replace(/本身不敏感/g, '<strong>本身不敏感</strong>')
+    .replace(/本身敏感/g, '<strong>本身敏感</strong>')
+    .replace(/泄露敏感属性([^，。；]+)/g, '<strong>泄露敏感属性$1</strong>');
 }
 
 function goToAttrConfig() {
@@ -429,10 +423,82 @@ function handleLogout() {
   color: #1f2d3d;
 }
 
+.protocol-summary {
+  border: 1px solid #dbeafe;
+}
+
+.protocol-summary :deep(.el-alert__title) {
+  color: #1e3a8a;
+  line-height: 1.7;
+  font-weight: 600;
+}
+
 .relation-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.grouping-standard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  justify-content: start;
+  gap: 10px;
+}
+
+.grouping-standard-desc {
+  margin: -2px 0 12px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.grouping-standard-panel {
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 10px 12px;
+}
+
+.grouping-standard-title {
+  color: #1f2d3d;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.grouping-standard-role {
+  color: #7b8794;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.grouping-standard-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.grouping-standard-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #475569;
+  line-height: 1.2;
+  font-size: 12px;
+}
+
+.grouping-standard-item strong {
+  color: #1e3a8a;
+}
+
+.grouping-standard-item span {
+  color: #475569;
 }
 
 .relation-card :deep(.el-card__body) {
@@ -454,10 +520,22 @@ function handleLogout() {
   font-weight: 700;
 }
 
-.relation-protocol {
+.relation-subtitle {
   margin-top: 4px;
-  color: #409eff;
-  font-weight: 700;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.inline-tags {
+  justify-content: flex-start;
 }
 
 .relation-row span {
@@ -474,13 +552,36 @@ function handleLogout() {
   line-height: 1.7;
 }
 
-.server-visible {
-  border: 1px solid #dbeafe;
+.role-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.role-split > div {
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background: #f8fbff;
-  padding: 12px;
-  color: #1e3a8a;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.role-split span {
+  display: block;
+  color: #7b8794;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.role-split p {
+  margin: 0;
+  color: #334155;
   line-height: 1.7;
+}
+
+.sensitive-note-card p {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.8;
 }
 
 .next-tip {
@@ -499,6 +600,7 @@ function handleLogout() {
 
 @media (max-width: 1200px) {
   .overview-grid,
+  .grouping-standard-grid,
   .relation-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -510,6 +612,7 @@ function handleLogout() {
   }
 
   .overview-grid,
+  .grouping-standard-grid,
   .relation-grid {
     grid-template-columns: 1fr;
   }

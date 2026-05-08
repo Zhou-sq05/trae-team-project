@@ -1,4 +1,4 @@
-import { ARR, aggregateARR } from './ldpAlgorithms';
+import { ARR, aggregateARR, calculateARRParameters } from './ldpAlgorithms';
 import {
   CONDITION_DISTRIBUTION_KEYS,
   sampleObservedValue
@@ -34,11 +34,14 @@ export function getArrParams(task, attributeConfigStore) {
   const expEpsilon = Math.exp(epsilon);
   const fallbackP = expEpsilon / (expEpsilon + 1);
   const fallbackQ = 1 - fallbackP;
+  const alpha = Number(config?.alphaBetaResult?.alpha ?? config?.alpha ?? 0);
+  const beta = Number(config?.alphaBetaResult?.beta ?? config?.beta ?? 0);
+  const calibrated = calculateARRParameters(alpha, beta, epsilon, 2);
 
   return {
     epsilon,
-    p: Number(config?.calibratedParams?.p ?? fallbackP),
-    q: Number(config?.calibratedParams?.q ?? fallbackQ),
+    p: calibrated.p,
+    q: calibrated.q,
     traditionalP: fallbackP,
     traditionalQ: fallbackQ
   };

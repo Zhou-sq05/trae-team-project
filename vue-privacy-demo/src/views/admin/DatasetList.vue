@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="admin-container">
     <el-container>
       <el-header>
@@ -47,7 +47,7 @@
                 <span>演示与验证</span>
               </template>
               <el-menu-item index="/admin/demo/arr-experiment-comparison">
-                实验效果对比
+                误差评估
               </el-menu-item>
             </el-sub-menu>
           </el-menu>

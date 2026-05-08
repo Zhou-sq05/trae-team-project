@@ -1,4 +1,4 @@
-import { Encode, perturbAOUEWithDetails } from './ldpAlgorithms';
+import { Encode, calculateAOUEParameters, perturbAOUEWithDetails } from './ldpAlgorithms';
 import { STEP_BUCKET_ORDER } from './constants';
 import {
   CONDITION_DISTRIBUTION_KEYS,
@@ -31,14 +31,15 @@ export function getAoueConfig(task, attributeConfigStore) {
 export function getAoueParams(task, attributeConfigStore) {
   const config = getAoueConfig(task, attributeConfigStore);
   const epsilon = Number(config?.epsilon ?? task?.privacyBudget ?? 0.5);
-  const fallbackP = 0.5;
-  const fallbackQ = 1 / (Math.exp(epsilon) + 1);
+  const alpha = Number(config?.alphaBetaResult?.alpha ?? config?.alpha ?? 0);
+  const beta = Number(config?.alphaBetaResult?.beta ?? config?.beta ?? 0);
+  const calibrated = calculateAOUEParameters(alpha, beta, epsilon);
 
   return {
     epsilon,
     domainSize: STEP_BUCKET_ORDER.length,
-    p: Number(config?.calibratedParams?.p ?? fallbackP),
-    q: Number(config?.calibratedParams?.q ?? fallbackQ)
+    p: calibrated.p,
+    q: calibrated.q
   };
 }
 

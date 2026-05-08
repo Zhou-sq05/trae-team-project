@@ -86,18 +86,11 @@ function getTaskConfig(task, protocol, domainSize) {
   const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
   const epsilon = Number(snapshot.epsilon ?? task?.privacyBudget ?? 1);
 
-  let p = Number(snapshot.calibratedParams?.p);
-  let q = Number(snapshot.calibratedParams?.q);
+  const calculated = protocol === 'AGRR'
+    ? calculateAGRParameters(alpha, beta, epsilon, domainSize)
+    : calculateARRParameters(alpha, beta, epsilon, domainSize);
 
-  if (!Number.isFinite(p) || !Number.isFinite(q)) {
-    const calculated = protocol === 'AGRR'
-      ? calculateAGRParameters(alpha, beta, epsilon, domainSize)
-      : calculateARRParameters(alpha, beta, epsilon, domainSize);
-    p = calculated.p;
-    q = calculated.q;
-  }
-
-  return { alpha, beta, epsilon, p, q };
+  return { alpha, beta, epsilon, p: calculated.p, q: calculated.q };
 }
 
 function getProtectionMode(task) {
@@ -385,6 +378,19 @@ function buildTspDiagnostics({
     displayAdjustedMissingEstimates: displayAdjustedMissingEstimates.map(value => Number(value ?? 0)),
     displayAdjustedScoreEstimates: displayAdjustedScoreEstimates.map(value => Number(value ?? 0)),
     displayDistortionReason,
+    config: {
+      version: config.version,
+      versionLabel: config.versionMeta.label,
+      alpha: config.alpha,
+      beta: config.beta,
+      epsilon: config.epsilon,
+      p1: config.p1,
+      q1: config.q1,
+      p2: config.p2,
+      q2: config.q2,
+      pStar: config.pStar,
+      qStar: config.qStar
+    },
     recordsTable: buildTspRecordRows(records)
   };
 }
@@ -491,6 +497,16 @@ function createAggregateViewModel({
     alpha: config.alpha.toFixed(4),
     beta: config.beta.toFixed(4),
     epsilon: String(config.epsilon),
+    perturbParams: {
+      p: Number(config.p),
+      q: Number(config.q),
+      p1: Number(config.p1),
+      q1: Number(config.q1),
+      p2: Number(config.p2),
+      q2: Number(config.q2),
+      pStar: Number(config.pStar),
+      qStar: Number(config.qStar)
+    },
     sampleCount: summary.sampleCount,
     domainSize: labels.length,
     metrics,
@@ -777,6 +793,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
       }
     ],
     sourceDescription: `${`当前结果基于 task_id = ${taskId}、${scope?.batchId ? `batch_id = ${scope.batchId}` : '全部批次'} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} ${config.versionMeta.description} 当前表格与图表默认展示的是原始无偏恢复结果；辅助实验误差指标和理论方差指标都在同一 task/batch 作用域下计算。`,
+    diagnostics,
   })];
 }
 

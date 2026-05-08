@@ -49,7 +49,7 @@
                 <span>演示与验证</span>
               </template>
               <el-menu-item index="/admin/demo/arr-experiment-comparison">
-                实验效果对比
+                误差评估
               </el-menu-item>
             </el-sub-menu>
           </el-menu>
@@ -61,9 +61,9 @@
               <template #header>
                 <div class="page-header">
                   <div>
-                    <div class="page-title">实验效果对比</div>
-                    <div class="page-desc">
-                      用于模拟实验效果验证，真实值仅来自模拟数据生成过程。
+                    <div class="page-title">误差评估</div>
+                    <div class="page-desc" v-if="!isTspExperiment">
+                      用于模拟实验效果验证，真实分布来自模拟数据生成过程。
                     </div>
                   </div>
                   <div class="header-actions">
@@ -83,15 +83,6 @@
                 </div>
               </template>
 
-              <section class="notice-section">
-                <div class="notice-card">
-                  本页面仅用于模拟实验效果验证。真实分布来自模拟数据生成过程，用于评估聚合估计效果；真实系统中服务器无法获得用户原始真实值，也不会获得用户敏感属性。
-                </div>
-                <div class="notice-card notice-card--blue">
-                  聚合端页面表示真实系统中的服务器视角，只能看到扰动后上报值和聚合估计结果；本页面是模拟实验验证视角，可以读取模拟数据生成时保存的真实值，用于评估估计误差。
-                </div>
-              </section>
-
               <el-empty
                 v-if="!currentResult"
                 class="empty-panel"
@@ -99,85 +90,90 @@
               />
 
               <template v-else>
-                <section class="metric-section">
-                  <div class="block-heading">
-                    <h3>指标概览</h3>
-                    <span>当前任务的样本、预算、扰动参数与估计误差</span>
+                <section class="comparison-summary-section">
+                  <div v-if="!isTspExperiment" class="conclusion-banner">
+                    {{ chartConclusionText }}
                   </div>
-                  <div class="metric-grid">
-                    <div v-for="item in metricCards" :key="item.label" class="metric-card">
+                  <div class="comparison-metric-grid">
+                    <div
+                      v-for="item in comparisonMetricCards"
+                      :key="item.label"
+                      class="comparison-metric-card"
+                      :class="`comparison-metric-card--${item.type}`"
+                    >
                       <span>{{ item.label }}</span>
-                      <strong>{{ item.value }}</strong>
+                      <strong>
+                        <el-tag
+                          v-if="item.isTag"
+                          :type="item.value === '新方案' ? 'success' : 'warning'"
+                          effect="light"
+                        >
+                          {{ item.value }}
+                        </el-tag>
+                        <template v-else>{{ item.value }}</template>
+                      </strong>
                     </div>
                   </div>
                 </section>
 
                 <section class="result-section">
+                  <el-card v-if="showTraditionalComparison" shadow="never" class="result-card">
+                    <template #header>
+                      <div class="block-heading block-heading--compact">
+                        <h3>估计偏差对比图</h3>
+                        <span>偏差越接近 0，说明估计结果越接近真实分布；正值表示高估，负值表示低估。</span>
+                      </div>
+                    </template>
+                    <div ref="errorChartRef" class="chart-box chart-box--bias"></div>
+                  </el-card>
+
                   <el-card shadow="never" class="result-card">
                     <template #header>
                       <div class="block-heading block-heading--compact">
-                        <h3>估计结果明细</h3>
-                        <span>表格完整展示当前任务的所有类别，便于从上到下对比讲解</span>
+                        <h3>分布估计结果对照</h3>
+                        <span>{{ distributionChartDescription }}</span>
                       </div>
                     </template>
-                    <div class="table-explain-card">
-                      本表用于模拟实验验证。真实计数仅来自模拟数据生成过程；新方案和传统方案均为聚合估计结果。为突出估计效果，误差列展示估计值与真实计数之间的绝对误差。
-                    </div>
-                    <el-table :data="comparisonRows" border style="width: 100%">
-                      <el-table-column prop="label" label="类别" min-width="150" fixed />
-                      <el-table-column prop="trueCount" label="真实计数" min-width="120" align="center" />
-                      <el-table-column prop="reportCount" label="扰动后观测计数" min-width="150" align="center">
+                    <div ref="chartRef" class="chart-box chart-box--distribution"></div>
+                  </el-card>
+
+                  <el-card shadow="never" class="result-card">
+                    <template #header>
+                      <div class="block-heading block-heading--compact">
+                        <h3>误差明细表</h3>
+                        <span>{{ detailTableDescription }}</span>
+                      </div>
+                    </template>
+                    <el-table :data="comparisonDetailRows" border style="width: 100%">
+                      <el-table-column prop="label" label="类别" min-width="140" fixed />
+                      <el-table-column prop="referenceValue" label="真实值" min-width="110" align="center">
+                        <template #default="scope">{{ formatDetailNumber(scope.row.referenceValue) }}</template>
+                      </el-table-column>
+                      <el-table-column prop="newEstimate" label="新方案估计" min-width="140" align="center">
                         <template #default="scope">
-                          <span class="muted-count">{{ scope.row.reportCount }}</span>
+                          <span class="new-estimate-value">{{ formatDetailNumber(scope.row.newEstimate) }}</span>
                         </template>
                       </el-table-column>
-                      <el-table-column prop="newEstimate" label="新方案聚合估计值" min-width="170" align="center">
+                      <el-table-column prop="newBias" label="新方案偏差" min-width="130" align="center">
+                        <template #default="scope">{{ formatSignedDetail(scope.row.newBias) }}</template>
+                      </el-table-column>
+                      <el-table-column v-if="showTraditionalComparison" prop="traditionalEstimate" label="传统方案估计" min-width="150" align="center">
+                        <template #default="scope">{{ formatOptionalDetailNumber(scope.row.traditionalEstimate) }}</template>
+                      </el-table-column>
+                      <el-table-column v-if="showTraditionalComparison" prop="traditionalBias" label="传统方案偏差" min-width="140" align="center">
+                        <template #default="scope">{{ formatOptionalSignedDetail(scope.row.traditionalBias) }}</template>
+                      </el-table-column>
+                      <el-table-column v-if="showTraditionalComparison" prop="betterScheme" label="更优方案" min-width="120" align="center">
                         <template #default="scope">
-                          <span class="new-estimate-value">{{ formatNumber(scope.row.newEstimate) }}</span>
+                          <el-tag
+                            :type="scope.row.betterScheme === '新方案' ? 'success' : 'warning'"
+                            effect="light"
+                          >
+                            {{ scope.row.betterScheme }}
+                          </el-tag>
                         </template>
-                      </el-table-column>
-                      <el-table-column prop="newError" label="新方案绝对误差" min-width="150" align="center">
-                        <template #default="scope">{{ formatAbsoluteError(scope.row.newError) }}</template>
-                      </el-table-column>
-                      <el-table-column prop="traditionalEstimate" label="传统方案估计值" min-width="160" align="center">
-                        <template #default="scope">{{ formatOptionalNumber(scope.row.traditionalEstimate) }}</template>
-                      </el-table-column>
-                      <el-table-column prop="traditionalError" label="传统方案绝对误差" min-width="150" align="center">
-                        <template #default="scope">{{ formatOptionalAbsoluteError(scope.row.traditionalError) }}</template>
-                      </el-table-column>
-                      <el-table-column label="误差降低" min-width="130" align="center">
-                        <template #default="scope">{{ formatErrorReduction(scope.row) }}</template>
                       </el-table-column>
                     </el-table>
-                    <div v-if="hasNegativeTraditionalEstimate" class="table-footnote">
-                      传统方案估计值可能因随机扰动校正产生负估计，表格保留原始计算结果用于对比；实际应用中可根据任务需求进行非负截断或归一化处理。
-                    </div>
-                  </el-card>
-
-                  <el-card shadow="never" class="result-card">
-                    <template #header>
-                      <div class="block-heading block-heading--compact">
-                        <h3>分布拟合对比图</h3>
-                        <span>主图聚焦真实分布、新方案聚合估计分布和传统方案估计分布</span>
-                      </div>
-                    </template>
-                    <div class="chart-conclusion-card">
-                      {{ chartConclusionText }}
-                    </div>
-                    <div ref="chartRef" class="chart-box"></div>
-                    <div class="chart-note">
-                      扰动后观测分布作为中间观测结果保留在表格中。传统方案估计值可能因噪声校正出现负值，图中保留原始估计结果用于对比。
-                    </div>
-                  </el-card>
-
-                  <el-card shadow="never" class="result-card">
-                    <template #header>
-                      <div class="block-heading block-heading--compact">
-                        <h3>估计误差对比</h3>
-                        <span>使用表格中已有误差字段的绝对值，突出不同方案的估计偏差</span>
-                      </div>
-                    </template>
-                    <div ref="errorChartRef" class="chart-box chart-box--error"></div>
                   </el-card>
                 </section>
               </template>
@@ -211,6 +207,13 @@ import {
   getArrParams,
   getArrRecords
 } from '../../utils/arrDemoUtils';
+import {
+  aggregateAOUE,
+  aggregateTraditionalGRR,
+  perturbAOUEWithDetails,
+  perturbByTraditionalGRR
+} from '../../utils/ldpAlgorithms';
+import { STAND_BUCKET_ORDER, STEP_BUCKET_ORDER } from '../../utils/constants';
 
 const PROTOCOL_ATTRIBUTE_LABELS = {
   ARR: '是否触发睡眠异常提醒',
@@ -240,26 +243,66 @@ const experimentTasks = computed(() => taskStore.taskList.filter(task => {
 }));
 const selectedTask = computed(() => experimentTasks.value.find(task => String(task.id) === String(selectedTaskId.value)) || null);
 const currentProtocol = computed(() => getTaskProtocol(selectedTask.value));
+const isTspExperiment = computed(() => currentProtocol.value === 'TSP');
+const showTraditionalComparison = computed(() => !isTspExperiment.value);
 const comparisonRows = computed(() => buildComparisonRows());
-const metricCards = computed(() => buildMetricCards());
+const comparisonDetailRows = computed(() => buildComparisonDetailRows());
+const newMAE = computed(() => average(comparisonDetailRows.value.map(row => row.newAbsError)));
+const traditionalMAE = computed(() => average(
+  comparisonDetailRows.value
+    .filter(row => row.traditionalAbsError != null)
+    .map(row => row.traditionalAbsError)
+));
+const improvementRate = computed(() => {
+  const traditional = Number(traditionalMAE.value);
+  const current = Number(newMAE.value);
+  if (!Number.isFinite(traditional) || traditional <= 0 || !Number.isFinite(current)) {
+    return 0;
+  }
+  return ((traditional - current) / traditional) * 100;
+});
+const betterOverallScheme = computed(() => {
+  if (traditionalMAE.value == null) {
+    return '新方案';
+  }
+  return Number(newMAE.value) <= Number(traditionalMAE.value) ? '新方案' : '传统方案';
+});
+const comparisonMetricCards = computed(() => {
+  const cards = [
+    { label: '新方案 MAE', value: formatDetailNumber(newMAE.value), type: 'new' }
+  ];
+  if (!showTraditionalComparison.value) {
+    return cards;
+  }
+  return [
+    ...cards,
+    { label: '传统方案 MAE', value: formatOptionalDetailNumber(traditionalMAE.value), type: 'traditional' },
+    { label: '误差下降', value: `${formatPercent(improvementRate.value)}%`, type: 'improvement' },
+    { label: '当前更优方案', value: betterOverallScheme.value, type: 'best', isTag: true }
+  ];
+});
 const hasTraditionalEstimate = computed(() => comparisonRows.value.some(row => row.traditionalEstimate != null));
-const hasNegativeTraditionalEstimate = computed(() => comparisonRows.value.some(row => Number(row.traditionalEstimate) < 0));
+const distributionChartDescription = computed(() => (
+  showTraditionalComparison.value
+    ? '展示真实分布、新方案估计分布与传统方案估计分布的数值差异。'
+    : '展示真实分布与新方案估计分布的数值差异。'
+));
+const detailTableDescription = computed(() => (
+  showTraditionalComparison.value
+    ? '逐类展示真实值、估计偏差和更优方案。'
+    : '逐类展示真实值与新方案估计偏差。'
+));
 const chartConclusionText = computed(() => {
   if (!currentResult.value) {
     return '';
   }
-  const rows = comparisonRows.value;
-  const newMae = average(rows.map(row => Math.abs(Number(row.newError))));
-  const traditionalMae = average(
-    rows
-      .filter(row => row.traditionalError != null)
-      .map(row => Math.abs(Number(row.traditionalError)))
-  );
-
-  if (traditionalMae == null) {
-    return `当前任务暂未配置传统方案估计结果，仅展示新方案估计效果。新方案 MAE = ${formatOptionalNumber(newMae)}。`;
+  if (!showTraditionalComparison.value) {
+    return '';
   }
-  return `当前任务下，新方案聚合估计结果更接近真实分布。新方案 MAE = ${formatOptionalNumber(newMae)}，传统方案 MAE = ${formatOptionalNumber(traditionalMae)}。`;
+  if (traditionalMAE.value == null) {
+    return `当前任务暂未配置传统方案估计结果，仅展示新方案估计效果。新方案 MAE = ${formatDetailNumber(newMAE.value)}。`;
+  }
+  return `当前任务下，新方案聚合估计结果更接近真实分布。新方案 MAE = ${formatDetailNumber(newMAE.value)}，传统方案 MAE = ${formatDetailNumber(traditionalMAE.value)}，误差下降约 ${formatPercent(improvementRate.value)}%。`;
 });
 const emptyText = computed(() => {
   if (!experimentTasks.value.length) {
@@ -288,12 +331,174 @@ function getArrTraditionalRows() {
   return buildArrExperimentRows(records, params);
 }
 
+function createDeterministicRandom(seedText) {
+  let seed = 2166136261;
+  String(seedText).split('').forEach(char => {
+    seed ^= char.charCodeAt(0);
+    seed = Math.imul(seed, 16777619);
+  });
+  return () => {
+    seed = Math.imul(seed ^ (seed >>> 15), 2246822507);
+    seed = Math.imul(seed ^ (seed >>> 13), 3266489909);
+    seed ^= seed >>> 16;
+    return (seed >>> 0) / 4294967296;
+  };
+}
+
+function getStoredSubmissions(taskId = '') {
+  try {
+    const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
+    return storedData.filter(item => !taskId || String(item.task_id ?? item.taskId) === String(taskId));
+  } catch (error) {
+    console.error('读取实验对比数据失败:', error);
+    return [];
+  }
+}
+
+function normalizeAgrrCode(value) {
+  const numericValue = Number(value);
+  if (!Number.isInteger(numericValue) || numericValue < 1 || numericValue > STAND_BUCKET_ORDER.length) {
+    return null;
+  }
+  return numericValue;
+}
+
+function normalizeAoueCode(value) {
+  const numericValue = Number(value);
+  if (!Number.isInteger(numericValue) || numericValue < 1 || numericValue > STEP_BUCKET_ORDER.length) {
+    return null;
+  }
+  return numericValue;
+}
+
+function getAgrrOriginalSamples() {
+  if (currentProtocol.value !== 'AGRR' || !selectedTask.value) {
+    return [];
+  }
+  return getStoredSubmissions(selectedTask.value.id)
+    .filter(item => String(item?.reportData?.protocol || item?.protocol || '').toUpperCase() === 'AGRR')
+    .map(item => (
+      item.original_bucket_code
+      ?? item.rawData?.standBucketCode
+      ?? item.reportData?.rawBucketCode
+      ?? item.rawData?.rawValue
+    ))
+    .map(normalizeAgrrCode)
+    .filter(value => value != null);
+}
+
+function getAgrrTraditionalRows() {
+  if (currentProtocol.value !== 'AGRR' || !selectedTask.value || !currentResult.value) {
+    return [];
+  }
+  const originalSamples = getAgrrOriginalSamples();
+  if (!originalSamples.length) {
+    return [];
+  }
+  const domainValues = STAND_BUCKET_ORDER.map((_, index) => index + 1);
+  const epsilon = Number(currentResult.value.epsilon ?? selectedTask.value?.privacyBudget ?? 0.5);
+  const grrReportedValues = originalSamples.map((rawValue, index) => (
+    perturbByTraditionalGRR(
+      rawValue,
+      domainValues,
+      epsilon,
+      createDeterministicRandom(`${selectedTask.value.id}-agrr-traditional-grr-${index}-${rawValue}`)
+    ).reportedValue
+  ));
+  const grrResult = aggregateTraditionalGRR(grrReportedValues, domainValues, epsilon);
+  const traditionalEstimates = grrResult.rawEstimatedCounts || grrResult.estimatedCounts || [];
+  return STAND_BUCKET_ORDER.map((label, index) => ({
+    label,
+    traditionalEstimate: Number((Number(traditionalEstimates[index] ?? 0)).toFixed(4))
+  }));
+}
+
+function getAoueOriginalSamplesFromResult() {
+  if (!currentResult.value?.compareRows?.length) {
+    return [];
+  }
+  return currentResult.value.compareRows.flatMap((row, index) => {
+    const count = Math.max(0, Math.round(Number(row.trueCount || 0)));
+    return new Array(count).fill(index + 1);
+  });
+}
+
+function getAoueOriginalSamples() {
+  if (currentProtocol.value !== 'AOUE' || !selectedTask.value) {
+    return [];
+  }
+  const records = getStoredSubmissions(selectedTask.value.id)
+    .filter(item => String(item?.reportData?.protocol || item?.protocol || '').toUpperCase() === 'AOUE');
+  const samples = records
+    .map(item => {
+      const rawBucket = item.original_bucket || item.rawData?.stepsBucket || item.reportData?.rawBucket;
+      if (rawBucket) {
+        const labelIndex = STEP_BUCKET_ORDER.indexOf(rawBucket);
+        if (labelIndex >= 0) {
+          return labelIndex + 1;
+        }
+      }
+      return (
+        item.original_bucket_code
+        ?? item.rawData?.stepsBucketCode
+        ?? item.reportData?.rawBucketCode
+        ?? item.rawData?.rawValue
+      );
+    })
+    .map(normalizeAoueCode)
+    .filter(value => value != null);
+
+  return samples.length ? samples : getAoueOriginalSamplesFromResult();
+}
+
+function getAoueTraditionalRows() {
+  if (currentProtocol.value !== 'AOUE' || !selectedTask.value || !currentResult.value) {
+    return [];
+  }
+  const originalSamples = getAoueOriginalSamples();
+  if (!originalSamples.length) {
+    return [];
+  }
+  const domainSize = STEP_BUCKET_ORDER.length;
+  const epsilon = Number(currentResult.value.epsilon ?? selectedTask.value?.privacyBudget ?? 0.5);
+  const q = 1 / (Math.exp(epsilon) + 1);
+  const p = 0.5;
+  const perturbedVectors = originalSamples.map((rawValue, index) => (
+    perturbAOUEWithDetails(
+      rawValue,
+      domainSize,
+      q,
+      p,
+      createDeterministicRandom(`${selectedTask.value.id}-aoue-traditional-oue-${index}-${rawValue}`)
+    ).reportValue
+  ));
+  const traditionalEstimates = aggregateAOUE(perturbedVectors, epsilon, domainSize, p, q);
+
+  return STEP_BUCKET_ORDER.map((label, index) => ({
+    label,
+    traditionalEstimate: Number((Number(traditionalEstimates[index] ?? 0)).toFixed(4))
+  }));
+}
+
+function getTraditionalRows() {
+  if (currentProtocol.value === 'ARR') {
+    return getArrTraditionalRows();
+  }
+  if (currentProtocol.value === 'AGRR') {
+    return getAgrrTraditionalRows();
+  }
+  if (currentProtocol.value === 'AOUE') {
+    return getAoueTraditionalRows();
+  }
+  return [];
+}
+
 function buildComparisonRows() {
   if (!currentResult.value) {
     return [];
   }
 
-  const traditionalRows = getArrTraditionalRows();
+  const traditionalRows = getTraditionalRows();
   return currentResult.value.compareRows.map((row, index) => {
     const traditionalRow = traditionalRows.find(item => item.label === row.label);
     const traditionalEstimate = traditionalRow?.traditionalEstimate ?? null;
@@ -309,6 +514,33 @@ function buildComparisonRows() {
   });
 }
 
+function buildComparisonDetailRows() {
+  return comparisonRows.value.map(row => {
+    const referenceValue = Number(row.trueCount || 0);
+    const newEstimate = Number(row.newEstimate || 0);
+    const traditionalEstimate = row.traditionalEstimate == null ? null : Number(row.traditionalEstimate);
+    const newBias = Number((newEstimate - referenceValue).toFixed(4));
+    const traditionalBias = traditionalEstimate == null
+      ? null
+      : Number((traditionalEstimate - referenceValue).toFixed(4));
+    const newAbsError = Math.abs(newBias);
+    const traditionalAbsError = traditionalBias == null ? null : Math.abs(traditionalBias);
+    const betterScheme = traditionalAbsError == null || newAbsError <= traditionalAbsError ? '新方案' : '传统方案';
+    return {
+      label: row.label,
+      referenceValue,
+      reportCount: row.reportCount,
+      newEstimate,
+      newBias,
+      newAbsError,
+      traditionalEstimate,
+      traditionalBias,
+      traditionalAbsError,
+      betterScheme
+    };
+  });
+}
+
 function average(values) {
   const numericValues = values.filter(value => Number.isFinite(Number(value))).map(Number);
   if (!numericValues.length) {
@@ -318,11 +550,27 @@ function average(values) {
 }
 
 function calculateTraditionalMetrics() {
-  if (currentProtocol.value !== 'ARR') {
+  if (!['ARR', 'AGRR', 'AOUE'].includes(currentProtocol.value)) {
     return null;
   }
-  const rows = getArrTraditionalRows();
-  const metrics = buildArrErrorMetrics(rows);
+  const rows = currentProtocol.value === 'ARR'
+    ? getArrTraditionalRows()
+    : comparisonRows.value.filter(row => row.traditionalError != null);
+  if (!rows.length) {
+    return null;
+  }
+  const metrics = currentProtocol.value === 'ARR'
+    ? buildArrErrorMetrics(rows)
+    : [
+        {
+          label: '传统方案 MAE',
+          value: average(rows.map(row => Math.abs(Number(row.traditionalError || 0))))?.toFixed(4) ?? '--'
+        },
+        {
+          label: '传统方案 MSE',
+          value: average(rows.map(row => Number(row.traditionalError || 0) ** 2))?.toFixed(4) ?? '--'
+        }
+      ];
   return {
     mae: metrics.find(item => item.label === '传统方案 MAE')?.value ?? '--',
     mse: metrics.find(item => item.label === '传统方案 MSE')?.value ?? '--'
@@ -399,6 +647,7 @@ function renderChart() {
     errorChartInstance?.resize();
 
     const rows = comparisonRows.value;
+    const detailRows = comparisonDetailRows.value;
     const series = [
       {
         name: '真实分布',
@@ -409,7 +658,7 @@ function renderChart() {
         itemStyle: { color: '#67c23a', borderRadius: [6, 6, 0, 0] }
       },
       {
-        name: '新方案聚合估计分布',
+        name: '新方案估计分布',
         type: 'bar',
         barGap: '0%',
         barMaxWidth: 34,
@@ -442,39 +691,57 @@ function renderChart() {
       series
     }, true);
 
-    const errorSeries = [
+    const biasSeries = [
       {
-        name: '新方案绝对误差',
+        name: '新方案偏差',
         type: 'bar',
         barGap: '0%',
         barMaxWidth: 34,
-        data: rows.map(row => Math.abs(Number(row.newError || 0))),
-        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] }
+        data: detailRows.map(row => Number(row.newBias || 0)),
+        itemStyle: { color: '#409eff', borderRadius: [6, 6, 0, 0] },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          data: [{ yAxis: 0, name: '0 基准线' }],
+          lineStyle: { color: '#111827', width: 1, type: 'solid' },
+          label: { formatter: '0 基准线', color: '#475569' }
+        }
       }
     ];
 
     if (hasTraditionalEstimate.value) {
-      errorSeries.push({
-        name: '传统方案绝对误差',
+      biasSeries.push({
+        name: '传统方案偏差',
         type: 'bar',
         barGap: '0%',
         barMaxWidth: 34,
-        data: rows.map(row => row.traditionalError == null ? 0 : Math.abs(Number(row.traditionalError))),
+        data: detailRows.map(row => row.traditionalBias == null ? 0 : Number(row.traditionalBias)),
         itemStyle: { color: '#f59e0b', borderRadius: [6, 6, 0, 0] }
       });
     }
 
     errorChartInstance?.setOption({
-      tooltip: { trigger: 'axis' },
+      tooltip: {
+        trigger: 'axis',
+        formatter(params) {
+          const category = params?.[0]?.axisValue ?? '';
+          const lines = [`${category}`];
+          params.forEach(item => {
+            lines.push(`${item.marker}${item.seriesName}：${formatSignedDetail(item.value)}`);
+          });
+          lines.push('偏差 = 估计值 - 真实值');
+          return lines.join('<br/>');
+        }
+      },
       legend: { top: 0 },
       grid: { top: 48, left: 52, right: 24, bottom: 48 },
       xAxis: {
         type: 'category',
-        data: rows.map(row => row.label),
+        data: detailRows.map(row => row.label),
         axisLabel: { interval: 0 }
       },
-      yAxis: { type: 'value', name: '绝对误差' },
-      series: errorSeries
+      yAxis: { type: 'value', name: '估计偏差' },
+      series: biasSeries
     }, true);
   });
 }
@@ -530,18 +797,64 @@ function formatOptionalSigned(value) {
   return value == null ? '--' : formatSigned(value);
 }
 
+function formatDetailNumber(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '--';
+  }
+  return numeric.toFixed(2);
+}
+
+function formatOptionalDetailNumber(value) {
+  return value == null ? '--' : formatDetailNumber(value);
+}
+
+function formatSignedDetail(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '--';
+  }
+  return numeric > 0 ? `+${numeric.toFixed(2)}` : numeric.toFixed(2);
+}
+
+function formatOptionalSignedDetail(value) {
+  return value == null ? '--' : formatSignedDetail(value);
+}
+
+function formatPercent(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '0.00';
+  }
+  return numeric.toFixed(2);
+}
+
 function handleLogout() {
   userStore.logout();
   router.push('/login');
 }
 
 watch(selectedTaskId, refreshExperiment);
+watch(
+  () => route.query.taskId,
+  taskId => {
+    if (!taskId) return;
+    const matchedTask = experimentTasks.value.find(task => String(task.id) === String(taskId));
+    if (matchedTask && String(selectedTaskId.value) !== String(matchedTask.id)) {
+      selectedTaskId.value = matchedTask.id;
+    }
+  }
+);
 watch(comparisonRows, renderChart);
 
 onMounted(() => {
   taskStore.loadFromLocalStorage();
   attributeConfigStore.loadFromLocalStorage();
-  if (experimentTasks.value.length > 0) {
+  const routeTaskId = route.query.taskId;
+  const matchedTask = experimentTasks.value.find(task => String(task.id) === String(routeTaskId));
+  if (matchedTask) {
+    selectedTaskId.value = matchedTask.id;
+  } else if (experimentTasks.value.length > 0) {
     selectedTaskId.value = experimentTasks.value[0].id;
   }
   refreshExperiment();
@@ -695,8 +1008,84 @@ onUnmounted(() => {
   min-height: 280px;
 }
 
+.comparison-summary-section,
 .metric-section {
   flex: 0 0 auto;
+}
+
+.conclusion-banner {
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%);
+  color: #1e3a8a;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.comparison-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.comparison-metric-card {
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.comparison-metric-card span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.comparison-metric-card strong {
+  margin-top: 8px;
+  color: #111827;
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.comparison-metric-card--new {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.comparison-metric-card--new strong {
+  color: #0f5db8;
+}
+
+.comparison-metric-card--traditional {
+  border-color: #fed7aa;
+  background: #fffaf3;
+}
+
+.comparison-metric-card--traditional strong {
+  color: #b45309;
+}
+
+.comparison-metric-card--improvement {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.comparison-metric-card--improvement strong {
+  color: #15803d;
+}
+
+.comparison-metric-card--best {
+  align-items: flex-start;
 }
 
 .metric-grid {
@@ -833,13 +1222,27 @@ onUnmounted(() => {
   background: #fff;
 }
 
-.chart-box--error {
+.chart-box--bias {
+  height: 380px;
+}
+
+.chart-box--distribution {
   height: 320px;
 }
 
 .chart-note {
   margin-top: 10px;
   color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.comparison-note-strip {
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
   font-size: 13px;
   line-height: 1.6;
 }
@@ -854,6 +1257,10 @@ onUnmounted(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .comparison-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .notice-section {
     grid-template-columns: 1fr;
   }
@@ -861,6 +1268,10 @@ onUnmounted(() => {
 
 @media (max-width: 720px) {
   .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-metric-grid {
     grid-template-columns: 1fr;
   }
 

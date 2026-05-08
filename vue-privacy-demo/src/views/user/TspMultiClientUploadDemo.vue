@@ -556,6 +556,8 @@ function buildSubmissionRecords() {
     report_value: row.stageTwoValue,
     original_missing: row.rawMissing,
     original_score: row.rawScore,
+    stage1_result: row.stageOneSkipped ? 'skipped' : row.stageOneValue,
+    stage2_input: row.stageTwoInput,
     rawData: {
       scenario: 'tsp',
       sleepMissing: row.rawMissing,

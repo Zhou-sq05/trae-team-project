@@ -2,8 +2,7 @@
   <div class="aoue-demo-panel" :class="`is-${mode}`">
     <div v-if="showExpandAction || mode === 'expanded'" class="aoue-shell-head">
       <div>
-        <div class="aoue-shell-eyebrow">{{ mode === 'expanded' ? '放大演示模式' : '紧凑演示模式' }}</div>
-        <div class="aoue-shell-title">AOUE 单次扰动演示</div>
+        <div v-if="mode === 'expanded'" class="aoue-shell-eyebrow">放大演示模式</div>
       </div>
       <el-button v-if="showExpandAction" plain @click="demo.onExpand">
         <el-icon><FullScreen /></el-icon>
@@ -12,40 +11,19 @@
     </div>
 
     <div class="aoue-compact-strip">
-      <div v-for="item in demo.metaCards" :key="item.label" class="aoue-meta-card">
+      <div
+        v-for="item in demo.metaCards"
+        :key="item.label"
+        class="aoue-meta-card"
+        :class="{ 'is-stage-active': demo.animationStatus === 'bucketing' && ['原始步数', '当前分桶'].includes(item.label) }"
+      >
         <div class="aoue-meta-label">{{ item.label }}</div>
         <div class="aoue-meta-value">{{ item.value }}</div>
       </div>
     </div>
 
-    <div v-if="demo.currentPerturbationStatus" class="aoue-soft-note">
-      <div class="aoue-soft-note__title">{{ demo.currentPerturbationStatus.title }}</div>
-      <div class="aoue-soft-note__desc">{{ demo.currentPerturbationStatus.description }}</div>
-    </div>
-
     <div v-if="!demo.parametersReady" class="preview-tip">
       当前任务尚未在管理端完成 AOUE 参数保存，暂时无法执行本地扰动。
-    </div>
-
-    <div class="aoue-hero-card" :class="demo.animationStatus === 'done' ? `is-${demo.finalResultAnalysis.resultType}` : 'is-running'">
-      <div class="aoue-hero-head">
-        <div>
-          <div class="aoue-hero-eyebrow">AOUE 单次扰动结果总览</div>
-          <h4 class="aoue-hero-title">本次扰动后编码向量</h4>
-        </div>
-        <div class="aoue-hero-status">{{ demo.overviewTypeText }}</div>
-      </div>
-      <div class="aoue-hero-vector">{{ demo.overviewVectorText }}</div>
-      <div class="aoue-hero-grid">
-        <div class="aoue-hero-metric">
-          <span class="aoue-hero-metric__label">播放模式</span>
-          <span class="aoue-hero-metric__value">{{ demo.playModeText }}</span>
-        </div>
-        <div class="aoue-hero-metric">
-              <span class="aoue-hero-metric__label">向量说明</span>
-          <span class="aoue-hero-metric__value">{{ demo.overviewVectorNoteText }}</span>
-        </div>
-      </div>
     </div>
 
     <div class="aoue-stepper">
@@ -64,13 +42,11 @@
       <div class="aoue-visual-panel">
         <div class="summary-heading">
           <h4>{{ demo.animationStatusText }}</h4>
-          <span class="section-tip">先展示分桶与编码，再进入 AOUE 的逐位独立扰动</span>
         </div>
 
         <div v-if="demo.animationReady" class="aoue-vector-board">
           <div class="aoue-vector-caption-row">
             <span>初始编码向量</span>
-            <span class="aoue-vector-caption-row__hint">编码阶段会先出现全 0 向量，再把目标位置为 1</span>
           </div>
           <div class="aoue-vector-columns">
             <div v-for="cell in demo.vectorColumns" :key="`original-${cell.index}`" class="aoue-vector-column">
@@ -96,7 +72,6 @@
 
           <div class="aoue-vector-caption-row aoue-vector-caption-row--bottom">
             <span>扰动后编码向量</span>
-            <span class="aoue-vector-caption-row__hint">进入扰动阶段后，结果向量会按位从左到右逐步生成</span>
           </div>
           <div class="aoue-vector-columns">
             <div v-for="cell in demo.vectorColumns" :key="`result-${cell.index}`" class="aoue-vector-column">
@@ -108,11 +83,6 @@
             </div>
           </div>
 
-          <div class="aoue-board-footer">
-            <span>状态：{{ demo.animationStatusText }}</span>
-            <span>模式：{{ demo.playModeText }}</span>
-            <span>已完成 {{ demo.completedBitsCount }} / {{ demo.bitStepsLength }} 位</span>
-          </div>
         </div>
 
         <div v-else class="empty-box">
@@ -181,7 +151,6 @@
         <h4>bit 日志</h4>
         <el-button text @click="demo.onToggleLog">{{ demo.logToggleText }}</el-button>
       </div>
-      <div class="aoue-log-panel__hint">日志区保留最近若干条 bit 判断，主视觉仍聚焦编码与向量变化。</div>
       <div v-if="demo.animationReady" class="aoue-log-scroll">
         <div
           v-for="step in demo.visibleLogRows"
@@ -251,7 +220,7 @@ defineProps({
 
 .aoue-compact-strip {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
 }
 
@@ -260,6 +229,12 @@ defineProps({
   border-radius: 10px;
   border: 1px solid #e6edf5;
   background: #fafcff;
+}
+
+.aoue-meta-card.is-stage-active {
+  border-color: #f6c453;
+  background: #fff8e8;
+  box-shadow: 0 0 0 3px rgba(246, 196, 83, 0.16);
 }
 
 .aoue-meta-label {
@@ -295,7 +270,7 @@ defineProps({
 }
 
 .aoue-hero-card {
-  padding: 20px 22px;
+  padding: 16px 18px;
   border-radius: 18px;
   border: 1px solid #d9e8fb;
   background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 100%);
@@ -352,46 +327,63 @@ defineProps({
   white-space: nowrap;
 }
 
-.aoue-hero-vector {
-  margin-top: 16px;
-  padding: 16px 18px;
+.aoue-hero-result-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.45fr) minmax(0, 0.55fr);
+  gap: 14px;
+}
+
+.aoue-hero-result-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aoue-hero-result-card {
+  min-height: 120px;
+  padding: 18px 20px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(191, 219, 254, 0.9);
-  font-size: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.aoue-hero-result-card--note {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.aoue-hero-result-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1f2f46;
+  padding-left: 2px;
+}
+
+.aoue-hero-vector {
+  font-size: 38px;
   line-height: 1.35;
   font-weight: 800;
   color: #0f172a;
   word-break: break-all;
 }
 
-.aoue-hero-grid {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 12px;
+.aoue-hero-vector.is-placeholder {
+  font-size: 30px;
 }
 
-.aoue-hero-metric {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(219, 234, 254, 0.95);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.aoue-hero-metric__label {
-  font-size: 12px;
-  color: #6b7785;
-}
-
-.aoue-hero-metric__value {
-  font-size: 16px;
+.aoue-hero-note {
+  font-size: 23px;
   font-weight: 700;
   color: #1f2d3d;
-  line-height: 1.6;
+  line-height: 1.45;
+}
+
+.aoue-hero-note.is-placeholder {
+  font-size: 20px;
+  line-height: 1.5;
 }
 
 .aoue-stepper {
@@ -784,7 +776,11 @@ defineProps({
 }
 
 .aoue-demo-panel.is-compact .aoue-hero-vector {
-  font-size: 26px;
+  font-size: 36px;
+}
+
+.aoue-demo-panel.is-compact .aoue-hero-vector.is-placeholder {
+  font-size: 30px;
 }
 
 .aoue-demo-panel.is-expanded {
@@ -796,11 +792,19 @@ defineProps({
 }
 
 .aoue-demo-panel.is-expanded .aoue-hero-card {
-  padding: 24px 28px;
+  padding: 18px 22px;
 }
 
 .aoue-demo-panel.is-expanded .aoue-hero-vector {
-  font-size: 34px;
+  font-size: 40px;
+}
+
+.aoue-demo-panel.is-expanded .aoue-hero-vector.is-placeholder {
+  font-size: 30px;
+}
+
+.aoue-demo-panel.is-expanded .aoue-hero-result-card {
+  min-height: 136px;
 }
 
 .aoue-demo-panel.is-expanded .aoue-main-grid {
@@ -827,7 +831,7 @@ defineProps({
 
 @media (max-width: 960px) {
   .aoue-compact-strip,
-  .aoue-hero-grid,
+  .aoue-hero-result-grid,
   .aoue-main-grid,
   .aoue-stepper {
     grid-template-columns: 1fr;

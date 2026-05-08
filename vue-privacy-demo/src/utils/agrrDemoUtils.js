@@ -1,4 +1,4 @@
-import { AGRR } from './ldpAlgorithms';
+import { AGRR, calculateAGRParameters } from './ldpAlgorithms';
 import { STAND_BUCKET_ORDER } from './constants';
 import {
   CONDITION_DISTRIBUTION_KEYS,
@@ -33,15 +33,15 @@ export function getAgrrParams(task, attributeConfigStore) {
   const config = getAgrrConfig(task, attributeConfigStore);
   const epsilon = Number(config?.epsilon ?? task?.privacyBudget ?? 0.5);
   const domainSize = STAND_BUCKET_ORDER.length;
-  const expEpsilon = Math.exp(epsilon);
-  const fallbackP = expEpsilon / (expEpsilon + domainSize - 1);
-  const fallbackQ = 1 / (expEpsilon + domainSize - 1);
+  const alpha = Number(config?.alphaBetaResult?.alpha ?? config?.alpha ?? 0);
+  const beta = Number(config?.alphaBetaResult?.beta ?? config?.beta ?? 0);
+  const calibrated = calculateAGRParameters(alpha, beta, epsilon, domainSize);
 
   return {
     epsilon,
     domainSize,
-    p: Number(config?.calibratedParams?.p ?? fallbackP),
-    q: Number(config?.calibratedParams?.q ?? fallbackQ)
+    p: calibrated.p,
+    q: calibrated.q
   };
 }
 

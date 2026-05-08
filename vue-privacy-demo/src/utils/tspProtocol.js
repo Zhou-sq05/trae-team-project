@@ -53,38 +53,16 @@ export function resolveTspTaskConfig(taskOrSnapshot, scoreDomainSize = 5) {
   const version = getTspVersion();
   const calculated = calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize);
 
-  let p1 = Number(snapshot.calibratedParams?.p1);
-  let q1 = Number(snapshot.calibratedParams?.q1);
-  let p2 = Number(snapshot.calibratedParams?.p2);
-  let q2 = Number(snapshot.calibratedParams?.q2);
-  let pStar = Number(snapshot.calibratedParams?.pStar);
-  let qStar = Number(snapshot.calibratedParams?.qStar);
-
-  if (!hasValidStoredTspParams({ p1, q1, p2, q2, pStar, qStar, scoreDomainSize })) {
-    p1 = calculated.p1;
-    q1 = calculated.q1;
-    p2 = calculated.p2;
-    q2 = calculated.q2;
-    pStar = calculated.pStar;
-    qStar = calculated.qStar;
-  }
-
-  if (!Number.isFinite(pStar) || !Number.isFinite(qStar)) {
-    const constraints = buildProbabilityConstraints(p1, q1, p2, q2, scoreDomainSize);
-    pStar = constraints.expectedPStar;
-    qStar = constraints.expectedQStar;
-  }
-
   return {
     alpha,
     beta,
     epsilon,
-    p1,
-    q1,
-    p2,
-    q2,
-    pStar,
-    qStar,
+    p1: calculated.p1,
+    q1: calculated.q1,
+    p2: calculated.p2,
+    q2: calculated.q2,
+    pStar: calculated.pStar,
+    qStar: calculated.qStar,
     scoreDomainSize,
     unifiedDomainSize: scoreDomainSize + 1,
     version,

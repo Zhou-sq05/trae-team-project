@@ -34,22 +34,13 @@
               />
             </el-select>
           </div>
-          <div v-if="currentTaskDetail" class="task-meta-grid">
-            <div class="meta-card">
-              <div class="meta-label">当前任务</div>
-              <div class="meta-value">{{ currentTaskDetail.title }}</div>
+          <div v-if="currentTaskDetail" class="task-binding-summary">
+            <div class="task-plain-row">
+              <span class="task-plain-label">采集任务：</span>
+              <span class="task-plain-value">{{ currentTaskDetail.title }}</span>
             </div>
-            <div class="meta-card">
-              <div class="meta-label">协议</div>
-              <div class="meta-value">{{ currentTaskDetail.protocol }}</div>
-            </div>
-            <div class="meta-card">
-              <div class="meta-label">防护模式</div>
-              <div class="meta-value">{{ currentTaskDetail.mode }}</div>
-            </div>
-            <div class="meta-card">
-              <div class="meta-label">任务 ID</div>
-              <div class="meta-value">{{ currentTaskDetail.taskId }}</div>
+            <div class="task-tech-note">
+              技术方案：{{ currentTaskDetail.protocol }}｜防护模式：{{ currentTaskDetail.mode }}
             </div>
           </div>
         </div>
@@ -66,10 +57,6 @@
               <span>{{ statusText }}</span>
             </div>
           </div>
-          <div class="info-item">
-            <span>采集模式：</span>
-            <span>按当前任务动态采集</span>
-          </div>
         </div>
 
         <div class="dynamic-form-panel">
@@ -78,7 +65,7 @@
             <p>请先选择任务，系统会根据当前任务动态展示采集属性。</p>
           </div>
 
-          <div v-else class="dynamic-form">
+          <div v-else class="dynamic-form collection-input-card">
             <div v-if="currentTaskDetail.scenario === 'arr'" class="form-item">
               <span>是否触发睡眠异常提醒</span>
               <el-radio-group v-model="dynamicForm.fallAlarm" @change="markFormTouched">
@@ -137,58 +124,17 @@
           </div>
         </div>
 
-        <div class="dynamic-form-panel">
-          <div class="summary-heading">
-            <h3>单次扰动演示</h3>
-            <span class="section-tip">基于当前输入执行一次本地扰动，查看单条样本的处理过程</span>
-          </div>
-
+        <div class="dynamic-form-panel demo-action-panel">
           <div v-if="!currentTaskDetail" class="empty-box">
             <p>请先选择任务，再执行单次扰动演示。</p>
           </div>
 
           <div v-else class="dynamic-form batch-simulator">
-            <div class="derived-hint">点击后将基于当前采集输入执行一次本地扰动，并自动切换到右侧“单次扰动演示”页签。</div>
+            <div class="derived-hint">请先生成示例输入，再执行一次扰动演示。</div>
             <div class="action-row">
               <el-button type="primary" @click="refreshData" :disabled="!currentTaskDetail">生成示例输入</el-button>
               <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
                 执行单次扰动演示
-              </el-button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="!['arr', 'agrr', 'tsp'].includes(currentTaskDetail?.scenario)" class="dynamic-form-panel separated-panel">
-          <div class="summary-heading">
-            <h3>手环端连续采集</h3>
-            <span class="section-tip">在当前页面连续执行本地扰动，健康手环持续采集</span>
-          </div>
-
-          <div v-if="!currentTaskDetail" class="empty-box">
-            <p>请先选择任务，再配置连续采集模拟。</p>
-          </div>
-
-          <div v-else class="dynamic-form batch-simulator">
-            <div class="form-item">
-              <span>连续采集次数</span>
-              <el-select v-model="batchSimulationCount" style="width: 180px">
-                <el-option label="10 次" :value="10" />
-                <el-option label="50 次" :value="50" />
-                <el-option label="100 次" :value="100" />
-                <el-option label="200 次" :value="200" />
-                <el-option label="500 次" :value="500" />
-              </el-select>
-            </div>
-
-            <div class="derived-hint">点击后将由手环端自动连续采集 {{ batchSimulationCount }} 次，并自动切换到右侧“连续采集结果”页签。</div>
-            <div class="action-row">
-              <el-button
-                type="success"
-                @click="runBatchSimulation"
-                :loading="batchSimulationRunning"
-                :disabled="!canRunBatchSimulation || batchSimulationRunning"
-              >
-                手环连续采集
               </el-button>
             </div>
           </div>
@@ -234,27 +180,7 @@
       <div class="right-section">
         <h3>演示调试区域</h3>
         <template v-if="['arr', 'agrr', 'aoue', 'tsp'].includes(currentTaskDetail?.scenario)">
-          <div v-if="!['agrr', 'tsp'].includes(currentTaskDetail?.scenario)" class="demo-tab-bar">
-            <button
-              v-if="currentTaskDetail?.scenario !== 'arr'"
-              type="button"
-              class="demo-tab-button"
-              :class="{ active: activeDemoTab === 'single' }"
-              @click="activeDemoTab = 'single'"
-            >
-              单次扰动演示
-            </button>
-            <button
-              type="button"
-              class="demo-tab-button"
-              :class="{ active: activeDemoTab === 'batch' }"
-              @click="activeDemoTab = 'batch'"
-            >
-              连续采集结果
-            </button>
-          </div>
-
-          <template v-if="activeDemoTab === 'single'">
+          <template v-if="true">
             <template v-if="currentTaskDetail?.scenario === 'aoue'">
               <AoueDemoPanel
                 :demo="aoueDemoViewModel"
@@ -293,10 +219,6 @@
                     <span class="demo-top-label">隐私预算 ε</span>
                     <span class="demo-top-value">{{ displayEpsilon }}</span>
                   </div>
-                  <div class="demo-top-item">
-                    <span class="demo-top-label">TSP 版本</span>
-                    <span class="demo-top-value">{{ tspVersionMeta?.label || '--' }}</span>
-                  </div>
                 </div>
               </div>
 
@@ -311,16 +233,24 @@
               </div>
 
               <div class="summary-block">
-                <div class="summary-heading">
-                  <h4>第一阶段</h4>
-                  <span class="section-tip">仅非缺失样本进入评分扰动</span>
+                <div class="summary-heading summary-heading--with-action">
+                  <div class="summary-heading__copy">
+                    <h4>编码</h4>
+                  </div>
+                  <el-button
+                    type="primary"
+                    plain
+                    @click="revealTspEncoding"
+                    :disabled="!canRevealTspEncoding"
+                  >
+                    编码
+                  </el-button>
                 </div>
-                <div v-if="tspSimulationResult?.stageOneSkipped" class="tsp-skip-panel">
-                  <div class="tsp-skip-title">第一阶段已跳过</div>
-                  <div class="tsp-skip-desc">{{ tspSimulationResult.stageOneSkipReason }}</div>
-                </div>
-                <div v-else class="card-grid">
-                  <div v-for="item in tspStageOneCards" :key="item.label" class="summary-card preview-card">
+                <div class="tsp-encoding-panel">
+                  <div class="preview-tip">
+                    编码规则：缺失值编码为 0，有效评分值保持为 1~5。非缺失样本先进入第一阶段扰动；缺失样本跳过第一阶段，直接进入第二阶段统一域扰动。
+                  </div>
+                  <div v-for="item in tspInputEncodingCards" :key="item.label" class="summary-card tsp-flow-card">
                     <div class="card-label">{{ item.label }}</div>
                     <div class="card-value">{{ item.value }}</div>
                   </div>
@@ -328,51 +258,99 @@
               </div>
 
               <div class="summary-block">
-                <div class="summary-heading">
-                  <h4>第二阶段</h4>
-                  <span class="section-tip">统一域 {0,1,2,3,4,5} 上报扰动</span>
+                <div class="summary-heading summary-heading--with-action">
+                  <div class="summary-heading__copy">
+                    <h4>第一阶段</h4>
+                    <span class="section-tip">仅非缺失样本进入评分扰动</span>
+                  </div>
+                  <el-button
+                    type="primary"
+                    plain
+                    @click="executeTspStageOne"
+                    :disabled="!canRunTspStageOne"
+                  >
+                    执行第一阶段扰动
+                  </el-button>
                 </div>
-                <div class="card-grid">
-                  <div v-for="item in tspStageTwoCards" :key="item.label" class="summary-card preview-card">
-                    <div class="card-label">{{ item.label }}</div>
-                    <div class="card-value">{{ item.value }}</div>
+                <div class="tsp-stage-layout">
+                  <div class="tsp-stage-main">
+                    <div v-for="item in tspStageOneMainCards" :key="item.label" class="summary-card preview-card tsp-flow-card">
+                      <div class="card-label">{{ item.label }}</div>
+                      <div class="card-value">{{ item.value }}</div>
+                    </div>
+                    <div v-if="tspStageOneReady && tspSimulationResult?.stageOneSkipped" class="tsp-skip-panel">
+                      <div class="tsp-skip-title">第一阶段已跳过</div>
+                      <div class="tsp-skip-desc">{{ tspSimulationResult.stageOneSkipReason }}</div>
+                    </div>
+                  </div>
+                  <div class="tsp-stage-aside">
+                    <div v-for="item in tspStageOneMetaCards" :key="item.label" class="tsp-meta-row">
+                      <span>{{ item.label }}</span>
+                      <strong>{{ item.value }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-block">
+                <div class="summary-heading summary-heading--with-action">
+                  <div class="summary-heading__copy">
+                    <h4>第二阶段</h4>
+                    <span class="section-tip">统一域 {0,1,2,3,4,5} 上报扰动</span>
+                  </div>
+                  <el-button
+                    type="primary"
+                    plain
+                    @click="executeTspStageTwo"
+                    :disabled="!canRunTspStageTwo"
+                  >
+                    执行第二阶段扰动
+                  </el-button>
+                </div>
+                <div class="tsp-stage-layout">
+                  <div class="tsp-stage-main">
+                    <div v-for="item in tspStageTwoMainCards" :key="item.label" class="summary-card preview-card tsp-flow-card">
+                      <div class="card-label">{{ item.label }}</div>
+                      <div class="card-value">{{ item.value }}</div>
+                    </div>
+                  </div>
+                  <div class="tsp-stage-aside">
+                    <div v-for="item in tspStageTwoMetaCards" :key="item.label" class="tsp-meta-row">
+                      <span>{{ item.label }}</span>
+                      <strong>{{ item.value }}</strong>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div class="summary-block">
                 <div class="summary-heading">
-                  <h4>最终上报结果</h4>
-                  <span class="section-tip">两阶段输出汇总后的最终值</span>
+                  <h4>待上报扰动结果</h4>
+                  <span class="section-tip">两阶段输出汇总后的待上报值</span>
                 </div>
-                <div class="card-grid">
-                  <div v-for="item in tspFinalReportCards" :key="item.label" class="summary-card preview-card">
-                    <div class="card-label">{{ item.label }}</div>
-                    <div class="card-value">{{ item.value }}</div>
+                <div class="tsp-final-layout">
+                  <div class="summary-card preview-card tsp-flow-card tsp-final-value-card">
+                    <div class="card-label">扰动结果</div>
+                    <div class="card-value">{{ tspPendingReportValue }}</div>
+                  </div>
+                  <div class="tsp-final-meta">
+                    <div v-for="item in tspFinalReportCards" :key="item.label" class="tsp-meta-row">
+                      <span>{{ item.label }}</span>
+                      <strong>{{ item.value }}</strong>
+                    </div>
                   </div>
                 </div>
-                <div class="preview-tip">{{ processPreviewTip }}</div>
+                <div v-if="!tspStageTwoReady" class="preview-tip">
+                  请先依次完成编码、第一阶段扰动和第二阶段扰动，再查看待上报扰动结果。
+                </div>
+                <div v-else class="preview-tip">{{ processPreviewTip }}</div>
                 <div v-if="!tspParametersReady" class="preview-tip">
                   当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段扰动演示。
                 </div>
                 <div class="action-row">
-                  <el-button
-                    v-if="currentTaskDetail?.scenario === 'arr'"
-                    type="success"
-                    @click="executeArrPerturbAndSubmit"
-                    :loading="submitting"
-                    :disabled="!canRunSingleSimulation"
-                  >
-                    执行本地扰动并上报
+                  <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
+                    提交上报
                   </el-button>
-                  <template v-else>
-                    <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                      {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
-                    </el-button>
-                    <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
-                      提交上报
-                    </el-button>
-                  </template>
                 </div>
               </div>
             </template>
@@ -397,16 +375,6 @@
               </div>
 
               <div class="summary-block">
-                  <h4>原始输入</h4>
-                <div class="card-grid">
-                  <div v-for="item in singleRawCards" :key="item.label" class="summary-card">
-                    <div class="card-label">{{ item.label }}</div>
-                    <div class="card-value">{{ item.value }}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="summary-block">
                 <div class="summary-heading">
                   <h4>扰动参数</h4>
                   <span class="section-tip">从管理端当前任务的已保存配置中读取</span>
@@ -419,16 +387,62 @@
                 </div>
                 <div v-if="currentPerturbationStatus" class="perturbation-status-banner" :class="`is-${currentPerturbationStatus.statusKey}`">
                   <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
-                  <div class="perturbation-status-desc">{{ currentPerturbationStatus.description }}</div>
                 </div>
                 <div v-if="(currentTaskDetail?.scenario === 'arr' && !arrParametersReady) || (currentTaskDetail?.scenario === 'agrr' && !agrrParametersReady)" class="preview-tip">
                   当前任务尚未在管理端完成 {{ currentTaskDetail?.protocol }} 参数保存，暂时无法执行本地扰动。
                 </div>
               </div>
+
+              <div v-if="currentTaskDetail?.scenario === 'arr'" class="summary-block">
+                <div class="summary-heading">
+                  <h4>输入与编码</h4>
+                  <el-button type="primary" plain @click="revealArrEncoding">
+                    编码
+                  </el-button>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in arrInputEncodingCards" :key="item.label" class="summary-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+                <div class="preview-tip">
+                  编码规则：0 = 未触发提醒，1 = 触发提醒。系统将原始语义值映射为二元编码后，再执行 ARR 扰动。
+                </div>
+              </div>
+
+              <div v-else class="summary-block">
+                <div class="summary-heading">
+                  <h4>原始输入</h4>
+                  <el-button
+                    v-if="currentTaskDetail?.scenario === 'agrr'"
+                    type="primary"
+                    plain
+                    @click="revealAgrrEncoding"
+                    :disabled="!hasAgrrRawMinutes"
+                  >
+                    编码
+                  </el-button>
+                </div>
+                <div class="card-grid">
+                  <div v-for="item in singleRawCards" :key="item.label" class="summary-card">
+                    <div class="card-label">{{ item.label }}</div>
+                    <div class="card-value">{{ item.value }}</div>
+                  </div>
+                </div>
+              </div>
               <div class="summary-block">
                 <div class="summary-heading">
                   <h4>扰动结果</h4>
-                  <span class="section-tip">同一原始值下可重复随机模拟</span>
+                  <el-button
+                    v-if="['arr', 'agrr'].includes(currentTaskDetail?.scenario)"
+                    type="primary"
+                    plain
+                    @click="simulateCurrentTaskOnce"
+                    :disabled="currentTaskDetail?.scenario === 'agrr' ? !canRunAgrrPerturbation : !canRunSingleSimulation"
+                  >
+                    扰动
+                  </el-button>
                 </div>
                 <div class="card-grid">
                   <div v-for="item in resultCards" :key="item.label" class="summary-card preview-card">
@@ -436,25 +450,14 @@
                     <div class="card-value">{{ item.value }}</div>
                   </div>
                 </div>
-                <div class="preview-tip">
-                  <template v-if="currentTaskDetail?.scenario === 'agrr'">
-                    AGRR 会先对原始分钟数做分档，再按当前档位编码值与参数 p、q 执行一次本地随机扰动。
-                  </template>
-                  <template v-else>
-                    ARR 会按当前原始编码值与参数 p、q 进行一次本地随机扰动，再生成本次上报值。
-                  </template>
-                </div>
               </div>
 
               <div class="summary-block">
                 <div class="summary-heading">
                   <h4>操作区</h4>
-                  <span class="section-tip">先执行一次扰动，再提交上报</span>
+                  <span class="section-tip">先执行扰动，再提交上报</span>
                 </div>
                 <div class="action-row">
-                  <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                    {{ currentSimulationResult ? '重新执行一次扰动' : '执行一次扰动' }}
-                  </el-button>
                   <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
                     提交上报
                   </el-button>
@@ -809,7 +812,16 @@ import { useAoueAnimation } from '../../composables/useAoueAnimation';
 import { useUserStore } from '../../store/user';
 import { useTaskStore } from '../../store/task';
 import { useAttributeConfigStore } from '../../store/attributeConfig';
-import { AGRR, ARR, aggregateAOUE, applyTSP, perturbAOUEWithDetails } from '../../utils/ldpAlgorithms';
+import {
+  AGRR,
+  ARR,
+  aggregateAOUE,
+  applyTSP,
+  calculateAOUEParameters,
+  calculateAGRParameters,
+  calculateARRParameters,
+  perturbAOUEWithDetails
+} from '../../utils/ldpAlgorithms';
 import { STAND_BUCKET_ORDER, STEP_BUCKET_ORDER } from '../../utils/constants';
 import {
   STAND_DURATION_BUCKET_RULES,
@@ -836,7 +848,7 @@ import {
   sampleTspRawRecordByDistribution,
   sampleTspRawRecordFromDistribution
 } from '../../utils/tspEmpiricalDistribution';
-import { getTspVersionMeta, resolveTspTaskConfig } from '../../utils/tspProtocol.js';
+import { resolveTspTaskConfig } from '../../utils/tspProtocol.js';
 import {
   CONDITION_DISTRIBUTION_KEYS,
   sampleObservedValue
@@ -852,11 +864,16 @@ const currentTaskId = ref('');
 const submitting = ref(false);
 const systemStatus = ref(0);
 const formTouched = ref(false);
+const arrEncodingRevealed = ref(false);
+const agrrEncodingRevealed = ref(false);
+const tspEncodingRevealed = ref(false);
 const arrSimulationResult = ref(null);
 const arrBatchResult = ref(null);
 const agrrSimulationResult = ref(null);
 const agrrBatchResult = ref(null);
 const tspSimulationResult = ref(null);
+const tspStageOneReady = ref(false);
+const tspStageTwoReady = ref(false);
 const tspBatchResult = ref(null);
 const aoueSimulationResult = ref(null);
 const aoueBatchResult = ref(null);
@@ -966,50 +983,56 @@ const currentAttributeConfig = computed(() => {
 
 const arrConfigParams = computed(() => {
   if (currentTaskDetail.value?.scenario !== 'arr') return null;
-  const calibratedParams = currentAttributeConfig.value?.calibratedParams;
-  if (!calibratedParams) return null;
+  const snapshot = currentAttributeConfig.value;
+  if (!snapshot) return null;
 
-  const p = Number(calibratedParams.p);
-  const q = Number(calibratedParams.q);
+  const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
+  const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
+  const epsilon = Number(snapshot.epsilon ?? currentTaskDetail.value?.epsilon ?? 1);
+  const { p, q } = calculateARRParameters(alpha, beta, epsilon, 2);
   if (!Number.isFinite(p) || !Number.isFinite(q)) return null;
 
   return {
     p,
     q,
-    epsilon: currentAttributeConfig.value?.epsilon ?? currentTaskDetail.value?.epsilon ?? '--'
+    epsilon
   };
 });
 
 const agrrConfigParams = computed(() => {
   if (currentTaskDetail.value?.scenario !== 'agrr') return null;
-  const calibratedParams = currentAttributeConfig.value?.calibratedParams;
-  if (!calibratedParams) return null;
+  const snapshot = currentAttributeConfig.value;
+  if (!snapshot) return null;
 
-  const p = Number(calibratedParams.p);
-  const q = Number(calibratedParams.q);
+  const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
+  const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
+  const epsilon = Number(snapshot.epsilon ?? currentTaskDetail.value?.epsilon ?? 1);
+  const { p, q } = calculateAGRParameters(alpha, beta, epsilon, STAND_BUCKET_ORDER.length);
   if (!Number.isFinite(p) || !Number.isFinite(q)) return null;
 
   return {
     p,
     q,
-    epsilon: currentAttributeConfig.value?.epsilon ?? currentTaskDetail.value?.epsilon ?? '--',
+    epsilon,
     d: STAND_BUCKET_ORDER.length
   };
 });
 
 const aoueConfigParams = computed(() => {
   if (currentTaskDetail.value?.scenario !== 'aoue') return null;
-  const calibratedParams = currentAttributeConfig.value?.calibratedParams;
-  if (!calibratedParams) return null;
+  const snapshot = currentAttributeConfig.value;
+  if (!snapshot) return null;
 
-  const p = Number(calibratedParams.p);
-  const q = Number(calibratedParams.q);
+  const alpha = Number(snapshot.alphaBetaResult?.alpha ?? snapshot.alpha ?? 0);
+  const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
+  const epsilon = Number(snapshot.epsilon ?? currentTaskDetail.value?.epsilon ?? 1);
+  const { p, q } = calculateAOUEParameters(alpha, beta, epsilon);
   if (!Number.isFinite(p) || !Number.isFinite(q)) return null;
 
   return {
     p,
     q,
-    epsilon: currentAttributeConfig.value?.epsilon ?? currentTaskDetail.value?.epsilon ?? '--',
+    epsilon,
     d: STEP_BUCKET_ORDER.length
   };
 });
@@ -1035,17 +1058,6 @@ const tspParametersReady = computed(() => Boolean(tspConfigParams.value));
 const arrPerturbationStatus = computed(() => getPerturbationStatus('ARR', arrConfigParams.value));
 const agrrPerturbationStatus = computed(() => getPerturbationStatus('AGRR', agrrConfigParams.value));
 const aouePerturbationStatus = computed(() => getPerturbationStatus('AOUE', aoueConfigParams.value));
-const tspVersionMeta = computed(() => {
-  if (currentTaskDetail.value?.scenario !== 'tsp' || !tspConfigParams.value) {
-    return null;
-  }
-
-  return getTspVersionMeta(tspConfigParams.value.version);
-});
-const tspVersionNotice = computed(() => {
-  if (!tspVersionMeta.value) return '';
-  return '当前任务按统一总隐私预算 ε 求解两阶段参数。';
-});
 const currentPerturbationStatus = computed(() => {
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return agrrPerturbationStatus.value;
@@ -1063,8 +1075,10 @@ const canSimulateAgrr = computed(() => (
   currentTaskDetail.value?.scenario === 'agrr'
   && formTouched.value
   && agrrParametersReady.value
+  && hasAgrrRawMinutes.value
   && Boolean(derivedStandBucket.value)
 ));
+const canRunAgrrPerturbation = computed(() => canSimulateAgrr.value && agrrEncodingRevealed.value);
 const canSimulateAoue = computed(() => (
   currentTaskDetail.value?.scenario === 'aoue'
   && formTouched.value
@@ -1076,6 +1090,14 @@ const canSimulateTsp = computed(() => (
   && formTouched.value
   && tspParametersReady.value
   && (dynamicForm.sleepMissing === 1 || Number.isFinite(Number(dynamicForm.sleepScore)))
+));
+const canRevealTspEncoding = computed(() => canSimulateTsp.value && !tspEncodingRevealed.value);
+const canRunTspStageOne = computed(() => canSimulateTsp.value && tspEncodingRevealed.value && !tspStageOneReady.value);
+const canRunTspStageTwo = computed(() => (
+  canSimulateTsp.value
+  && tspStageOneReady.value
+  && Boolean(tspSimulationResult.value)
+  && !tspStageTwoReady.value
 ));
 const canRunSingleSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
@@ -1136,7 +1158,7 @@ const canSubmitCurrentTask = computed(() => {
     return Boolean(aoueSimulationResult.value) && aoueAnimationStage.value === 'done';
   }
   if (currentTaskDetail.value.scenario === 'tsp') {
-    return Boolean(tspSimulationResult.value);
+    return Boolean(tspSimulationResult.value) && tspStageTwoReady.value;
   }
   return formTouched.value;
 });
@@ -1164,11 +1186,26 @@ const statusColor = computed(() => {
   }
 });
 
+const hasAgrrRawMinutes = computed(() => (
+  dynamicForm.standMinutes !== null
+  && dynamicForm.standMinutes !== undefined
+  && dynamicForm.standMinutes !== ''
+  && Number.isFinite(Number(dynamicForm.standMinutes))
+));
+
 const derivedStandBucket = computed(() => {
+  if (!hasAgrrRawMinutes.value) {
+    return null;
+  }
+
   return getStandDurationBucket(dynamicForm.standMinutes);
 });
 
 const derivedStandBucketCode = computed(() => {
+  if (!hasAgrrRawMinutes.value) {
+    return null;
+  }
+
   return getStandBucketCodeByMinutes(dynamicForm.standMinutes);
 });
 
@@ -1190,7 +1227,7 @@ const rawSummaryCards = computed(() => {
       ];
     case 'agrr':
       return [
-        { label: '原始分钟数', value: dynamicForm.standMinutes ?? '--' },
+        { label: '原始分钟数', value: hasAgrrRawMinutes.value ? dynamicForm.standMinutes : '--' },
         { label: '映射分档', value: derivedStandBucket.value || '--' }
       ];
     case 'aoue':
@@ -1209,15 +1246,23 @@ const rawSummaryCards = computed(() => {
 });
 
 const arrRawCards = computed(() => [
-  { label: '当前用户原始值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' },
-  { label: 'ARR 二元取值', value: '0 = 未触发提醒，1 = 触发提醒' },
-  { label: '扰动前值', value: `${dynamicForm.fallAlarm}（${dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒'}）` }
+  { label: '当前用户原始值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' }
+]);
+
+const arrInputEncodingCards = computed(() => [
+  { label: '原始值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' },
+  { label: '编码值', value: arrEncodingRevealed.value ? String(dynamicForm.fallAlarm) : '--' }
 ]);
 
 const agrrRawCards = computed(() => [
-  { label: '原始分钟数', value: dynamicForm.standMinutes ?? '--' },
-  { label: '当前分档', value: derivedStandBucket.value || '--' },
-  { label: '原始编码值', value: derivedStandBucketCode.value ? String(derivedStandBucketCode.value) : '--' }
+  {
+    label: '原始分钟数 / 自动分档',
+    value: hasAgrrRawMinutes.value ? `${dynamicForm.standMinutes} 分钟 → ${derivedStandBucket.value || '--'}` : '--'
+  },
+  {
+    label: '原始编码值',
+    value: agrrEncodingRevealed.value && derivedStandBucketCode.value ? String(derivedStandBucketCode.value) : '--'
+  }
 ]);
 
 const aoueRawCards = computed(() => [
@@ -1228,13 +1273,7 @@ const aoueRawCards = computed(() => [
 
 const arrParameterCards = computed(() => [
   { label: 'p（保留原值概率）', value: arrParametersReady.value ? arrConfigParams.value.p.toFixed(4) : '--' },
-  { label: 'q（翻转为相反值概率）', value: arrParametersReady.value ? arrConfigParams.value.q.toFixed(4) : '--' },
-  {
-    label: '扰动概率说明',
-    value: arrParametersReady.value
-      ? `以 p=${arrConfigParams.value.p.toFixed(4)} 保留扰动前值，以 q=${arrConfigParams.value.q.toFixed(4)} 翻转为另一个二元值`
-      : '--'
-  }
+  { label: 'q（翻转为相反值概率）', value: arrParametersReady.value ? arrConfigParams.value.q.toFixed(4) : '--' }
 ]);
 
 const agrrParameterCards = computed(() => [
@@ -1249,22 +1288,10 @@ const aoueParameterCards = computed(() => [
 
 const arrResultCards = computed(() => [
   {
-    label: '扰动前值',
-    value: `${dynamicForm.fallAlarm}（${dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒'}）`
-  },
-  {
     label: '扰动后值',
-    value: arrSimulationResult.value ? (arrSimulationResult.value.perturbedLabel) : '--'
-  },
-  {
-    label: '上报值',
-    value: arrSimulationResult.value ? String(arrSimulationResult.value.reportValue) : '--'
-  },
-  {
-    label: '单次扰动过程',
     value: arrSimulationResult.value
-      ? `输入 ${arrSimulationResult.value.rawValue}，输出 ${arrSimulationResult.value.reportValue}`
-      : '点击“执行一次扰动”后展示本次 ARR 随机扰动结果'
+      ? `${arrSimulationResult.value.reportValue}（${arrSimulationResult.value.perturbedLabel}）`
+      : '--'
   }
 ]);
 
@@ -1299,30 +1326,58 @@ const tspRawCards = computed(() => [
   { label: '睡眠质量评分', value: dynamicForm.sleepMissing === 1 ? '--' : dynamicForm.sleepScore ?? '--' }
 ]);
 
-const tspStageOneCards = computed(() => [
-  { label: '第一阶段输入', value: tspSimulationResult.value?.stageOneInputDisplay || '--' },
-  { label: '总隐私预算 ε', value: tspParametersReady.value ? String(tspConfigParams.value.epsilon) : '--' },
+const tspInputEncodingCards = computed(() => {
+  if (dynamicForm.sleepMissing === 1) {
+    return [
+      { label: '当前编码值（协议输入）', value: tspEncodingRevealed.value ? '0（缺失）' : '--' }
+    ];
+  }
+
+  const score = dynamicForm.sleepScore ?? '--';
+  return [
+    { label: '当前编码值（协议输入）', value: tspEncodingRevealed.value ? `${score}（有效评分）` : '--' }
+  ];
+});
+
+const tspStageOneInputValue = computed(() => {
+  if (!tspEncodingRevealed.value) return '--';
+  return dynamicForm.sleepMissing === 1 ? '缺失样本不进入第一阶段' : `${dynamicForm.sleepScore} 分`;
+});
+
+const tspStageOneMainCards = computed(() => [
+  {
+    label: '第一阶段输入',
+    value: tspStageOneInputValue.value
+  },
+  { label: '第一阶段扰动结果', value: tspStageOneReady.value ? tspSimulationResult.value?.stageOneLabel || '--' : '--' }
+]);
+
+const tspStageOneMetaCards = computed(() => [
   { label: '第一阶段值域', value: 'd = 5，对应 {1,2,3,4,5}' },
   { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
   { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' },
-  { label: '归一约束', value: 'p1 + (d - 1)q1 = 1' },
-  { label: '第一阶段扰动结果', value: tspSimulationResult.value?.stageOneLabel || '--' }
+  { label: '归一约束', value: 'p1 + (d - 1)q1 = 1' }
 ]);
 
-const tspStageTwoCards = computed(() => [
-  { label: '第二阶段输入', value: tspSimulationResult.value?.stageTwoInputDisplay ?? '--' },
-  { label: 'TSP 版本', value: tspParametersReady.value ? tspVersionMeta.value?.label || '--' : '--' },
+const tspStageTwoMainCards = computed(() => [
+  { label: '第二阶段输入', value: tspStageOneReady.value ? tspSimulationResult.value?.stageTwoInputDisplay ?? '--' : '--' },
+  { label: '第二阶段扰动结果', value: tspStageTwoReady.value ? tspSimulationResult.value?.stageTwoLabel || '--' : '--' }
+]);
+
+const tspStageTwoMetaCards = computed(() => [
   { label: '第二阶段值域', value: 'd + 1 = 6，对应 {0,1,2,3,4,5}' },
   { label: '参数 p2', value: tspParametersReady.value ? tspConfigParams.value.p2.toFixed(4) : '--' },
   { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' },
-  { label: '归一约束', value: 'p2 + dq2 = 1' },
-  { label: '第二阶段扰动结果', value: tspSimulationResult.value?.stageTwoLabel || '--' }
+  { label: '归一约束', value: 'p2 + dq2 = 1' }
 ]);
 
+const tspPendingReportValue = computed(() => (
+  tspStageTwoReady.value ? tspSimulationResult.value?.reportValueDisplay || '--' : '--'
+));
+
 const tspFinalReportCards = computed(() => [
-  { label: '最终上报值', value: tspSimulationResult.value?.reportValueDisplay || '--' },
-  { label: '上报缺失状态', value: tspSimulationResult.value?.reportMissingLabel || '--' },
-  { label: '上报评分', value: tspSimulationResult.value?.reportScoreDisplay ?? '--' }
+  { label: '上报缺失状态', value: tspStageTwoReady.value ? tspSimulationResult.value?.reportMissingLabel || '--' : '--' },
+  { label: '上报评分', value: tspStageTwoReady.value ? tspSimulationResult.value?.reportScoreDisplay ?? '--' : '--' }
 ]);
 
 const aoueAnimationReady = computed(() => (
@@ -1400,7 +1455,6 @@ const aoueMetaCards = computed(() => [
   { label: 'ε', value: String(displayEpsilon.value ?? '--') },
   { label: '原始步数', value: String(aoueSimulationResult.value?.rawSteps ?? dynamicForm.dailySteps ?? '--') },
   { label: '当前分桶', value: aoueSimulationResult.value?.rawLabel ?? derivedStepsBucket.value ?? '--' },
-  { label: '原始编码值', value: String(aoueSimulationResult.value?.rawValue ?? derivedStepsBucketCode.value ?? '--') },
   { label: 'p', value: aoueParametersReady.value ? aoueConfigParams.value.p.toFixed(4) : '--' },
   { label: 'q', value: aoueParametersReady.value ? aoueConfigParams.value.q.toFixed(4) : '--' }
 ]);
@@ -1593,7 +1647,7 @@ const aoueCurrentDetailTitle = computed(() => {
   }
 
   if (aoueAnimationStage.value === 'done') {
-    return '最终上报结果';
+    return `扰动后编码向量：${aoueSimulationResult.value?.reportValueDisplay || '--'}`;
   }
 
   return '等待开始';
@@ -1625,7 +1679,7 @@ const aoueVectorDetailText = computed(() => {
   }
 
   if (aoueAnimationStage.value === 'done' && aoueSimulationResult.value) {
-    return `扰动后编码向量为 ${aoueSimulationResult.value.reportValueDisplay}，向量说明：${aoueSimulationResult.value.perturbedLabel}。`;
+    return `向量说明：${aoueSimulationResult.value.perturbedLabel}。`;
   }
 
   const step = aoueCurrentDisplayStep.value;
@@ -1819,7 +1873,6 @@ const parameterCards = computed(() => {
   }
   if (currentTaskDetail.value?.scenario === 'tsp') {
     return [
-      { label: 'TSP 版本', value: tspVersionMeta.value?.label || '--' },
       { label: '总隐私预算 ε', value: tspParametersReady.value ? String(tspConfigParams.value.epsilon) : '--' },
       { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
       { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' },
@@ -1897,7 +1950,6 @@ const tspBatchSummaryCards = computed(() => {
     { label: '当前任务名称', value: currentTaskDetail.value?.title || '--' },
     { label: '当前协议', value: currentTaskDetail.value?.protocol || '--' },
     { label: '隐私预算 ε', value: tspConfigParams.value ? String(tspConfigParams.value.epsilon) : '--' },
-    { label: 'TSP 版本', value: tspConfigParams.value ? tspVersionMeta.value?.label || '--' : '--' },
     { label: 'α / β', value: tspConfigParams.value ? `${tspConfigParams.value.alpha.toFixed(4)} / ${tspConfigParams.value.beta.toFixed(4)}` : '--' }
   ];
 });
@@ -2323,7 +2375,10 @@ watch(
     }
 
     if (currentTaskDetail.value.scenario === 'tsp') {
+      tspEncodingRevealed.value = false;
       tspSimulationResult.value = null;
+      tspStageOneReady.value = false;
+      tspStageTwoReady.value = false;
       tspBatchResult.value = null;
       batchUploadState.value = null;
       systemStatus.value = 0;
@@ -2344,11 +2399,16 @@ function resetDynamicForm() {
 }
 
 function clearSimulationState() {
+  arrEncodingRevealed.value = false;
+  agrrEncodingRevealed.value = false;
+  tspEncodingRevealed.value = false;
   arrSimulationResult.value = null;
   arrBatchResult.value = null;
   agrrSimulationResult.value = null;
   agrrBatchResult.value = null;
   tspSimulationResult.value = null;
+  tspStageOneReady.value = false;
+  tspStageTwoReady.value = false;
   tspBatchResult.value = null;
   aoueSimulationResult.value = null;
   aoueBatchResult.value = null;
@@ -2468,9 +2528,6 @@ async function refreshData() {
   if (currentTaskDetail.value.scenario === 'arr' && arrParametersReady.value) {
     simulateArrPerturbation(false);
   }
-  if (currentTaskDetail.value.scenario === 'agrr' && agrrParametersReady.value) {
-    simulateAgrrPerturbation(false);
-  }
   if (currentTaskDetail.value.scenario === 'aoue' && aoueParametersReady.value) {
     simulateAouePerturbation(false);
   }
@@ -2491,6 +2548,7 @@ function markFormTouched() {
 function handleArrOptionClick(value) {
   dynamicForm.fallAlarm = value;
   markFormTouched();
+  arrEncodingRevealed.value = false;
   arrSimulationResult.value = null;
   arrBatchResult.value = null;
   batchUploadState.value = null;
@@ -2500,8 +2558,37 @@ function handleArrOptionClick(value) {
   }
 }
 
+function revealArrEncoding() {
+  arrEncodingRevealed.value = true;
+}
+
+function revealAgrrEncoding() {
+  if (!hasAgrrRawMinutes.value) {
+    ElMessage.warning('请先填写原始分钟数');
+    return;
+  }
+
+  agrrEncodingRevealed.value = true;
+}
+
+function revealTspEncoding() {
+  if (!canSimulateTsp.value) {
+    ElMessage.warning('请先生成有效输入，并确保管理端已保存当前 TSP 参数');
+    return;
+  }
+
+  tspEncodingRevealed.value = true;
+  tspSimulationResult.value = null;
+  tspStageOneReady.value = false;
+  tspStageTwoReady.value = false;
+  tspBatchResult.value = null;
+  batchUploadState.value = null;
+  systemStatus.value = 0;
+}
+
 function handleAgrrMinutesChange() {
   markFormTouched();
+  agrrEncodingRevealed.value = false;
   agrrSimulationResult.value = null;
   agrrBatchResult.value = null;
   batchUploadState.value = null;
@@ -2576,6 +2663,13 @@ function performAgrrPerturbation(rawMinutes) {
 }
 
 function simulateAgrrPerturbation(showMessage = true) {
+  if (!agrrEncodingRevealed.value) {
+    if (showMessage) {
+      ElMessage.warning('请先完成编码，再执行 AGRR 扰动');
+    }
+    return;
+  }
+
   if (!canSimulateAgrr.value) {
     if (showMessage) {
       ElMessage.warning('请先填写原始分钟数，并确保管理端已保存当前 AGRR 参数');
@@ -2901,11 +2995,60 @@ function simulateTspPerturbation(showMessage = true) {
   }
 
   tspSimulationResult.value = result;
+  tspEncodingRevealed.value = true;
+  tspStageOneReady.value = true;
+  tspStageTwoReady.value = true;
   systemStatus.value = 1;
 
   if (showMessage) {
     ElMessage.success('已完成一次 TSP 两阶段扰动演示');
   }
+}
+
+function executeTspStageOne() {
+  if (!canSimulateTsp.value) {
+    ElMessage.warning('请先生成有效输入，并确保管理端已保存当前 TSP 参数');
+    return;
+  }
+
+  if (!tspEncodingRevealed.value) {
+    ElMessage.warning('请先执行编码');
+    return;
+  }
+
+  const result = performTspPerturbation(dynamicForm.sleepMissing, dynamicForm.sleepScore);
+  if (!result) {
+    ElMessage.warning('当前 TSP 输入无效，请先检查缺失状态与评分');
+    return;
+  }
+
+  tspSimulationResult.value = result;
+  tspStageOneReady.value = true;
+  tspStageTwoReady.value = false;
+  systemStatus.value = 0;
+
+  if (result.stageOneSkipped) {
+    ElMessage.info('当前样本为缺失记录，第一阶段跳过，请继续执行第二阶段扰动');
+    return;
+  }
+
+  ElMessage.success('已完成第一阶段扰动');
+}
+
+function executeTspStageTwo() {
+  if (!tspStageOneReady.value || !tspSimulationResult.value) {
+    ElMessage.warning('请先执行第一阶段扰动');
+    return;
+  }
+
+  if (!canSimulateTsp.value) {
+    ElMessage.warning('当前 TSP 输入无效，请重新生成示例输入');
+    return;
+  }
+
+  tspStageTwoReady.value = true;
+  systemStatus.value = 1;
+  ElMessage.success('已完成第二阶段扰动');
 }
 
 function simulateCurrentTaskOnce() {
@@ -2921,12 +3064,14 @@ function simulateCurrentTaskOnce() {
   }
 
   if (currentTaskDetail.value.scenario === 'arr') {
+    arrEncodingRevealed.value = true;
     activeDemoTab.value = 'single';
     simulateArrPerturbation(true);
     return;
   }
 
   if (currentTaskDetail.value.scenario === 'agrr') {
+    agrrEncodingRevealed.value = true;
     activeDemoTab.value = 'single';
     simulateAgrrPerturbation(true);
     return;
@@ -3722,6 +3867,44 @@ onMounted(() => {
   margin-top: 14px;
 }
 
+.task-binding-summary {
+  margin-top: 14px;
+}
+
+.task-plain-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #1f2d3d;
+}
+
+.task-plain-label {
+  flex-shrink: 0;
+  color: #6b7785;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.task-plain-value {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.collection-input-card {
+  padding: 14px;
+  border: 1px solid #dfe6ee;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.task-tech-note {
+  margin-top: 8px;
+  color: #8a96a8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .tsp-skip-panel {
   padding: 14px 16px;
   border-radius: 10px;
@@ -3740,6 +3923,89 @@ onMounted(() => {
   font-size: 13px;
   line-height: 1.6;
   color: #7a6536;
+}
+
+.tsp-encoding-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.tsp-encoding-panel .preview-tip {
+  margin-top: 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e5ecf4;
+  background: #fbfdff;
+}
+
+.tsp-stage-layout,
+.tsp-final-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.tsp-stage-main {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tsp-stage-main .tsp-skip-panel {
+  grid-column: 1 / -1;
+}
+
+.tsp-stage-aside,
+.tsp-final-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e5ecf4;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.tsp-meta-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f4f8fc;
+  color: #6b7785;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.tsp-meta-row strong {
+  color: #223044;
+  font-size: 13px;
+  text-align: right;
+}
+
+.tsp-flow-card {
+  background: #f7fbff;
+  border-color: #cfe0f3;
+}
+
+.tsp-flow-card .card-value {
+  font-size: 18px;
+}
+
+.tsp-final-value-card {
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.tsp-final-value-card .card-value {
+  font-size: 22px;
 }
 
 .summary-heading {
@@ -3830,6 +4096,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.demo-action-panel {
+  margin-top: -8px;
 }
 
 .batch-simulator {
@@ -3938,6 +4208,74 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.right-section .summary-block {
+  margin-bottom: 12px;
+}
+
+.right-section .summary-block:last-child {
+  margin-bottom: 0;
+}
+
+.right-section .summary-block .demo-top-card {
+  margin-bottom: 0;
+}
+
+.right-section .summary-block > h4 {
+  margin: 0 0 10px;
+}
+
+.right-section .summary-heading {
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.right-section .summary-heading--with-action {
+  align-items: flex-start;
+}
+
+.right-section .summary-heading h4 {
+  margin: 0;
+  line-height: 1.35;
+}
+
+.right-section .section-tip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin-left: auto;
+  color: #8a96a8;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.right-section .summary-heading .el-button {
+  flex-shrink: 0;
+}
+
+.right-section .summary-heading + .card-grid,
+.right-section .summary-heading + .action-row {
+  margin-top: 0;
+}
+
+.right-section .summary-block > .card-grid {
+  gap: 10px;
+  margin-top: 0;
+}
+
+.right-section .summary-block > h4 + .card-grid {
+  margin-top: 10px;
+}
+
+.right-section .preview-tip {
+  margin-top: 8px;
+}
+
+.right-section .action-row {
+  margin-top: 0;
 }
 
 .demo-tab-bar {
@@ -4380,7 +4718,7 @@ onMounted(() => {
 
 .aoue-compact-strip {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -4919,6 +5257,10 @@ onMounted(() => {
   .card-grid,
   .batch-summary-strip,
   .tsp-stat-grid,
+  .tsp-encoding-panel,
+  .tsp-stage-layout,
+  .tsp-final-layout,
+  .tsp-stage-main,
   .aoue-hero-grid,
   .aoue-main-grid {
     grid-template-columns: 1fr;

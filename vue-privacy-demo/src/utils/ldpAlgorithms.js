@@ -65,6 +65,83 @@ export function aggregateAGRR(perturbedData, epsilon, domainSize, p, q) {
   return count.map(c => (c - n * q) / (p - q));
 }
 
+export function calculateTraditionalGRRParams(epsilon, domainSize) {
+  const resolvedEpsilon = Number(epsilon);
+  const resolvedDomainSize = Math.max(1, Number(domainSize) || 1);
+  const expEpsilon = Math.exp(resolvedEpsilon);
+  const denominator = expEpsilon + resolvedDomainSize - 1;
+  return {
+    p: expEpsilon / denominator,
+    q: 1 / denominator,
+    epsilon: resolvedEpsilon,
+    domainSize: resolvedDomainSize,
+    protocol: 'GRR'
+  };
+}
+
+export function perturbByTraditionalGRR(trueValue, domainValues, epsilon, randomFn = Math.random) {
+  const normalizedDomain = Array.from(domainValues || []);
+  const params = calculateTraditionalGRRParams(epsilon, normalizedDomain.length);
+  if (!normalizedDomain.length || !normalizedDomain.includes(trueValue)) {
+    return {
+      originalValue: trueValue,
+      reportedValue: trueValue,
+      p: params.p,
+      q: params.q,
+      protocol: 'GRR'
+    };
+  }
+
+  if (randomFn() < params.p) {
+    return {
+      originalValue: trueValue,
+      reportedValue: trueValue,
+      p: params.p,
+      q: params.q,
+      protocol: 'GRR'
+    };
+  }
+
+  const fallbackValues = normalizedDomain.filter(value => value !== trueValue);
+  const reportedValue = fallbackValues[Math.floor(randomFn() * fallbackValues.length)] ?? trueValue;
+  return {
+    originalValue: trueValue,
+    reportedValue,
+    p: params.p,
+    q: params.q,
+    protocol: 'GRR'
+  };
+}
+
+export function aggregateTraditionalGRR(reportedValues, domainValues, epsilon) {
+  const normalizedDomain = Array.from(domainValues || []);
+  const totalUsers = Array.isArray(reportedValues) ? reportedValues.length : 0;
+  const params = calculateTraditionalGRRParams(epsilon, normalizedDomain.length);
+  const reportedCounts = normalizedDomain.map(value => (
+    Array.isArray(reportedValues)
+      ? reportedValues.filter(item => item === value).length
+      : 0
+  ));
+  const rawEstimatedCounts = reportedCounts.map(count => (
+    params.p === params.q ? 0 : (count - totalUsers * params.q) / (params.p - params.q)
+  ));
+  const estimatedCounts = rawEstimatedCounts.map(value => Math.max(0, Number(value) || 0));
+  const estimatedTotal = estimatedCounts.reduce((sum, value) => sum + value, 0);
+  const estimatedFrequencies = estimatedCounts.map(value => (
+    estimatedTotal > 0 ? value / estimatedTotal : 0
+  ));
+
+  return {
+    protocol: 'GRR',
+    params,
+    reportedCounts,
+    rawEstimatedCounts,
+    estimatedCounts,
+    estimatedFrequencies,
+    totalUsers
+  };
+}
+
 // 计算 AGRR 的扰动参数
 export function calculateAGRParameters(alpha, beta, epsilon, domainSize) {
   const exp_eps = Math.exp(epsilon);
@@ -73,7 +150,7 @@ export function calculateAGRParameters(alpha, beta, epsilon, domainSize) {
   }
   const numerator = (1 - alpha) - (1 - beta) * exp_eps;
   const denominator = (1 - domainSize * alpha) - (1 - domainSize * beta) * exp_eps;
-  const p = Math.min(numerator / denominator, 1);
+  const p = numerator / denominator;
   const q = (1 - p) / (domainSize - 1);
   return { p, q, triggeredByThreshold: false, expEpsilon: exp_eps };
 }
@@ -109,11 +186,14 @@ export function aggregateARR(perturbedData, epsilon, domainSize, p, q) {
 // 计算 ARR 的扰动参数
 export function calculateARRParameters(alpha, beta, epsilon, domainSize) {
   const exp_eps = Math.exp(epsilon);
+  if (beta > 0 && alpha / beta <= exp_eps) {
+    return { p: 1, q: 0, triggeredByThreshold: true, expEpsilon: exp_eps };
+  }
   const numerator = (1 - alpha) - (1 - beta) * exp_eps;
   const denominator = (1 - domainSize * alpha) - (1 - domainSize * beta) * exp_eps;
-  const p = Math.min(numerator / denominator, 1);
-  const q = 1 - p;
-  return { p, q };
+  const p = numerator / denominator;
+  const q = (1 - p) / (domainSize - 1);
+  return { p, q, triggeredByThreshold: false, expEpsilon: exp_eps };
 }
 
 // AOUE 算法 - 编码
@@ -180,10 +260,12 @@ export function aggregateAOUE(perturbedData, epsilon, domainSize, p, q) {
 // 计算 AOUE 的扰动参数
 export function calculateAOUEParameters(alpha, beta, epsilon) {
   const exp_eps = Math.exp(epsilon);
+  if (beta > 0 && alpha / beta <= exp_eps) {
+    return { p: 1, q: 0, triggeredByThreshold: true, expEpsilon: exp_eps };
+  }
   const p = 0.5;
-  const rawQ = (alpha - beta * exp_eps) / ((exp_eps - 1) + 2 * (alpha - beta * exp_eps));
-  const q = Math.min(Math.max(rawQ, 0), 0.5);
-  return { p, q, rawQ, clamped: q !== rawQ };
+  const q = (alpha - beta * exp_eps) / ((exp_eps - 1) + 2 * (alpha - beta * exp_eps));
+  return { p, q, rawQ: q, clamped: false, triggeredByThreshold: false, expEpsilon: exp_eps };
 }
 
 export function generalizedRandomizedResponse(rawValue, domainValues, p, q) {
@@ -222,26 +304,83 @@ function sampleAlternativeValue(domainValues, currentValue) {
 export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5) {
   const unifiedDomainSize = scoreDomainSize + 1;
   const exp_eps = Math.exp(epsilon);
-  const stageTwo = calculateAGRParameters(alpha, beta, epsilon, unifiedDomainSize);
-  const p2 = clampProbability(stageTwo.p, 1);
-  const q2 = clampProbability((1 - p2) / scoreDomainSize, 0);
+  const p2Numerator = (1 - alpha) - (1 - beta) * exp_eps;
+  const p2Denominator = (1 - unifiedDomainSize * alpha) - (1 - unifiedDomainSize * beta) * exp_eps;
+  const p2 = p2Numerator / p2Denominator;
+  const q2 = (1 - p2) / scoreDomainSize;
   const delta = p2 - q2;
-  const stageOneDenominator = delta * ((scoreDomainSize - 1) + exp_eps);
+  const stageOneDenominator = (scoreDomainSize - 1 + exp_eps) * delta;
 
   let p1 = 1;
-  if (scoreDomainSize > 1 && stageOneDenominator > 0) {
+  if (scoreDomainSize > 1 && stageOneDenominator !== 0) {
     const stageOneNumerator = (
-      (scoreDomainSize - 1) * q2 * (exp_eps - 1)
-      + exp_eps * delta
+      exp_eps * p2
+      + ((scoreDomainSize - 2) * exp_eps - (scoreDomainSize - 1)) * q2
     );
-    p1 = clampProbability(stageOneNumerator / stageOneDenominator, 1);
+    p1 = stageOneNumerator / stageOneDenominator;
   }
   const q1 = scoreDomainSize > 1
-    ? clampProbability((1 - p1) / (scoreDomainSize - 1), 0)
+    ? (1 - p1) / (scoreDomainSize - 1)
     : 0;
 
-  const pStar = p1 * p2 + (1 - p1) * q2;
-  const qStar = q1 * p2 + (1 - q1) * q2;
+  // 检查参数有效性
+  const p1Valid = p1 >= 0 && p1 <= 1;
+  const q1Valid = q1 >= 0 && q1 <= 1;
+  const p2Valid = p2 >= 0 && p2 <= 1;
+  const q2Valid = q2 >= 0 && q2 <= 1;
+  
+  if (!p1Valid || !q1Valid || !p2Valid || !q2Valid) {
+    console.warn(`TSP参数计算警告: 推导的参数超出有效范围 [0,1]`);
+    console.warn(`  alpha=${alpha}, beta=${beta}, epsilon=${epsilon}, scoreDomainSize=${scoreDomainSize}`);
+    console.warn(`  p1=${p1}, q1=${q1}, p2=${p2}, q2=${q2}`);
+    console.warn(`  将回退到标准随机响应参数`);
+    
+    // 回退到标准随机响应
+    // 第一阶段：域 {1,...,K}（大小 K）
+    const stage1Denominator = exp_eps + scoreDomainSize - 1;
+    const fallbackP1 = exp_eps / stage1Denominator;
+    const fallbackQ1 = 1 / stage1Denominator;
+    
+    // 第二阶段：域 {0,1,...,K}（大小 K+1）
+    const stage2Denominator = exp_eps + scoreDomainSize;
+    const fallbackP2 = exp_eps / stage2Denominator;
+    const fallbackQ2 = 1 / stage2Denominator;
+    
+    // 计算回退情况下的 pStar 和 qStar
+    const fallbackPStar = fallbackP1 * fallbackP2 + (scoreDomainSize - 1) * fallbackQ1 * fallbackQ2;
+    const fallbackQStar = fallbackP1 * fallbackQ2 + fallbackQ1 * fallbackP2 + (scoreDomainSize - 2) * fallbackQ1 * fallbackQ2;
+    
+    return {
+      version: 'fallback_standard_rr',
+      epsilon,
+      p1: fallbackP1,
+      q1: fallbackQ1,
+      p2: fallbackP2,
+      q2: fallbackQ2,
+      pStar: fallbackPStar,
+      qStar: fallbackQStar,
+      scoreDomainSize,
+      unifiedDomainSize,
+      fallback: true,
+      fallbackReason: '参数超出有效范围'
+    };
+  }
+
+  // 正确的两阶段扰动概率计算
+  // pStar = Pr(上报值=原始值|原始值非缺失)
+  //       = Pr(阶段1保持且阶段2保持) + Pr(阶段1翻转且阶段2恰好翻回)
+  //       = p1*p2 + (K-1)*q1*q2
+  const pStar = p1 * p2 + (scoreDomainSize - 1) * q1 * q2;
+  
+  // Pr(上报0|原始值非缺失) = q2
+  // 这是正确的，因为阶段2翻转为0的概率是 q2
+  
+  // qStar = Pr(上报某个特定非原始非零值 u|原始值非缺失)
+  //       = Pr(阶段1保持且阶段2翻转到u) + Pr(阶段1翻转到u且阶段2保持) + Pr(阶段1翻转到其他值且阶段2翻转到u)
+  //       = p1*q2 + q1*p2 + (K-2)*q1*q2
+  //       注意：q2 已经是翻转为特定值的概率（因为阶段2有 K+1 个值，翻转时均匀分布到其他 K 个值）
+  const K = scoreDomainSize;
+  const qStar = p1 * q2 + q1 * p2 + (K - 2) * q1 * q2;
 
   return {
     version: 'paper_unified_budget',

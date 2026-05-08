@@ -93,20 +93,13 @@ function getTaskConfig(task, protocol, domainSize) {
   const beta = Number(snapshot.alphaBetaResult?.beta ?? snapshot.beta ?? 0);
   const epsilon = Number(snapshot.epsilon ?? task?.privacyBudget ?? 1);
 
-  let p = Number(snapshot.calibratedParams?.p);
-  let q = Number(snapshot.calibratedParams?.q);
+  const calculated = protocol === 'AGRR'
+    ? calculateAGRParameters(alpha, beta, epsilon, domainSize)
+    : protocol === 'AOUE'
+      ? calculateAOUEParameters(alpha, beta, epsilon)
+      : calculateARRParameters(alpha, beta, epsilon, domainSize);
 
-  if (!Number.isFinite(p) || !Number.isFinite(q)) {
-    const calculated = protocol === 'AGRR'
-      ? calculateAGRParameters(alpha, beta, epsilon, domainSize)
-      : protocol === 'AOUE'
-        ? calculateAOUEParameters(alpha, beta, epsilon)
-        : calculateARRParameters(alpha, beta, epsilon, domainSize);
-    p = calculated.p;
-    q = calculated.q;
-  }
-
-  return { alpha, beta, epsilon, p, q };
+  return { alpha, beta, epsilon, p: calculated.p, q: calculated.q };
 }
 
 function getProtectionMode(task) {
