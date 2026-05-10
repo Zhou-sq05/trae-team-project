@@ -126,15 +126,15 @@
 
         <div class="dynamic-form-panel demo-action-panel">
           <div v-if="!currentTaskDetail" class="empty-box">
-            <p>请先选择任务，再执行单次扰动演示。</p>
+            <p>请先选择任务，再执行本地扰动上报。</p>
           </div>
 
           <div v-else class="dynamic-form batch-simulator">
-            <div class="derived-hint">请先生成示例输入，再执行一次扰动演示。</div>
+            <div class="derived-hint">请先采集一条手环数据，再执行本地扰动上报。</div>
             <div class="action-row">
-              <el-button type="primary" @click="refreshData" :disabled="!currentTaskDetail">生成示例输入</el-button>
+              <el-button type="primary" @click="refreshData" :disabled="!currentTaskDetail">采集手环数据</el-button>
               <el-button type="primary" @click="simulateCurrentTaskOnce" :disabled="!canRunSingleSimulation">
-                执行单次扰动演示
+                本地扰动上报
               </el-button>
             </div>
           </div>
@@ -147,7 +147,7 @@
             plain
             @click="goToArrMultiClientDemo"
           >
-            演示：ARR 多客户端上报
+            演示：ARR 多客户端采集
           </el-button>
           <el-button
             v-if="currentTaskDetail?.scenario === 'agrr'"
@@ -155,7 +155,7 @@
             plain
             @click="goToAgrrMultiClientDemo"
           >
-            演示：AGRR 多客户端上报
+            演示：AGRR 多客户端采集
           </el-button>
           <el-button
             v-if="currentTaskDetail?.scenario === 'aoue'"
@@ -163,7 +163,7 @@
             plain
             @click="goToAoueMultiClientDemo"
           >
-            演示：AOUE 多客户端上报
+            演示：AOUE 多客户端采集
           </el-button>
           <el-button
             v-if="currentTaskDetail?.scenario === 'tsp'"
@@ -171,7 +171,7 @@
             plain
             @click="goToTspMultiClientDemo"
           >
-            演示：TSP 多客户端上报
+            演示：TSP 多客户端采集
           </el-button>
           <el-button @click="goToDashboard">返回首页</el-button>
         </div>
@@ -345,7 +345,7 @@
                 </div>
                 <div v-else class="preview-tip">{{ processPreviewTip }}</div>
                 <div v-if="!tspParametersReady" class="preview-tip">
-                  当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段扰动演示。
+                  当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段本地扰动上报。
                 </div>
                 <div class="action-row">
                   <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
@@ -519,7 +519,7 @@
                       </div>
                     </div>
                     <div class="tsp-action-buttons">
-                      <el-button @click="runBatchSimulation">重新生成样本</el-button>
+                      <el-button @click="runBatchSimulation">重新采集样本</el-button>
                       <el-button
                         type="primary"
                         @click="uploadCurrentBatchResult"
@@ -622,7 +622,7 @@
                         </div>
                       </div>
                       <div class="tsp-action-buttons">
-                        <el-button @click="runBatchSimulation">重新生成样本</el-button>
+                        <el-button @click="runBatchSimulation">重新采集样本</el-button>
                         <el-button
                           type="primary"
                           @click="uploadCurrentBatchResult"
@@ -714,7 +714,7 @@
                       </div>
                     </div>
                     <div class="tsp-action-buttons">
-                      <el-button @click="runBatchSimulation">重新生成样本</el-button>
+                      <el-button @click="runBatchSimulation">重新采集样本</el-button>
                       <el-button
                         type="primary"
                         @click="uploadCurrentBatchResult"
@@ -778,7 +778,7 @@
           <div class="summary-block">
             <h4>处理预览</h4>
             <div v-if="!currentTaskDetail" class="empty-box">
-              <p>选择任务后，这里会同步展示当前输入对应的原始处理链路。</p>
+              <p>选择任务后，这里会同步展示当前采集值对应的原始处理链路。</p>
             </div>
             <div v-else class="card-grid">
               <div v-for="item in processPreviewCards" :key="item.label" class="summary-card preview-card">
@@ -1169,10 +1169,10 @@ const statusText = computed(() => {
   }
 
   if (systemStatus.value === 1) {
-    return '已扰动';
+    return '待上报';
   }
 
-  return '待扰动';
+  return formTouched.value ? '待上报' : '待采集';
 });
 
 const statusColor = computed(() => {
@@ -1507,7 +1507,7 @@ const aoueOverviewVectorText = computed(() => {
   }
 
   if (!['perturbing', 'done'].includes(aoueAnimationStage.value)) {
-    return '待生成';
+    return '待扰动上报';
   }
 
   return formatAoueVectorDisplay(aoueResolvedResultVector.value, '?');
@@ -1515,7 +1515,7 @@ const aoueOverviewVectorText = computed(() => {
 
 const aoueOverviewTypeText = computed(() => {
   if (!aoueAnimationReady.value) {
-    return '等待生成样例';
+    return '待采集';
   }
 
   if (aoueAnimationStage.value === 'idle') {
@@ -1548,7 +1548,7 @@ const aoueOverviewTypeText = computed(() => {
 
 const aoueOverviewVectorNoteText = computed(() => {
   if (!aoueAnimationReady.value) {
-    return '先基于当前输入生成一组 AOUE 示例样本，再选择自动播放或手动模式。';
+    return '先采集一条手环数据，再选择自动播放或手动模式。';
   }
 
   if (aoueAnimationStage.value === 'idle') {
@@ -1625,7 +1625,7 @@ const aoueCurrentDisplayStep = computed(() => {
 
 const aoueCurrentDetailTitle = computed(() => {
   if (!aoueAnimationReady.value) {
-    return '等待生成样例';
+    return '等待采集数据';
   }
 
   if (aoueAnimationStage.value === 'bucketing') {
@@ -1655,7 +1655,7 @@ const aoueCurrentDetailTitle = computed(() => {
 
 const aoueVectorDetailText = computed(() => {
   if (!aoueAnimationReady.value) {
-    return '点击左侧“执行单次扰动演示”或“生成示例输入”后，会先准备当前样例，但不会自动播放。';
+    return '点击左侧“本地扰动上报”或“采集手环数据”后，会先准备当前采集值，但不会自动播放。';
   }
 
   if (aoueAnimationStage.value === 'idle') {
@@ -2290,7 +2290,7 @@ const processPreviewCards = computed(() => {
     case 'arr':
       return [
         { label: '处理链路', value: '原始值 -> 扰动值（下一步接入）' },
-        { label: '当前输入', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' }
+        { label: '当前采集值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' }
       ];
     case 'agrr':
       return [
@@ -2326,7 +2326,7 @@ const processPreviewTip = computed(() => {
     return '当前 TSP 使用两阶段扰动链路：非缺失评分先进入第一阶段有效值扰动，随后缺失值 0 与有效值统一进入第二阶段扰动。';
   }
 
-  return '当前优先完成 ARR 场景的本地扰动演示，其余协议的完整上报链路将在下一步继续接入。';
+  return '当前优先完成 ARR 场景的本地扰动上报，其余协议的完整上报链路将在下一步继续接入。';
 });
 
 watch(currentTaskDetail, detail => {
@@ -2498,8 +2498,8 @@ async function refreshData() {
   try {
     exampleInput = await generateRandomExampleInput(currentTaskDetail.value.scenario);
   } catch (error) {
-    console.error('生成示例输入失败:', error);
-    ElMessage.error('生成示例输入失败，请检查 TSP 基础样本数据');
+    console.error('采集手环数据失败:', error);
+    ElMessage.error('采集手环数据失败，请检查 TSP 基础样本数据');
     return;
   }
 
@@ -2521,7 +2521,7 @@ async function refreshData() {
 
   formTouched.value = true;
   systemStatus.value = 0;
-  // 生成示例输入后自动切换到单次扰动演示标签页
+  // 采集手环数据后自动切换到单次扰动上报标签页
   activeDemoTab.value = 'single';
   clearSimulationState();
   batchUploadState.value = null;
@@ -2531,7 +2531,7 @@ async function refreshData() {
   if (currentTaskDetail.value.scenario === 'aoue' && aoueParametersReady.value) {
     simulateAouePerturbation(false);
   }
-  ElMessage.success('已生成当前任务的随机示例输入');
+  ElMessage.success('已采集当前任务的一条手环数据');
 }
 
 function markFormTouched() {
@@ -2573,7 +2573,7 @@ function revealAgrrEncoding() {
 
 function revealTspEncoding() {
   if (!canSimulateTsp.value) {
-    ElMessage.warning('请先生成有效输入，并确保管理端已保存当前 TSP 参数');
+    ElMessage.warning('请先采集有效手环数据，并确保管理端已保存当前 TSP 参数');
     return;
   }
 
@@ -2625,7 +2625,7 @@ function simulateArrPerturbation(showMessage = true) {
   systemStatus.value = 1;
 
   if (showMessage) {
-    ElMessage.success('已完成一次 ARR 本地扰动');
+    ElMessage.success('已完成一次 ARR 本地扰动上报');
   }
 }
 
@@ -2689,7 +2689,7 @@ function simulateAgrrPerturbation(showMessage = true) {
   systemStatus.value = 1;
 
   if (showMessage) {
-    ElMessage.success('已完成一次 AGRR 本地扰动');
+    ElMessage.success('已完成一次 AGRR 本地扰动上报');
   }
 }
 
@@ -2812,7 +2812,7 @@ function simulateAouePerturbation(showMessage = true) {
   }
 
   if (showMessage) {
-    ElMessage.success('已生成 AOUE 单次演示样例，请选择自动播放或手动模式开始');
+    ElMessage.success('已采集 AOUE 手环数据，请选择自动播放或手动模式开始');
   }
 }
 
@@ -2989,7 +2989,7 @@ function simulateTspPerturbation(showMessage = true) {
   const result = performTspPerturbation(dynamicForm.sleepMissing, dynamicForm.sleepScore);
   if (!result) {
     if (showMessage) {
-      ElMessage.warning('当前 TSP 输入无效，请先检查缺失状态与评分');
+      ElMessage.warning('当前 TSP 采集值无效，请先检查缺失状态与评分');
     }
     return;
   }
@@ -3001,13 +3001,13 @@ function simulateTspPerturbation(showMessage = true) {
   systemStatus.value = 1;
 
   if (showMessage) {
-    ElMessage.success('已完成一次 TSP 两阶段扰动演示');
+    ElMessage.success('已完成一次 TSP 本地扰动上报');
   }
 }
 
 function executeTspStageOne() {
   if (!canSimulateTsp.value) {
-    ElMessage.warning('请先生成有效输入，并确保管理端已保存当前 TSP 参数');
+    ElMessage.warning('请先采集有效手环数据，并确保管理端已保存当前 TSP 参数');
     return;
   }
 
@@ -3018,7 +3018,7 @@ function executeTspStageOne() {
 
   const result = performTspPerturbation(dynamicForm.sleepMissing, dynamicForm.sleepScore);
   if (!result) {
-    ElMessage.warning('当前 TSP 输入无效，请先检查缺失状态与评分');
+    ElMessage.warning('当前 TSP 采集值无效，请先检查缺失状态与评分');
     return;
   }
 
@@ -3042,7 +3042,7 @@ function executeTspStageTwo() {
   }
 
   if (!canSimulateTsp.value) {
-    ElMessage.warning('当前 TSP 输入无效，请重新生成示例输入');
+    ElMessage.warning('当前 TSP 采集值无效，请重新采集手环数据');
     return;
   }
 
@@ -3083,7 +3083,7 @@ function simulateCurrentTaskOnce() {
     return;
   }
 
-  ElMessage.info('当前优先完成 ARR 场景，其他协议的单次扰动演示将在下一步接入');
+  ElMessage.info('当前优先完成 ARR 场景，其他协议的本地扰动上报将在下一步接入');
 }
 
 function generateArrRawSample() {
@@ -3564,27 +3564,27 @@ function submitData() {
   }
 
   if (!formTouched.value) {
-    ElMessage.warning('请先完成当前任务的数据填写');
+    ElMessage.warning('请先完成当前任务的手环数据采集');
     return;
   }
 
   if (currentTaskDetail.value.scenario === 'arr' && !arrSimulationResult.value) {
-    ElMessage.warning('请先完成一次 ARR 本地扰动');
+    ElMessage.warning('请先完成一次 ARR 本地扰动上报');
     return;
   }
 
   if (currentTaskDetail.value.scenario === 'agrr' && !agrrSimulationResult.value) {
-    ElMessage.warning('请先完成一次 AGRR 本地扰动');
+    ElMessage.warning('请先完成一次 AGRR 本地扰动上报');
     return;
   }
 
   if (currentTaskDetail.value.scenario === 'aoue' && !aoueSimulationResult.value) {
-    ElMessage.warning('请先完成一次 AOUE 本地扰动');
+    ElMessage.warning('请先完成一次 AOUE 本地扰动上报');
     return;
   }
 
   if (currentTaskDetail.value.scenario === 'tsp' && !tspSimulationResult.value) {
-    ElMessage.warning('请先完成一次 TSP 两阶段扰动演示');
+    ElMessage.warning('请先完成一次 TSP 本地扰动上报');
     return;
   }
 

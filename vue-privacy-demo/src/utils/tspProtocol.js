@@ -93,6 +93,48 @@ export function aggregateTspDomainCounts(reportCounts, sampleCount, config) {
   return estimatedCounts;
 }
 
+export function buildTspAggregationTrace(reportCounts, sampleCount, config) {
+  const labels = ['缺失值 0', ...Array.from({ length: Number(config?.scoreDomainSize ?? 5) }, (_, index) => `${index + 1} 分`)];
+  const total = Number(sampleCount) || 0;
+  const unifiedDomainSize = Number(config?.unifiedDomainSize ?? labels.length);
+  const observedCounts = Array.from({ length: unifiedDomainSize }, (_, index) => Number(reportCounts?.[index] ?? 0));
+  const estimatedCounts = aggregateTspDomainCounts(observedCounts, total, config);
+  const n0Hat = Number(estimatedCounts[0] ?? 0);
+  const scoreBaseline = n0Hat * Number(config?.q2 ?? 0) + (total - n0Hat) * Number(config?.qStar ?? 0);
+
+  return {
+    parameters: {
+      epsilon: Number(config?.epsilon),
+      d1: Number(config?.scoreDomainSize ?? 5),
+      d2: unifiedDomainSize,
+      p1: Number(config?.p1),
+      q1: Number(config?.q1),
+      p2: Number(config?.p2),
+      q2: Number(config?.q2),
+      pStar: Number(config?.pStar),
+      qStar: Number(config?.qStar),
+      stageOneDenominator: Number(config?.pStar) - Number(config?.qStar),
+      stageTwoDenominator: Number(config?.p2) - Number(config?.q2)
+    },
+    categorySteps: labels.map((label, index) => {
+      const isMissing = index === 0;
+      const baseline = isMissing ? total * Number(config?.q2 ?? 0) : scoreBaseline;
+      const denominator = isMissing
+        ? Number(config?.p2) - Number(config?.q2)
+        : Number(config?.pStar) - Number(config?.qStar);
+      return {
+        label,
+        observedCount: observedCounts[index] ?? 0,
+        baseline: Number(baseline.toFixed(4)),
+        denominator: Number(denominator.toFixed(6)),
+        estimatedCount: Number((estimatedCounts[index] ?? 0).toFixed(4))
+      };
+    }),
+    estimatedCounts: estimatedCounts.map(value => Number(Number(value ?? 0).toFixed(4))),
+    sumEstimatedCounts: Number(estimatedCounts.reduce((sum, value) => sum + Number(value ?? 0), 0).toFixed(4))
+  };
+}
+
 function clampFrequency(value) {
   if (!Number.isFinite(value)) {
     return 0;

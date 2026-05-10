@@ -14,6 +14,7 @@ import { buildAggregateMetrics } from '../utils/aggregate/aggregateMetrics';
 import { getPerturbationStatus } from '../utils/perturbationStatus';
 import {
   aggregateTspDomainCounts,
+  buildTspAggregationTrace,
   calculateTspFrequencyVarianceMetrics,
   resolveTspTaskConfig
 } from '../utils/tspProtocol.js';
@@ -327,6 +328,40 @@ function buildTspRecordRows(tspRecords) {
       reportValue: reportValue == null ? null : Number(reportValue)
     };
   });
+}
+
+function buildTspStageOneCounts(tspRecords, scoreDomainSize = 5) {
+  const counts = new Array(scoreDomainSize + 1).fill(0);
+  tspRecords.forEach(item => {
+    const originalMissing = Number(item.original_missing ?? item.rawData?.sleepMissing);
+    if (originalMissing === 1) {
+      counts[0] += 1;
+      return;
+    }
+    const stage1Result = item.stage1_result ?? item.reportData?.stageOneResult;
+    const value = stage1Result === 'skipped' ? 0 : normalizeTspCode(stage1Result, scoreDomainSize);
+    if (value != null) {
+      counts[value] += 1;
+    }
+  });
+  return counts;
+}
+
+function logTspAggregationDebug({ scope, records, summary, rawEstimatedCounts, displayEstimatedCounts, config }) {
+  const trueCounts = summary.hasRawSummary ? summary.rawCounts : summary.reportCounts;
+  const trace = buildTspAggregationTrace(summary.reportCounts, summary.sampleCount, config);
+  console.groupCollapsed?.(`[TSP聚合调试] task_id=${scope?.taskId || '--'} batch_id=${scope?.batchId || 'ALL'} n=${summary.sampleCount}`);
+  console.log('原始真实分布 trueCounts', trueCounts);
+  console.log('用户端生成的原始睡眠评分分布 rawCountsBeforePerturb', trueCounts);
+  console.log('第一阶段扰动结果计数 stage1PerturbedCounts', buildTspStageOneCounts(records, config.scoreDomainSize));
+  console.log('第二阶段扰动结果计数 stage2PerturbedCounts', summary.reportCounts);
+  console.log('TSP 参数', trace.parameters);
+  console.table?.(trace.categorySteps);
+  console.log('原始无偏估计值 rawEstimatedCounts', rawEstimatedCounts);
+  console.log('约束后处理估计值 displayEstimatedCounts', displayEstimatedCounts);
+  console.log('sum(rawEstimatedCounts)', trace.sumEstimatedCounts);
+  console.log('sum(displayEstimatedCounts)', displayEstimatedCounts.reduce((sum, value) => sum + Number(value ?? 0), 0));
+  console.groupEnd?.();
 }
 
 function buildTspDiagnostics({
@@ -660,32 +695,32 @@ function getTspAggregateResults(records, task, taskId, scope) {
 
   const config = resolveTspTaskConfig(task, 5);
   const summary = buildTspSummary(tspRecords, config.scoreDomainSize);
-  const estimatedCounts = aggregateTspCounts(summary.reportCounts, summary.sampleCount, config);
+  const rawEstimatedCounts = aggregateTspCounts(summary.reportCounts, summary.sampleCount, config);
+  const estimatedCounts = constrainCountsForDisplay(rawEstimatedCounts, summary.sampleCount);
   const trueCounts = summary.hasRawSummary ? summary.rawCounts : summary.reportCounts;
   const overallMetrics = buildAggregateMetrics({
     labels: summary.labels,
     trueCounts,
-    estimatedCounts,
+    estimatedCounts: rawEstimatedCounts,
     sampleCount: summary.sampleCount,
     consistencyThreshold: 0.05
   });
   const varianceMetrics = calculateTspFrequencyVarianceMetrics({
     trueCounts,
-    estimatedCounts,
+    estimatedCounts: rawEstimatedCounts,
     sampleCount: summary.sampleCount,
     config
   });
-  const displayOverallCounts = constrainCountsForDisplay(estimatedCounts, summary.sampleCount);
   const displayOverallMetrics = buildAggregateMetrics({
     labels: summary.labels,
     trueCounts,
-    estimatedCounts: displayOverallCounts,
+    estimatedCounts,
     sampleCount: summary.sampleCount,
     consistencyThreshold: 0.05
   });
-  const rawResultSections = buildTspResultSections(summary, estimatedCounts, false);
-  const displayResultSections = buildTspResultSections(summary, estimatedCounts, true);
-  const resultSections = rawResultSections;
+  const rawResultSections = buildTspResultSections(summary, rawEstimatedCounts, false);
+  const displayResultSections = buildTspResultSections(summary, rawEstimatedCounts, true);
+  const resultSections = displayResultSections;
   const missingSection = rawResultSections.find(section => section.key === 'missing');
   const scoreSection = rawResultSections.find(section => section.key === 'score');
   const displayMissingSection = displayResultSections.find(section => section.key === 'missing');
@@ -704,6 +739,14 @@ function getTspAggregateResults(records, task, taskId, scope) {
     displayResultSections,
     trueValueSource
   });
+  logTspAggregationDebug({
+    scope,
+    records: tspRecords,
+    summary,
+    rawEstimatedCounts,
+    displayEstimatedCounts: estimatedCounts,
+    config
+  });
 
   return [createAggregateViewModel({
     id: 1,
@@ -716,8 +759,8 @@ function getTspAggregateResults(records, task, taskId, scope) {
     summary,
     estimatedCounts,
     resultSections,
-    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复' : '基于最终上报分布近似',
-    sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`,
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复，默认展示非负归一化后的稳定估计' : '基于最终上报分布近似，默认展示非负归一化后的稳定估计',
+    sourceDescription: `当前结果基于 task_id = ${taskId}、${scope?.batchId ? `batch_id = ${scope.batchId}` : '全部批次'} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。${config.versionMeta.description} 页面默认展示经过非负归一化后处理的稳定估计，原始无偏估计和逐类中间量保留在 TSP 聚合调试日志与诊断数据中。`,
     summaryCards: [
       { label: '任务名称', value: '睡眠质量评分' },
       { label: '任务 ID', value: taskId || '--' },
@@ -739,8 +782,8 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: '95% 置信区间宽度', value: varianceMetrics.ciWidth95.toFixed(8), description: '按 2 × 1.96 × 标准误给出的近似区间宽度，用于辅助展示理论波动范围。' },
       { label: '每类频率估计方差', value: formatCountSnapshot(summary.labels, summary.labels.map((_, index) => varianceMetrics.varianceByCategory[String(index)] ?? 0), 8), description: '按统一域类别分别给出频率估计方差，变量命名为 varianceByCategory。0 表示缺失值，1~5 表示评分。' },
       { label: '预算逻辑', value: config.versionMeta.label, description: '当前任务按论文定义使用统一的总隐私预算 ε 联合求解两阶段参数，不再拆分预算。' },
-      { label: '原始无偏缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], [estimatedCounts[0], estimatedCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0)]), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
-      { label: '原始无偏评分块估计值', value: formatCountSnapshot(['1 分', '2 分', '3 分', '4 分', '5 分'], estimatedCounts.slice(1)), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
+      { label: '原始无偏缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], [rawEstimatedCounts[0], rawEstimatedCounts.slice(1).reduce((sum, value) => sum + Number(value ?? 0), 0)]), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
+      { label: '原始无偏评分块估计值', value: formatCountSnapshot(['1 分', '2 分', '3 分', '4 分', '5 分'], rawEstimatedCounts.slice(1)), description: '保留未加展示约束的原始无偏恢复结果，供理论参考。' },
       { label: '原始无偏统一域计数离散度', value: overallMetrics.estimateVariance.toFixed(4), description: '这是对无偏估计计数向量本身做的离散度统计，不等同于论文中更常用的频率估计方差。保留它仅用于辅助观察。' },
       { label: '原始无偏统一域误差上界', value: String(overallMetrics.maxCountError), description: '保留未加展示约束的统一域最大计数误差绝对值，供理论参考。' },
       { label: '约束后缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], displayMissingSection?.metrics?.estimatedCounts || []), description: '表格与图表当前默认展示这一版约束后结果：先做非负截断，再归一化到总样本数 N。' },
@@ -792,7 +835,6 @@ function getTspAggregateResults(records, task, taskId, scope) {
         cardClass: ''
       }
     ],
-    sourceDescription: `${`当前结果基于 task_id = ${taskId}、${scope?.batchId ? `batch_id = ${scope.batchId}` : '全部批次'} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`} ${config.versionMeta.description} 当前表格与图表默认展示的是原始无偏恢复结果；辅助实验误差指标和理论方差指标都在同一 task/batch 作用域下计算。`,
     diagnostics,
   })];
 }

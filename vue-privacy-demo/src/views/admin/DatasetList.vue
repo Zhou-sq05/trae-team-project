@@ -91,17 +91,14 @@
                 <el-table-column label="序号" type="index" width="80" />
                 <el-table-column prop="userId" label="用户ID" />
                 <el-table-column prop="taskId" label="任务ID" />
+                <el-table-column prop="attribute" label="上传属性" min-width="180" />
+                <el-table-column prop="reportedValue" label="上报值" min-width="200" />
                 <el-table-column prop="batchId" label="批次号" min-width="180" />
                 <el-table-column prop="algorithm" label="协议" width="120" />
                 <el-table-column prop="uploadTime" label="上传时间" min-width="180" />
                 <el-table-column prop="status" label="数据状态" width="100">
                   <template #default="scope">
                     <el-tag :type="scope.row.status === '已上报' ? 'success' : 'warning'">{{ scope.row.status }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="数据详情" width="100">
-                  <template #default="scope">
-                    <el-button size="small" @click="viewDataDetail(scope.row)">查看</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -124,58 +121,6 @@
       </el-container>
     </el-container>
 
-    <el-drawer
-      v-model="detailDrawerVisible"
-      title="数据详情"
-      size="52%"
-      destroy-on-close
-    >
-      <template v-if="selectedDataset">
-        <div class="detail-overview">
-          <div class="detail-chip">
-            <span class="detail-chip-label">用户ID</span>
-            <span class="detail-chip-value">{{ selectedDataset.userId }}</span>
-          </div>
-          <div class="detail-chip">
-            <span class="detail-chip-label">任务ID</span>
-            <span class="detail-chip-value">{{ selectedDataset.taskId }}</span>
-          </div>
-          <div class="detail-chip">
-            <span class="detail-chip-label">批次号</span>
-            <span class="detail-chip-value">{{ selectedDataset.batchId }}</span>
-          </div>
-          <div class="detail-chip">
-            <span class="detail-chip-label">协议</span>
-            <span class="detail-chip-value">{{ selectedDataset.algorithm }}</span>
-          </div>
-        </div>
-
-        <div v-if="selectedDataset.algorithm === 'TSP' && tspDetailSections.length" class="tsp-detail-sections">
-          <div v-for="section in tspDetailSections" :key="section.title" class="tsp-detail-card">
-            <div class="tsp-detail-card__title">{{ section.title }}</div>
-            <div class="tsp-detail-grid">
-              <div v-for="item in section.items" :key="item.label" class="tsp-detail-item">
-                <span class="tsp-detail-item__label">{{ item.label }}</span>
-                <span class="tsp-detail-item__value">{{ item.value }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <el-table :data="dataDetails" style="width: 100%">
-          <el-table-column label="序号" type="index" width="80" />
-          <el-table-column prop="userId" label="用户ID" />
-          <el-table-column prop="taskId" label="任务ID" />
-          <el-table-column prop="batchId" label="批次号" min-width="180" />
-          <el-table-column prop="attribute" label="属性名" min-width="180" />
-          <el-table-column prop="rawValue" label="原始值" min-width="160" />
-          <el-table-column prop="reportedValue" label="上报值" min-width="180" />
-          <el-table-column prop="mode" label="模式" width="140" />
-          <el-table-column prop="algorithm" label="算法" width="120" />
-          <el-table-column prop="uploadTime" label="上传时间" min-width="180" />
-        </el-table>
-      </template>
-    </el-drawer>
   </div>
 </template>
 
@@ -200,10 +145,6 @@ const pageSize = ref(10);
 const tasks = ref([]);
 const selectedTaskId = ref('');
 const filterTaskId = ref('');
-const selectedDataset = ref(null);
-const dataDetails = ref([]);
-const tspDetailSections = ref([]);
-const detailDrawerVisible = ref(false);
 const loading = ref(false);
 const rawSubmissions = ref([]);
 
@@ -320,10 +261,6 @@ function formatAgrrLabel(bucket, code) {
   return `${bucket || '--'}（${code}）`;
 }
 
-function formatTspMissingLabel(value) {
-  return Number(value) === 1 ? '缺失（M=1）' : '非缺失（M=0）';
-}
-
 function formatTspValue(value) {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) {
@@ -332,48 +269,68 @@ function formatTspValue(value) {
   return numericValue === 0 ? '0（缺失值）' : `${numericValue} 分`;
 }
 
-function buildTspDetailSections(submission, dataset) {
-  if (!submission) return [];
+function formatVectorValue(value) {
+  if (Array.isArray(value)) {
+    return `[${value.join(', ')}]`;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  return value == null ? '--' : String(value);
+}
 
-  const originalMissing = submission.original_missing ?? submission.rawData?.sleepMissing ?? null;
-  const originalScore = submission.original_score ?? submission.rawData?.sleepScore ?? null;
-  const stage1Result = submission.stage1_result ?? submission.reportData?.stageOneResult ?? null;
-  const stage2Input = submission.stage2_input ?? submission.reportData?.stageTwoInput ?? null;
-  const reportValue = submission.report_value ?? submission.reportData?.reportValue ?? submission.reportData?.perturbedValue ?? null;
-  const stage1Skipped = stage1Result === 'skipped' || stage1Result == null;
+function getDisplayAttribute(meta, protocol) {
+  if (String(protocol).toUpperCase() === 'TSP') {
+    return `${meta.attributeName} / 缺失状态`;
+  }
+  return meta.attributeName;
+}
 
-  return [
-    {
-      title: '原始输入',
-      items: [
-        { label: '缺失状态', value: formatTspMissingLabel(originalMissing) },
-        { label: '原始评分', value: originalScore == null ? '--' : `${originalScore} 分` }
-      ]
-    },
-    {
-      title: '第一阶段',
-      items: [
-        { label: '是否执行第一阶段', value: stage1Skipped ? '跳过' : '执行' },
-        { label: '第一阶段结果', value: stage1Skipped ? '跳过' : `${stage1Result} 分` }
-      ]
-    },
-    {
-      title: '第二阶段',
-      items: [
-        { label: '第二阶段输入', value: formatTspValue(stage2Input) },
-        { label: '最终上报值', value: formatTspValue(reportValue) }
-      ]
-    },
-    {
-      title: '元信息',
-      items: [
-        { label: 'task_id', value: submission.task_id ?? submission.taskId ?? dataset.taskId ?? '--' },
-        { label: 'protocol', value: submission.protocol ?? submission.reportData?.protocol ?? dataset.algorithm ?? '--' },
-        { label: 'batch_id', value: submission.batch_id ?? submission.sampleMeta?.batchId ?? dataset.batchId ?? '--' },
-        { label: 'upload_time', value: formatDateTime(submission.upload_time ?? submission.uploadTime ?? dataset.uploadTime) }
-      ]
-    }
-  ];
+function getReportedValueDisplay(record, protocol) {
+  const normalizedProtocol = String(protocol || record?.protocol || record?.reportData?.protocol || '').toUpperCase();
+  const reportValue = record?.report_value
+    ?? record?.reportData?.reportValue
+    ?? record?.reportData?.perturbedValue
+    ?? record?.perturbed_value
+    ?? record?.reportValue;
+
+  if (record?.uploadedValue && record.uploadedValue !== '待上传') {
+    return record.uploadedValue;
+  }
+  if (record?.uploadedVectorDisplay && record.uploadedVectorDisplay !== '待上传') {
+    return record.uploadedVectorDisplay;
+  }
+  if (record?.finalReportDisplay && record.finalReportDisplay !== '待上传') {
+    return record.finalReportDisplay;
+  }
+
+  if (normalizedProtocol === 'ARR') {
+    return `${record?.reportData?.perturbedLabel || formatArrLabel(reportValue)}（${reportValue ?? '--'}）`;
+  }
+
+  if (normalizedProtocol === 'AGRR') {
+    const reportBucket = record?.perturbed_bucket
+      || record?.reportData?.perturbedBucket
+      || record?.reportData?.perturbedLabel
+      || record?.perturbedLabel
+      || '--';
+    const reportCode = record?.perturbed_bucket_code
+      ?? record?.reportData?.perturbedBucketCode
+      ?? record?.reportData?.perturbedValue
+      ?? reportValue
+      ?? '--';
+    return formatAgrrLabel(reportBucket, reportCode);
+  }
+
+  if (normalizedProtocol === 'AOUE') {
+    return formatVectorValue(reportValue);
+  }
+
+  if (normalizedProtocol === 'TSP') {
+    return formatTspValue(reportValue);
+  }
+
+  return formatVectorValue(reportValue);
 }
 
 function buildDatasetRows(submissions) {
@@ -383,6 +340,7 @@ function buildDatasetRows(submissions) {
     if (Array.isArray(item?.samples)) {
       const taskId = item.task_id ?? item.taskId;
       const meta = getTaskMeta(taskId);
+      const protocol = item.protocol || meta.algorithm;
       item.samples.forEach((sample, sampleIndex) => {
         rows.push({
           id: `${index + 1}-${sampleIndex + 1}`,
@@ -391,10 +349,12 @@ function buildDatasetRows(submissions) {
           sampleIndex,
           userId: item.user_id || item.userId || `用户${String(index + 1).padStart(3, '0')}`,
           taskId,
+          attribute: getDisplayAttribute(meta, protocol),
+          reportedValue: getReportedValueDisplay(sample, protocol),
           batchId: item.batch_id || '--',
           uploadTime: formatDateTime(item.upload_time || item.uploadTime || Date.now()),
           status: '已上报',
-          algorithm: item.protocol || meta.algorithm
+          algorithm: protocol
         });
       });
       return;
@@ -402,120 +362,23 @@ function buildDatasetRows(submissions) {
 
     const taskId = item.task_id ?? item.taskId;
     const meta = getTaskMeta(taskId);
+    const protocol = item.protocol || item.reportData?.protocol || meta.algorithm;
     rows.push({
       id: index + 1,
       sourceIndex: index,
       sourceType: 'single',
       userId: item.user_id || item.userId || `用户${String(index + 1).padStart(3, '0')}`,
       taskId,
+      attribute: getDisplayAttribute(meta, protocol),
+      reportedValue: getReportedValueDisplay(item, protocol),
       batchId: item.batch_id || item.sampleMeta?.batchId || '--',
       uploadTime: formatDateTime(item.upload_time || item.uploadTime || Date.now()),
       status: item.reportData ? '已上报' : '已扰动',
-      algorithm: item.protocol || item.reportData?.protocol || meta.algorithm
+      algorithm: protocol
     });
   });
 
   return rows;
-}
-
-function buildDetailRows(submission, dataset) {
-  if (!submission) return [];
-
-  const meta = getTaskMeta(dataset.taskId);
-
-  if (dataset.sourceType === 'batch' && Array.isArray(submission.samples)) {
-    const sample = submission.samples[dataset.sampleIndex] || {};
-    const reportValue = sample.perturbed_value ?? sample.report_value;
-    return [{
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      batchId: dataset.batchId,
-      attribute: meta.attributeName,
-      rawValue: '--',
-      reportedValue: `${formatArrLabel(reportValue)}（${reportValue}）`,
-      mode: meta.mode,
-      algorithm: dataset.algorithm,
-      uploadTime: dataset.uploadTime
-    }];
-  }
-
-  const scenario = submission.rawData?.scenario;
-
-  if (submission.reportData && (scenario === 'arr' || submission.reportData?.protocol === 'ARR')) {
-    const hasRawValue = submission.rawData?.fallAlarm !== undefined && submission.rawData?.fallAlarm !== null;
-    const rawValue = hasRawValue ? Number(submission.rawData.fallAlarm) : null;
-    const reportValue = submission.reportData?.perturbedValue ?? submission.reportData?.reportValue;
-    return [{
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      batchId: dataset.batchId,
-      attribute: meta.attributeName,
-      rawValue: hasRawValue ? `${formatArrLabel(rawValue)}（${rawValue}）` : '--',
-      reportedValue: `${submission.reportData?.perturbedLabel || formatArrLabel(reportValue)}（${reportValue}）`,
-      mode: meta.mode,
-      algorithm: submission.reportData?.protocol || meta.algorithm,
-      uploadTime: dataset.uploadTime
-    }];
-  }
-
-  if (submission.reportData && (scenario === 'agrr' || submission.reportData?.protocol === 'AGRR')) {
-    const rawMinutes = submission.original_minutes ?? submission.rawData?.standMinutes ?? '--';
-    const rawBucket = submission.original_bucket || submission.rawData?.standBucket || submission.reportData?.rawBucket || '--';
-    const rawCode = submission.original_bucket_code ?? submission.rawData?.standBucketCode ?? submission.reportData?.rawBucketCode ?? '--';
-    const reportBucket = submission.perturbed_bucket || submission.reportData?.perturbedBucket || submission.reportData?.perturbedLabel || '--';
-    const reportCode = submission.perturbed_bucket_code ?? submission.reportData?.perturbedBucketCode ?? submission.reportData?.perturbedValue ?? submission.reportData?.reportValue ?? '--';
-
-    return [{
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      batchId: dataset.batchId,
-      attribute: meta.attributeName,
-      rawValue: `${rawMinutes} 分钟 -> ${formatAgrrLabel(rawBucket, rawCode)}`,
-      reportedValue: formatAgrrLabel(reportBucket, reportCode),
-      mode: meta.mode,
-      algorithm: submission.reportData?.protocol || meta.algorithm,
-      uploadTime: dataset.uploadTime
-    }];
-  }
-
-  if (submission.reportData && (scenario === 'tsp' || submission.reportData?.protocol === 'TSP')) {
-    const originalMissing = submission.original_missing ?? submission.rawData?.sleepMissing ?? '--';
-    const originalScore = submission.original_score ?? submission.rawData?.sleepScore ?? null;
-    const stage1Result = submission.stage1_result ?? submission.reportData?.stageOneResult;
-    const stage2Input = submission.stage2_input ?? submission.reportData?.stageTwoInput;
-    const reportValue = submission.report_value ?? submission.reportData?.reportValue ?? submission.reportData?.perturbedValue;
-
-    const rawParts = [
-      `缺失状态：${formatTspMissingLabel(originalMissing)}`,
-      `原始评分：${originalScore == null ? '--' : `${originalScore} 分`}`,
-      `第一阶段：${stage1Result === 'skipped' || stage1Result == null ? 'skipped' : `${stage1Result} 分`}`,
-      `第二阶段输入：${formatTspValue(stage2Input)}`
-    ];
-
-    return [{
-      userId: dataset.userId,
-      taskId: dataset.taskId,
-      batchId: dataset.batchId,
-      attribute: meta.attributeName,
-      rawValue: rawParts.join(' / '),
-      reportedValue: formatTspValue(reportValue),
-      mode: meta.mode,
-      algorithm: submission.reportData?.protocol || meta.algorithm,
-      uploadTime: dataset.uploadTime
-    }];
-  }
-
-  return [{
-    userId: dataset.userId,
-    taskId: dataset.taskId,
-    batchId: dataset.batchId,
-    attribute: meta.attributeName,
-    rawValue: '--',
-    reportedValue: '--',
-    mode: meta.mode,
-    algorithm: dataset.algorithm,
-    uploadTime: dataset.uploadTime
-  }];
 }
 
 function loadDataFromStorage() {
@@ -550,29 +413,11 @@ function refreshData() {
   }, 300);
 }
 
-function viewDataDetail(dataset) {
-  selectedDataset.value = dataset;
-  const submission = rawSubmissions.value[dataset.sourceIndex] || null;
-  dataDetails.value = buildDetailRows(submission, dataset);
-  tspDetailSections.value = dataset.algorithm === 'TSP'
-    ? buildTspDetailSections(submission, dataset)
-    : [];
-  detailDrawerVisible.value = true;
-}
-
 function startAggregation() {
   ElMessage.success('开始聚合估计');
   const query = {};
   if (selectedTaskId.value) {
     query.taskId = selectedTaskId.value;
-  }
-  if (
-    selectedDataset.value?.taskId
-    && String(selectedDataset.value.taskId) === String(selectedTaskId.value)
-    && selectedDataset.value?.batchId
-    && selectedDataset.value.batchId !== '--'
-  ) {
-    query.batchId = selectedDataset.value.batchId;
   }
   router.push({ path: '/admin/aggregate', query });
 }
@@ -613,10 +458,6 @@ function batchDelete() {
     const updatedData = rawSubmissions.value.filter((_, index) => !selectedIndexes.has(index));
     localStorage.setItem('submittedData', JSON.stringify(updatedData));
     selectedRows.value = [];
-    selectedDataset.value = null;
-    dataDetails.value = [];
-    tspDetailSections.value = [];
-    detailDrawerVisible.value = false;
     if (tableRef.value) {
       tableRef.value.clearSelection();
     }
@@ -644,6 +485,15 @@ onMounted(() => {
 .admin-container {
   height: 100vh;
   overflow: hidden;
+}
+
+:deep(.el-container) {
+  min-height: 0;
+}
+
+:deep(.el-main) {
+  height: calc(100vh - 60px);
+  overflow-y: auto;
 }
 
 .el-header {

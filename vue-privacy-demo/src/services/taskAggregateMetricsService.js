@@ -17,7 +17,7 @@ import {
   getStepsBucketLabelByCode,
   normalizeStepsBucketCounts
 } from '../utils/stepsBuckets';
-import { aggregateTspDomainCounts, resolveTspTaskConfig } from '../utils/tspProtocol.js';
+import { aggregateTspDomainCounts, buildTspAggregationTrace, resolveTspTaskConfig } from '../utils/tspProtocol.js';
 import { buildAggregateMetrics } from '../utils/aggregate/aggregateMetrics';
 import { getPerturbationStatus } from '../utils/perturbationStatus';
 
@@ -313,6 +313,42 @@ function buildTspSummary(tspRecords, scoreDomainSize = 5) {
     hasRawSummary,
     labels
   };
+}
+
+function buildTspStageOneCounts(tspRecords, scoreDomainSize = 5) {
+  const counts = new Array(scoreDomainSize + 1).fill(0);
+  tspRecords.forEach(item => {
+    const rawMissing = Number(item.original_missing ?? item.rawData?.sleepMissing);
+    if (rawMissing === 1) {
+      counts[0] += 1;
+      return;
+    }
+    const value = normalizeTspCode(
+      item.stage1_result === 'skipped' ? 0 : item.stage1_result ?? item.reportData?.stageOneResult,
+      scoreDomainSize
+    );
+    if (value != null) {
+      counts[value] += 1;
+    }
+  });
+  return counts;
+}
+
+function logTspAggregationDebug({ taskId, tspRecords, summary, rawEstimatedCounts, displayEstimatedCounts, config }) {
+  const trueCounts = summary.hasRawSummary ? summary.rawCounts : summary.reportCounts;
+  const trace = buildTspAggregationTrace(summary.reportCounts, summary.sampleCount, config);
+  console.groupCollapsed?.(`[TSP聚合调试] task_id=${taskId || '--'} n=${summary.sampleCount}`);
+  console.log('原始真实分布 trueCounts', trueCounts);
+  console.log('用户端生成的原始睡眠评分分布 rawCountsBeforePerturb', trueCounts);
+  console.log('第一阶段扰动结果计数 stage1PerturbedCounts', buildTspStageOneCounts(tspRecords, config.scoreDomainSize));
+  console.log('第二阶段扰动结果计数 stage2PerturbedCounts', summary.reportCounts);
+  console.log('TSP 参数', trace.parameters);
+  console.table?.(trace.categorySteps);
+  console.log('原始无偏估计值 rawEstimatedCounts', rawEstimatedCounts);
+  console.log('约束后处理估计值 displayEstimatedCounts', displayEstimatedCounts);
+  console.log('sum(rawEstimatedCounts)', trace.sumEstimatedCounts);
+  console.log('sum(displayEstimatedCounts)', displayEstimatedCounts.reduce((sum, value) => sum + Number(value ?? 0), 0));
+  console.groupEnd?.();
 }
 
 function buildTspResultSections(summary, estimatedCounts, useDisplayConstraint = false) {
@@ -657,9 +693,19 @@ function getTspAggregateResults(records, task, taskId) {
 
   const config = resolveTspTaskConfig(task, 5);
   const summary = buildTspSummary(tspRecords, config.scoreDomainSize);
-  const estimatedCounts = aggregateTspDomainCounts(summary.reportCounts, summary.sampleCount, config)
+  const rawEstimatedCounts = aggregateTspDomainCounts(summary.reportCounts, summary.sampleCount, config)
     .map(value => Number(value.toFixed(4)));
+  const estimatedCounts = normalizeCountsForDisplay(rawEstimatedCounts, summary.sampleCount);
   const resultSections = buildTspResultSections(summary, estimatedCounts, false);
+
+  logTspAggregationDebug({
+    taskId,
+    tspRecords,
+    summary,
+    rawEstimatedCounts,
+    displayEstimatedCounts: estimatedCounts,
+    config
+  });
 
   return [createAggregateViewModel({
     id: 1,
@@ -672,8 +718,8 @@ function getTspAggregateResults(records, task, taskId) {
     summary,
     estimatedCounts,
     resultSections,
-    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复' : '基于最终上报分布近似',
-    sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。`
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复，展示值已做非负归一化后处理' : '基于最终上报分布近似，展示值已做非负归一化后处理',
+    sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计；TSP 原始无偏估计保留在控制台调试日志中，页面默认展示非负归一化后的稳定结果。`
   })];
 }
 
