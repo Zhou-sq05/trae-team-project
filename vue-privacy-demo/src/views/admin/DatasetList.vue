@@ -21,10 +21,6 @@
       <el-container>
         <el-aside width="200px">
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
-            <el-menu-item index="/admin/dashboard">
-              <el-icon><House /></el-icon>
-              <span>首页</span>
-            </el-menu-item>
             <el-menu-item index="/admin/scenario-overview">
               <el-icon><Document /></el-icon>
               <span>场景说明</span>
@@ -127,7 +123,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { House, Setting, Document, DataAnalysis, ArrowDown, Monitor } from '@element-plus/icons-vue';
+import { Setting, Document, DataAnalysis, ArrowDown, Monitor } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useUserStore } from '../../store/user';
 

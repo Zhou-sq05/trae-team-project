@@ -23,10 +23,6 @@
       <el-container>
         <el-aside width="220px">
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
-            <el-menu-item index="/admin/dashboard">
-              <el-icon><House /></el-icon>
-              <span>首页</span>
-            </el-menu-item>
             <el-menu-item index="/admin/scenario-overview">
               <el-icon><Document /></el-icon>
               <span>场景说明</span>
@@ -193,7 +189,6 @@ import {
   ArrowDown,
   DataAnalysis,
   Document,
-  House,
   Monitor,
   Setting
 } from '@element-plus/icons-vue';
