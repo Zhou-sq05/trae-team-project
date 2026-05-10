@@ -3,7 +3,7 @@
     <el-container>
       <el-header>
         <div class="header-left">
-          <h1>隐私保护数据采集与管理平台</h1>
+          <h1>聚合结果</h1>
         </div>
         <div class="header-right">
           <el-dropdown>
@@ -19,7 +19,11 @@
         </div>
       </el-header>
       <el-container>
-        <el-aside width="200px">
+        <el-aside width="240px">
+          <div class="sidebar-brand">
+            <div class="sidebar-brand-title">隐私保护平台</div>
+            <div class="sidebar-brand-subtitle">数据采集与管理</div>
+          </div>
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/scenario-overview">
               <el-icon><Document /></el-icon>
@@ -27,7 +31,7 @@
             </el-menu-item>
             <el-menu-item index="/admin/attr-config">
               <el-icon><Setting /></el-icon>
-              <span>属性配置</span>
+              <span>任务配置</span>
             </el-menu-item>
             <el-menu-item index="/admin/dataset">
               <el-icon><Document /></el-icon>

@@ -3,7 +3,7 @@
     <el-container>
       <el-header>
         <div class="header-left">
-          <h1>隐私保护数据采集与管理平台</h1>
+          <h1>任务配置</h1>
         </div>
         <div class="header-right">
           <el-dropdown>
@@ -21,7 +21,11 @@
       </el-header>
 
       <el-container>
-        <el-aside width="200px">
+        <el-aside width="240px">
+          <div class="sidebar-brand">
+            <div class="sidebar-brand-title">隐私保护平台</div>
+            <div class="sidebar-brand-subtitle">数据采集与管理</div>
+          </div>
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/scenario-overview">
               <el-icon><Document /></el-icon>
@@ -29,7 +33,7 @@
             </el-menu-item>
             <el-menu-item index="/admin/attr-config">
               <el-icon><Setting /></el-icon>
-              <span>属性配置</span>
+              <span>任务配置</span>
             </el-menu-item>
             <el-menu-item index="/admin/dataset">
               <el-icon><Document /></el-icon>
@@ -57,8 +61,8 @@
               <template #header>
                 <div class="card-header">
                   <div class="card-header-copy">
-                    <span>采集属性配置</span>
-                    <p>新方案参数由内在不确定性建模结果计算得到，传统方案参数作为基线对比；配置下发后，用户端将按照对应协议完成本地扰动上报。</p>
+                    <span>采集任务配置</span>
+                    <p>新方案参数由内在不确定性建模结果计算得到，传统方案参数作为基线对比；配置下发后，采集端将按照对应协议完成本地扰动上报。</p>
                   </div>
                   <el-button
                     plain
@@ -1212,7 +1216,7 @@
               </div>
             </div>
             <div class="overview-item overview-item-full">
-              <span class="overview-label">用户端处理方式摘要</span>
+              <span class="overview-label">采集端处理方式摘要</span>
               <span class="overview-value">{{ distributeSummary.userProcessSummary }}</span>
             </div>
           </div>
@@ -2349,7 +2353,7 @@ function handleClearAllTaskIds() {
   }
 
   ElMessageBox.confirm(
-    `确认清空当前 ${taskStore.taskList.length} 个任务 ID 吗？该操作不会删除采集属性配置。`,
+    `确认清空当前 ${taskStore.taskList.length} 个任务 ID 吗？该操作不会删除采集任务配置。`,
     '清空任务ID确认',
     {
       confirmButtonText: '清空',
@@ -2409,7 +2413,7 @@ function generateDistributeTaskId() {
 
 function openDistributeDialog(attribute) {
   if (!attributeConfigStore.hasConfigById(attribute.id)) {
-    ElMessage.warning('请先完成当前属性配置保存，再执行下发');
+    ElMessage.warning('请先完成当前任务配置保存，再执行下发');
     return;
   }
 
@@ -2428,7 +2432,7 @@ function confirmDistributeAttribute() {
 
   const savedConfig = attributeConfigStore.getConfigById(distributeAttribute.value.id);
   if (!savedConfig) {
-    ElMessage.warning('当前属性尚无可下发的已保存配置');
+    ElMessage.warning('当前任务尚无可下发的已保存配置');
     return;
   }
 

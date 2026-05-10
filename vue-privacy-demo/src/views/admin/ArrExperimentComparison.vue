@@ -3,7 +3,7 @@
     <el-container>
       <el-header>
         <div class="header-left">
-          <h1>隐私保护数据采集与管理平台</h1>
+          <h1>演示与验证</h1>
         </div>
         <div class="header-right">
           <el-dropdown>
@@ -21,7 +21,11 @@
       </el-header>
 
       <el-container>
-        <el-aside width="220px">
+        <el-aside width="240px">
+          <div class="sidebar-brand">
+            <div class="sidebar-brand-title">隐私保护平台</div>
+            <div class="sidebar-brand-subtitle">数据采集与管理</div>
+          </div>
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/scenario-overview">
               <el-icon><Document /></el-icon>
@@ -29,7 +33,7 @@
             </el-menu-item>
             <el-menu-item index="/admin/attr-config">
               <el-icon><Setting /></el-icon>
-              <span>属性配置</span>
+              <span>任务配置</span>
             </el-menu-item>
             <el-menu-item index="/admin/dataset">
               <el-icon><Document /></el-icon>
@@ -301,7 +305,7 @@ const chartConclusionText = computed(() => {
 });
 const emptyText = computed(() => {
   if (!experimentTasks.value.length) {
-    return '暂无可对比任务，请先在属性配置页下发 ARR、AGRR、AOUE 或 TSP 任务。';
+    return '暂无可对比任务，请先在任务配置页下发 ARR、AGRR、AOUE 或 TSP 任务。';
   }
   const protocol = currentProtocol.value || '当前协议';
   return `暂无 ${protocol} 模拟数据，请先在用户端运行对应多客户端上报模拟。`;

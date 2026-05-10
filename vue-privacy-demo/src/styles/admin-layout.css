@@ -1,0 +1,118 @@
+.admin-container {
+  height: 100vh !important;
+  overflow: hidden !important;
+  background: #eef3f8;
+}
+
+.admin-container > .el-container {
+  min-height: 100vh !important;
+  padding-top: 64px !important;
+  padding-left: 240px !important;
+  box-sizing: border-box !important;
+}
+
+.admin-container > .el-container > .el-header {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  left: 240px !important;
+  z-index: 20 !important;
+  height: 64px !important;
+  padding: 0 24px !important;
+  border-bottom: 1px solid #e6edf5 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.admin-container .header-left h1 {
+  margin: 0 !important;
+  color: #20344f !important;
+  font-size: 20px !important;
+  line-height: 1.2 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+}
+
+.admin-container .header-right {
+  color: #526176 !important;
+}
+
+.admin-container .el-aside {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 30 !important;
+  width: 240px !important;
+  background: #26384d !important;
+  overflow: hidden !important;
+}
+
+.admin-container .sidebar-brand {
+  height: 88px;
+  padding: 20px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #20344f;
+  box-sizing: border-box;
+}
+
+.admin-container .sidebar-brand-title {
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.admin-container .sidebar-brand-subtitle {
+  margin-top: 6px;
+  color: #9fb3ca;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.admin-container .el-menu,
+.admin-container .el-menu-vertical-demo {
+  width: 240px !important;
+  height: calc(100vh - 88px) !important;
+  border-right: none !important;
+  background: #26384d !important;
+}
+
+.admin-container .el-menu-item,
+.admin-container .el-sub-menu__title {
+  height: 56px !important;
+  color: #c9d7e8 !important;
+  font-size: 15px !important;
+}
+
+.admin-container .el-menu-item:hover,
+.admin-container .el-sub-menu__title:hover {
+  background: #30465f !important;
+  color: #ffffff !important;
+}
+
+.admin-container .el-menu-item.is-active {
+  background: rgba(47, 111, 143, 0.35) !important;
+  color: #ffffff !important;
+}
+
+.admin-container .el-menu-item .el-icon,
+.admin-container .el-sub-menu__title .el-icon {
+  color: inherit !important;
+}
+
+.admin-container > .el-container > .el-container {
+  height: calc(100vh - 64px) !important;
+}
+
+.admin-container .el-main {
+  min-width: 0 !important;
+  height: calc(100vh - 64px) !important;
+  padding: 24px !important;
+  overflow-y: auto !important;
+  background: #eef3f8 !important;
+  box-sizing: border-box !important;
+}

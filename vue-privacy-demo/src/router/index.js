@@ -21,12 +21,6 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
-    path: '/admin/dashboard',
-    name: 'AdminDashboard',
-    component: () => import('../views/admin/Dashboard.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/admin/scenario-overview',
     name: 'ScenarioOverview',
     component: () => import('../views/admin/ScenarioOverview.vue'),

@@ -1,78 +1,77 @@
-﻿<template>
+<template>
   <div class="home-container">
-    <div class="home-header">
-      <h1>基于内在不确定性的本地差分隐私演示系统</h1>
-      <p class="subtitle">面向健康手环场景的数据采集、隐私扰动与聚合估计平台</p>
-      <div class="protocol-tags">
-        <span class="tag">ARR</span>
-        <span class="tag">AGRR</span>
-        <span class="tag">AOUE</span>
-        <span class="tag">TSP</span>
+    <header class="topbar">
+      <div class="brand">
+        <img src="/logo.png" alt="山东大学" />
+        <div class="school-name">山东大学 网络空间安全学院</div>
       </div>
-    </div>
+      <el-button text class="register-link" @click="showRegisterDialog = true">注册账号</el-button>
+    </header>
 
-    <div class="flow-section">
-      <div class="flow-line">
-        <span class="flow-item">属性配置</span>
-        <span class="arrow">→</span>
-        <span class="flow-item">策略下发</span>
-        <span class="arrow">→</span>
-        <span class="flow-item">用户端采集</span>
-        <span class="arrow">→</span>
-        <span class="flow-item">本地扰动上报</span>
-        <span class="arrow">→</span>
-        <span class="flow-item">聚合估计</span>
-      </div>
-      <p class="flow-desc">
-        通过 ARR、AGRR、AOUE、TSP 等协议，完成健康数据的本地隐私扰动与聚合估计演示
-      </p>
-    </div>
+    <main class="home-main">
+      <section class="intro-section">
+        <p class="eyebrow">智能手环健康数据场景</p>
+        <h1>隐私保护健康数据采集与管理平台</h1>
+        <p class="subtitle">
+          支持采集任务配置、协议参数下发、采集端本地扰动上报与管理端聚合结果分析。
+        </p>
+        <div class="workflow" aria-label="系统流程">
+          <span>配置采集任务</span>
+          <el-icon><ArrowRight /></el-icon>
+          <span>下发协议参数</span>
+          <el-icon><ArrowRight /></el-icon>
+          <span>采集端填报</span>
+          <el-icon><ArrowRight /></el-icon>
+          <span>本地扰动上报</span>
+          <el-icon><ArrowRight /></el-icon>
+          <span>聚合分析</span>
+        </div>
+      </section>
 
-    <div class="cards-section">
-      <div class="card">
-        <div class="card-icon">📱</div>
-        <h2>用户端</h2>
-        <ul class="card-features">
-          <li>模拟健康手环采集与本地扰动</li>
-          <li>按任务动态采集</li>
-          <li>单次扰动 / 连续采集</li>
-        </ul>
-        <el-button type="primary" class="card-btn" @click="goToLogin('user')">
-          进入用户端
-        </el-button>
-      </div>
+      <section class="entry-section">
+        <article class="entry-card">
+          <div class="entry-icon entry-icon--collector">
+            <el-icon><Monitor /></el-icon>
+          </div>
+          <div class="entry-copy">
+            <h2>采集端</h2>
+            <p>接收管理端下发的采集任务，模拟智能手环健康数据采集，并在本地完成隐私扰动后上报。</p>
+          </div>
+          <ul class="feature-list">
+            <li>查看当前绑定任务</li>
+            <li>填写或模拟健康数据</li>
+            <li>本地扰动后提交</li>
+          </ul>
+          <el-button type="primary" class="entry-button" @click="goToLogin('user')">进入采集端</el-button>
+        </article>
 
-      <div class="card">
-        <div class="card-icon">⚙️</div>
-        <h2>管理端</h2>
-        <ul class="card-features">
-          <li>配置协议与参数</li>
-          <li>下发任务</li>
-          <li>查看数据列表与聚合结果</li>
-        </ul>
-        <el-button type="primary" class="card-btn" @click="goToLogin('admin')">
-          进入管理端
-        </el-button>
-      </div>
-    </div>
+        <article class="entry-card">
+          <div class="entry-icon entry-icon--admin">
+            <el-icon><Setting /></el-icon>
+          </div>
+          <div class="entry-copy">
+            <h2>管理控制台</h2>
+            <p>配置待采集属性、选择隐私保护协议与参数，查看上报数据和聚合估计结果。</p>
+          </div>
+          <ul class="feature-list">
+            <li>配置采集任务</li>
+            <li>下发协议参数</li>
+            <li>查看数据与聚合结果</li>
+          </ul>
+          <el-button type="primary" class="entry-button" @click="goToLogin('admin')">进入管理控制台</el-button>
+        </article>
+      </section>
 
-    <div class="register-footer">
-      <el-button type="text" @click="showRegisterDialog = true">注册账号</el-button>
-    </div>
-
-    <div class="university-logo">
-      <img src="/logo.png" alt="山东大学" />
-      <span>山东大学 网络空间安全学院</span>
-    </div>
+      <section class="protocol-strip" aria-label="支持协议">
+        <span class="protocol-label">支持协议</span>
+        <span v-for="protocol in protocols" :key="protocol" class="protocol-tag">{{ protocol }}</span>
+      </section>
+    </main>
 
     <el-dialog v-model="showRegisterDialog" title="选择注册类型" width="320px" :align-center="true">
       <div class="register-options">
-        <el-button type="primary" @click="goToRegister('user')" style="width: 100%; margin-bottom: 15px;">
-          注册用户端
-        </el-button>
-        <el-button type="success" @click="goToRegister('admin')" style="width: 100%;">
-          注册管理端
-        </el-button>
+        <el-button type="primary" @click="goToRegister('user')">注册采集端账号</el-button>
+        <el-button @click="goToRegister('admin')">注册管理账号</el-button>
       </div>
     </el-dialog>
   </div>
@@ -81,9 +80,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowRight, Monitor, Setting } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const showRegisterDialog = ref(false)
+const protocols = ['ARR', 'AGRR', 'AOUE', 'TSP']
 
 const goToLogin = (type) => {
   router.push({ path: '/login', query: { type } })
@@ -93,228 +94,268 @@ const goToRegister = (type) => {
   showRegisterDialog.value = false
   router.push({ path: '/register', query: { type } })
 }
-
 </script>
 
 <style scoped>
 .home-container {
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  padding: 40px 60px;
+  background: #f3f6fa;
+  color: #172033;
   box-sizing: border-box;
 }
 
-.home-header,
-.flow-section,
-.cards-section,
-.register-footer {
-  position: relative;
-  z-index: 1;
+.topbar {
+  height: 76px;
+  padding: 0 40px;
+  background: #20344f;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
 }
 
-.home-header {
+.brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+.school-name {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.register-link {
+  color: #dce8f8;
+  font-size: 14px;
+}
+
+.register-link:hover {
+  color: #ffffff;
+}
+
+.home-main {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 64px 0 40px;
+  box-sizing: border-box;
+}
+
+.intro-section {
+  max-width: 900px;
   text-align: left;
-  margin-bottom: 50px;
-  width: 100%;
 }
 
-.home-header h1 {
-  font-size: 42px;
-  color: white;
-  font-weight: bold;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  margin-bottom: 16px;
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--brand-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.intro-section h1 {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.18;
+  font-weight: 800;
+  color: #162033;
+  letter-spacing: 0;
 }
 
 .subtitle {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 20px;
+  margin: 16px 0 0;
+  max-width: 760px;
+  font-size: 17px;
+  line-height: 1.75;
+  color: #526176;
 }
 
-.protocol-tags {
-  display: flex;
-  justify-content: flex-start;
-  gap: 16px;
-}
-
-.tag {
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(4px);
-  padding: 6px 18px;
-  border-radius: 30px;
-  font-size: 14px;
-  font-weight: 500;
-  color: white;
-  letter-spacing: 1px;
-}
-
-.flow-section {
-  text-align: left;
-  margin-bottom: 60px;
-  width: 100%;
-  max-width: 1000px;
-}
-
-.flow-line {
+.workflow {
+  margin-top: 24px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-start;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
-}
-
-.flow-item {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(4px);
-  padding: 8px 20px;
-  border-radius: 40px;
-  color: white;
+  color: #526176;
   font-size: 14px;
-  font-weight: 500;
 }
 
-.arrow {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 18px;
-  font-weight: bold;
+.workflow span {
+  padding: 7px 12px;
+  border: 1px solid #d7e1ec;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
-.flow-desc {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 14px;
-  background: rgba(0, 0, 0, 0.15);
-  display: inline-block;
-  padding: 8px 24px;
-  border-radius: 30px;
-  margin-top: 8px;
+.workflow .el-icon {
+  color: #8aa0b8;
 }
 
-.cards-section {
+.entry-section {
+  margin-top: 34px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.entry-card {
+  min-height: 360px;
+  padding: 28px;
+  border: 1px solid #dfe7f0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(32, 52, 79, 0.08);
   display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.entry-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 50px;
-  flex-wrap: wrap;
-  width: 100%;
+  font-size: 25px;
 }
 
-.card {
-  background: white;
-  border-radius: 24px;
-  padding: 32px 28px;
-  width: 320px;
-  text-align: center;
-  box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.25);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+.entry-icon--collector,
+.entry-icon--admin {
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary);
 }
 
-.card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 25px 40px -12px rgba(0, 0, 0, 0.35);
-}
-
-.card-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-}
-
-.card h2 {
+.entry-copy h2 {
+  margin: 22px 0 10px;
   font-size: 26px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 20px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: #172033;
+  letter-spacing: 0;
 }
 
-.card-features {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 28px 0;
+.entry-copy p {
+  margin: 0;
+  min-height: 58px;
+  color: #5c6a7d;
+  font-size: 15px;
+  line-height: 1.7;
   text-align: left;
 }
 
-.card-features li {
-  padding: 8px 0;
-  color: #4b5563;
-  font-size: 14px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.card-features li::before {
-  content: "✓";
-  color: #667eea;
-  font-weight: bold;
-}
-
-.card-btn {
-  width: 100%;
-  padding: 12px !important;
-  font-size: 16px !important;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-}
-
-.card-btn:hover {
-  opacity: 0.9;
-}
-
-.register-footer {
-  position: absolute;
-  bottom: 24px;
-  right: 30px;
-}
-
-.register-footer .el-button {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
-}
-
-.register-footer .el-button:hover {
-  color: white;
-}
-
-.university-logo {
-  position: absolute;
-  top: 30px;
-  right: 40px;
-  display: flex;
-  align-items: center;
+.feature-list {
+  margin: 24px 0 28px;
+  padding: 0;
+  list-style: none;
+  display: grid;
   gap: 12px;
-  z-index: 1;
 }
 
-.university-logo img {
-  width: 50px;
-  height: 50px;
-  opacity: 0.9;
-  object-fit: cover;
+.feature-list li {
+  position: relative;
+  padding-left: 22px;
+  color: #2d3b4f;
+  font-size: 15px;
+  line-height: 1.4;
 }
 
-.university-logo span {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 1px;
+.feature-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+}
+
+.entry-button {
+  width: 100%;
+  margin-top: auto;
+  height: 42px;
+  border: none;
+  background: var(--brand-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.entry-button:hover {
+  background: var(--brand-primary-hover);
+}
+
+.protocol-strip {
+  margin-top: 24px;
+  padding: 16px 18px;
+  border: 1px solid #dfe7f0;
+  border-radius: 8px;
+  background: #ffffff;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.protocol-label {
+  margin-right: 4px;
+  color: #526176;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.protocol-tag {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .register-options {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 0;
-  width: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 6px 0 2px;
 }
 
 .register-options .el-button {
-  width: 80% !important;
-  min-width: 180px;
-  margin: 8px auto !important;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    height: auto;
+    min-height: 72px;
+    padding: 14px 20px;
+    gap: 16px;
+  }
+
+  .school-name {
+    font-size: 15px;
+  }
+
+  .home-main {
+    width: min(100% - 32px, 720px);
+    padding-top: 36px;
+  }
+
+  .intro-section h1 {
+    font-size: 30px;
+  }
+
+  .entry-section {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
