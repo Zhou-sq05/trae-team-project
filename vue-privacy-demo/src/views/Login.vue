@@ -2,26 +2,30 @@
   <div class="login-page">
     <section class="brand-panel">
       <div class="brand">
-        <img src="/logo.png" alt="山东大学" />
+        <img src="/logo.png" alt="山东大学" class="brand-logo" />
         <div>
           <div class="system-name">隐私保护健康数据采集与管理平台</div>
           <div class="school-name">山东大学 网络空间安全学院</div>
         </div>
       </div>
 
-      <div class="intro-copy">
+      <div class="workflow-copy">
         <p class="eyebrow">{{ roleLabel }}</p>
-        <h1>{{ pageTitle }}</h1>
+        <h1>{{ workbenchTitle }}</h1>
         <p>{{ roleDesc }}</p>
       </div>
 
-      <div class="process-list">
-        <span v-for="item in processItems" :key="item">{{ item }}</span>
+      <div class="workflow-steps">
+        <div v-for="(item, index) in processItems" :key="item" class="workflow-step">
+          <span class="step-index">{{ index + 1 }}</span>
+          <span>{{ item }}</span>
+        </div>
       </div>
     </section>
 
     <section class="login-card">
       <div class="panel-header">
+        <p>{{ roleLabel }}</p>
         <h2>{{ pageTitle }}</h2>
       </div>
 
@@ -89,17 +93,18 @@ const loginRules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
-const pageTitle = computed(() => (userType.value === 'admin' ? '管理控制台登录' : '采集端登录'))
 const roleLabel = computed(() => (userType.value === 'admin' ? '管理控制台' : '采集端'))
+const pageTitle = computed(() => `${roleLabel.value}登录`)
+const workbenchTitle = computed(() => (userType.value === 'admin' ? '任务与聚合工作台' : '采集任务工作台'))
 const roleDesc = computed(() =>
   userType.value === 'admin'
-    ? '配置采集任务、下发协议参数，并查看数据列表与聚合估计结果。'
-    : '查看绑定任务，完成健康数据采集，并在本地扰动后提交上报。'
+    ? '完成采集任务配置、协议参数下发，并查看扰动上报后的聚合分析结果。'
+    : '接收绑定任务，填写或模拟健康数据，并在采集端本地完成扰动后提交。'
 )
 const processItems = computed(() =>
   userType.value === 'admin'
-    ? ['配置采集任务', '下发协议参数', '聚合分析']
-    : ['查看当前绑定任务', '填写或模拟健康数据', '本地扰动后提交']
+    ? ['配置采集任务', '下发协议参数', '查看聚合分析']
+    : ['查看绑定任务', '填写健康数据', '本地扰动上报']
 )
 
 watch(userType, (type) => {
@@ -172,18 +177,20 @@ const goToRegister = () => {
 <style scoped>
 .login-page {
   min-height: 100vh;
-  padding: 70px;
+  padding: 72px;
   background: #f3f6fa;
   display: grid;
-  grid-template-columns: minmax(420px, 1.25fr) minmax(360px, 0.75fr);
-  gap: 52px;
+  grid-template-columns: minmax(520px, 1fr) 420px;
+  gap: 40px;
   align-items: center;
+  justify-content: center;
   box-sizing: border-box;
 }
 
 .brand-panel {
-  min-height: 560px;
-  padding: 36px;
+  min-height: 500px;
+  max-width: 900px;
+  padding: 34px 38px;
   border-radius: 8px;
   background: #20344f;
   color: #ffffff;
@@ -195,13 +202,14 @@ const goToRegister = () => {
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
-.brand img {
-  width: 62px;
-  height: 62px;
+.brand-logo {
+  width: 64px;
+  height: 64px;
   object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .system-name {
@@ -212,60 +220,77 @@ const goToRegister = () => {
 }
 
 .school-name {
-  margin-top: 3px;
+  margin-top: 4px;
   color: #c9d7e8;
   font-size: 13px;
   line-height: 1.4;
 }
 
-.intro-copy {
+.workflow-copy {
   margin-top: auto;
   margin-bottom: auto;
 }
 
 .eyebrow {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: #a7d7d0;
   font-size: 14px;
   font-weight: 700;
 }
 
-.intro-copy h1 {
+.workflow-copy h1 {
   margin: 0;
   color: #ffffff;
-  font-size: 44px;
+  font-size: 40px;
   line-height: 1.18;
   font-weight: 800;
   letter-spacing: 0;
 }
 
-.intro-copy p {
-  margin: 24px 0 0;
+.workflow-copy p {
+  margin: 22px 0 0;
   max-width: 680px;
   color: #dce8f8;
-  font-size: 20px;
-  line-height: 1.75;
+  font-size: 18px;
+  line-height: 1.8;
 }
 
-.process-list {
+.workflow-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
-.process-list span {
-  min-height: 46px;
-  padding: 0 18px;
+.workflow-step {
+  min-height: 56px;
+  padding: 0 16px;
   border: 1px solid rgba(220, 232, 248, 0.18);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   color: #eef5ff;
   display: flex;
   align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.step-index {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(167, 215, 208, 0.16);
+  color: #a7d7d0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .login-card {
-  padding: 44px 44px 36px;
+  width: 100%;
+  padding: 42px 42px 34px;
   border: 1px solid #dfe7f0;
   border-radius: 8px;
   background: #ffffff;
@@ -274,7 +299,14 @@ const goToRegister = () => {
 }
 
 .panel-header {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+}
+
+.panel-header p {
+  margin: 0 0 8px;
+  color: var(--brand-primary);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .panel-header h2 {
@@ -284,6 +316,10 @@ const goToRegister = () => {
   line-height: 1.2;
   font-weight: 800;
   letter-spacing: 0;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 20px;
 }
 
 .password-toggle {
@@ -307,7 +343,7 @@ const goToRegister = () => {
 }
 
 .footer-links {
-  margin-top: 24px;
+  margin-top: 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -326,6 +362,11 @@ const goToRegister = () => {
 
   .brand-panel {
     min-height: 420px;
+    max-width: none;
+  }
+
+  .login-card {
+    max-width: 520px;
   }
 }
 
@@ -339,11 +380,11 @@ const goToRegister = () => {
     padding: 28px 22px;
   }
 
-  .intro-copy h1 {
-    font-size: 34px;
+  .workflow-copy h1 {
+    font-size: 32px;
   }
 
-  .process-list {
+  .workflow-steps {
     grid-template-columns: 1fr;
   }
 }
