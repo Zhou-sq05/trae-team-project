@@ -1,5 +1,6 @@
 param(
-  [string]$OutputName = 'PrivacyLdpDemo-win32-x64'
+  [string]$OutputName = 'PrivacyLdpDemo-win32-x64',
+  [string[]]$Locales = @('zh-CN', 'en-US')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,11 +33,20 @@ if (Test-Path -LiteralPath $out) {
 
 New-Item -ItemType Directory -Path $out | Out-Null
 Get-ChildItem -LiteralPath $electronDist -Force |
-  Where-Object { $_.Name -notin @('electron.exe', 'resources') } |
+  Where-Object { $_.Name -notin @('electron.exe', 'resources', 'locales') } |
   ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination $out -Recurse -Force
   }
 Copy-Item -LiteralPath (Join-Path $electronDist 'electron.exe') -Destination (Join-Path $out 'PrivacyLdpDemo.exe') -Force
+
+$localesOut = Join-Path $out 'locales'
+New-Item -ItemType Directory -Path $localesOut -Force | Out-Null
+foreach ($locale in $Locales) {
+  $localeFile = Join-Path $electronDist "locales\$locale.pak"
+  if (Test-Path -LiteralPath $localeFile) {
+    Copy-Item -LiteralPath $localeFile -Destination $localesOut -Force
+  }
+}
 
 $appDir = Join-Path $out 'resources\app'
 New-Item -ItemType Directory -Path $appDir -Force | Out-Null
