@@ -81,18 +81,54 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Monitor, Setting } from '@element-plus/icons-vue'
+import { isTauri } from '@tauri-apps/api/core'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 const router = useRouter()
 const showRegisterDialog = ref(false)
 const protocols = ['ARR', 'AGRR', 'AOUE', 'TSP']
 
-const goToLogin = (type) => {
-  router.push({ path: '/login', query: { type } })
+const openRoleWindow = async (type, page) => {
+  if (!isTauri()) {
+    router.push({ path: `/${page}`, query: { type } })
+    return
+  }
+
+  const label = `${type}-${page}`
+  const existingWindow = await WebviewWindow.getByLabel(label)
+
+  if (existingWindow) {
+    await existingWindow.show()
+    await existingWindow.setFocus()
+    return
+  }
+
+  const roleTitle = type === 'admin' ? 'Admin Workbench' : 'User Workbench'
+  const routeUrl = `/#/${page}?type=${encodeURIComponent(type)}`
+  const roleWindow = new WebviewWindow(label, {
+    url: routeUrl,
+    title: `Privacy LDP Demo - ${roleTitle}`,
+    width: 1280,
+    height: 820,
+    minWidth: 1100,
+    minHeight: 720,
+    resizable: true,
+    center: true
+  })
+
+  roleWindow.once('tauri://error', (event) => {
+    console.error('Failed to create role window:', event.payload)
+    router.push({ path: `/${page}`, query: { type } })
+  })
 }
 
-const goToRegister = (type) => {
+const goToLogin = async (type) => {
+  await openRoleWindow(type, 'login')
+}
+
+const goToRegister = async (type) => {
   showRegisterDialog.value = false
-  router.push({ path: '/register', query: { type } })
+  await openRoleWindow(type, 'register')
 }
 </script>
 
