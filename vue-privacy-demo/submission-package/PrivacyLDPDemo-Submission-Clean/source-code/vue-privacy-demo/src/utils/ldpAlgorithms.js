@@ -367,7 +367,7 @@ export function calculateTSPParameters(alpha, beta, epsilon, scoreDomainSize = 5
   }
 
   // 正确的两阶段扰动概率计算
-  // pStar = Pr(上报值=原始值|原始值非缺失)
+  // pStar = Pr(扰动后编码值=原始值|原始值非缺失)
   //       = Pr(阶段1保持且阶段2保持) + Pr(阶段1翻转且阶段2恰好翻回)
   //       = p1*p2 + (K-1)*q1*q2
   const pStar = p1 * p2 + (scoreDomainSize - 1) * q1 * q2;

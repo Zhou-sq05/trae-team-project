@@ -8,7 +8,6 @@
       <div class="header-right">
         <el-dropdown>
           <span class="user-dropdown">
-            演示模式
             <el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
@@ -104,7 +103,7 @@
             执行第二阶段扰动
           </el-button>
           <el-button type="success" :disabled="!canUpload" @click="startUpload">
-            上传最终上报值
+            上传扰动后编码值
           </el-button>
           <el-button v-if="isAnimating" type="warning" plain @click="finishCurrentStage">
             立即完成当前步骤
@@ -144,7 +143,7 @@
             <el-table-column prop="missingStatusDisplay" label="本地编码状态" min-width="190" />
             <el-table-column prop="stageOneDisplay" label="第一阶段结果" min-width="210" />
             <el-table-column prop="stageTwoInputDisplay" label="第二阶段输入" min-width="170" />
-            <el-table-column prop="finalReportDisplay" label="第二阶段结果/最终上报值" min-width="230" />
+            <el-table-column prop="finalReportDisplay" label="第二阶段结果/扰动后编码值" min-width="230" />
             <el-table-column prop="uploadStatus" label="上报状态" width="120">
               <template #default="scope">
                 <el-tag :type="scope.row.uploadStatus === '已上报' ? 'success' : 'info'">
@@ -201,7 +200,7 @@ const FLOW_STEPS = [
     description: '缺失值 0 与第一阶段输出统一进入 {0,1,2,3,4,5} 扰动'
   },
   {
-    title: '上传最终上报值',
+    title: '上传扰动后编码值',
     description: '服务器仅接收第二阶段后的最终扰动值'
   }
 ];
@@ -240,7 +239,7 @@ const STAGE_TEXT = {
     done: '已完成 500 个客户端第二阶段扰动。'
   },
   [STAGES.UPLOAD]: {
-    running: '正在上传最终上报值',
+    running: '正在上传扰动后编码值',
     done: '已模拟 500 个客户端分别完成一次 TSP 两阶段本地扰动上报。'
   }
 };

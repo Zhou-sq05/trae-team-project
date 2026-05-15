@@ -363,7 +363,7 @@
                   </div>
                   <div class="formula-card">
                     <p>
-                      设样本总数为 <strong>n</strong>，统一上报值域为 {0,1,2,...,K}，其中 <strong>0</strong> 表示缺失值，<strong>1~K</strong> 表示评分取值。记真实缺失计数为 <strong>x<sub>0</sub></strong>，真实第 <strong>v</strong> 类有效评分计数为 <strong>x<sub>v</sub></strong>，服务端观测到的扰动后计数分别为 <strong>y<sub>0</sub></strong>、<strong>y<sub>v</sub></strong>。TSP 协议采用两阶段扰动机制，参数为 <strong>p1</strong>、<strong>q1</strong>、<strong>p2</strong>、<strong>q2</strong>。
+                      设样本总数为 <strong>n</strong>，统一扰动后编码值域为 {0,1,2,...,K}，其中 <strong>0</strong> 表示缺失值，<strong>1~K</strong> 表示评分取值。记真实缺失计数为 <strong>x<sub>0</sub></strong>，真实第 <strong>v</strong> 类有效评分计数为 <strong>x<sub>v</sub></strong>，服务端观测到的扰动后计数分别为 <strong>y<sub>0</sub></strong>、<strong>y<sub>v</sub></strong>。TSP 协议采用两阶段扰动机制，参数为 <strong>p1</strong>、<strong>q1</strong>、<strong>p2</strong>、<strong>q2</strong>。
                     </p>
                     <p>
                       对于缺失值 <strong>0</strong>，由于其不参与第一阶段，仅在第二阶段随机响应中以概率 <strong>p2</strong> 保持为 0、以概率 <strong>q2</strong> 扰动到其他值，因此有：
@@ -528,7 +528,7 @@
                 <section v-if="!isArrAggregateView && !isAgrrAggregateView && !isAoueAggregateView && !isTspAggregateView && currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
                   <div class="section-heading">
                     <h3>服务端接收计数</h3>
-                    <p>这里直接展示服务端收到的统一域计数 c0, c1, ..., c5，其中 c0 对应上报值 0，ci 对应上报值 i（i=1..5）。</p>
+                    <p>这里直接展示服务端收到的统一域计数 c0, c1, ..., c5，其中 c0 对应扰动后编码值 0，ci 对应扰动后编码值 i（i=1..5）。</p>
                   </div>
                   <div class="summary-strip">
                     <div class="summary-card summary-card--adaptive" v-for="item in tspReportedCountCards" :key="item.label">

@@ -2,13 +2,10 @@
   <div class="client-demo-container">
     <header class="header">
       <div class="header-left">
-        <h1>用户采集端</h1>
-        <span>客户端本地扰动演示</span>
-      </div>
+        <h1>用户采集端</h1>      </div>
       <div class="header-right">
         <el-dropdown>
           <span class="user-dropdown">
-            演示模式
             <el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
@@ -27,8 +24,8 @@
             <div>
               <div class="page-title">演示：AGRR 多客户端上报</div>
               <div class="page-desc">
-                本页面为答辩演示用的多客户端模拟器。由于演示环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟多个虚拟客户端分别完成一次本地采集、分档编码、AGRR 扰动与上报。
-                表格中的本地采集值和本地编码值仅用于展示虚拟客户端的本地扰动过程，不代表服务器或管理员能够获得用户原始数据；真实系统中服务器只接收扰动后上传值。
+                本页面为答辩演示用的多客户端模拟器。由于演示环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟多个客户端分别完成一次本地采集、分档编码、AGRR 扰动与上报。
+                表格中的本地采集值和本地编码值仅用于展示客户端的本地扰动过程，不代表服务器或管理员能够获得用户原始数据；真实系统中服务器只接收扰动后上传值。
               </div>
             </div>
             <div class="header-actions">
@@ -88,7 +85,7 @@
 
         <section class="step-actions">
           <el-button type="primary" :disabled="!selectedTask || isAnimating" @click="startClientStartup">
-            启动 500 个虚拟客户端
+            启动 500 个客户端
           </el-button>
           <el-button :disabled="!canEncode" @click="startLocalEncoding">
             客户端本地分档编码
@@ -130,7 +127,7 @@
             height="560"
             border
             style="width: 100%"
-            empty-text="请先启动 500 个虚拟客户端"
+            empty-text="请先启动 500 个客户端"
           >
             <el-table-column prop="userNo" label="客户端编号" width="150" />
             <el-table-column prop="rawDisplay" label="客户端本地采集值" min-width="220" />
@@ -176,7 +173,7 @@ import { getStandBucketLabelByCode } from '../../utils/standDurationBuckets';
 
 const FLOW_STEPS = [
   {
-    title: '启动虚拟客户端',
+    title: '启动客户端',
     description: '模拟 500 个客户端各自完成一次日均站立时长本地采集'
   },
   {
@@ -209,8 +206,8 @@ const STAGE_STEP = {
 
 const STAGE_TEXT = {
   [STAGES.START]: {
-    running: '正在接入虚拟客户端',
-    done: '已启动 500 个虚拟客户端，可继续执行本地分档编码。'
+    running: '正在接入客户端',
+    done: '已启动 500 个客户端，可继续执行本地分档编码。'
   },
   [STAGES.ENCODE]: {
     running: '正在执行本地分档编码',
@@ -222,7 +219,7 @@ const STAGE_TEXT = {
   },
   [STAGES.UPLOAD]: {
     running: '正在上传扰动后值',
-    done: '已模拟 500 个虚拟客户端分别完成一次 AGRR 本地扰动上报。'
+    done: '已模拟 500 个客户端分别完成一次 AGRR 本地扰动上报。'
   }
 };
 

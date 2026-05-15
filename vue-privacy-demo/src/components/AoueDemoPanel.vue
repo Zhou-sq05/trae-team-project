@@ -2,7 +2,7 @@
   <div class="aoue-demo-panel" :class="`is-${mode}`">
     <div v-if="showExpandAction || mode === 'expanded'" class="aoue-shell-head">
       <div>
-        <div v-if="mode === 'expanded'" class="aoue-shell-eyebrow">放大演示模式</div>
+        <div v-if="mode === 'expanded'" class="aoue-shell-eyebrow">放大</div>
       </div>
       <el-button v-if="showExpandAction" plain @click="demo.onExpand">
         <el-icon><FullScreen /></el-icon>

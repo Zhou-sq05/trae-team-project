@@ -92,7 +92,7 @@
                 <el-table-column prop="userId" label="用户ID" />
                 <el-table-column prop="taskId" label="任务ID" />
                 <el-table-column prop="attribute" label="上传属性" min-width="180" />
-                <el-table-column prop="reportedValue" label="上报值" min-width="200" />
+                <el-table-column prop="reportedValue" label="扰动后编码值" min-width="200" />
                 <el-table-column prop="batchId" label="批次号" min-width="180" />
                 <el-table-column prop="algorithm" label="协议" width="120" />
                 <el-table-column prop="uploadTime" label="上传时间" min-width="180" />

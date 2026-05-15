@@ -729,7 +729,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
   const stageTwoConstraint = config.p2 + config.scoreDomainSize * config.q2;
   const trueValueSource = summary.hasRawSummary
     ? '真实值直接按当前参与聚合记录中的 original_missing / original_score 统计'
-    : '当前记录缺少原始字段，真实值退化为基于上报值的近似统计';
+    : '当前记录缺少原始字段，真实值退化为基于扰动后编码值的近似统计';
   const diagnostics = buildTspDiagnostics({
     scope,
     records: tspRecords,
@@ -759,7 +759,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
     summary,
     estimatedCounts,
     resultSections,
-    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复，默认展示非负归一化后的稳定估计' : '基于最终上报分布近似，默认展示非负归一化后的稳定估计',
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与扰动后编码值统一恢复，默认展示非负归一化后的稳定估计' : '基于最终上报分布近似，默认展示非负归一化后的稳定估计',
     sourceDescription: `当前结果基于 task_id = ${taskId}、${scope?.batchId ? `batch_id = ${scope.batchId}` : '全部批次'} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计。${config.versionMeta.description} 页面默认展示经过非负归一化后处理的稳定估计，原始无偏估计和逐类中间量保留在 TSP 聚合调试日志与诊断数据中。`,
     summaryCards: [
       { label: '任务名称', value: '睡眠质量评分' },

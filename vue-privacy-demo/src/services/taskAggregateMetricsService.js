@@ -718,7 +718,7 @@ function getTspAggregateResults(records, task, taskId) {
     summary,
     estimatedCounts,
     resultSections,
-    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与最终上报值统一恢复，展示值已做非负归一化后处理' : '基于最终上报分布近似，展示值已做非负归一化后处理',
+    distributionFit: summary.hasRawSummary ? '基于当前 task_id 下全部 TSP 原始值与扰动后编码值统一恢复，展示值已做非负归一化后处理' : '基于最终上报分布近似，展示值已做非负归一化后处理',
     sourceDescription: `当前结果基于 task_id = ${taskId} 下全部已上报的 ${summary.sampleCount} 条 TSP 样本统一统计与估计；TSP 原始无偏估计保留在控制台调试日志中，页面默认展示非负归一化后的稳定结果。`
   })];
 }

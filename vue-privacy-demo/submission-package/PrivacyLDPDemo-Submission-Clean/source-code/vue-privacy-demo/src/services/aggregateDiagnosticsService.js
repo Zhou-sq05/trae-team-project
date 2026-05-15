@@ -183,7 +183,7 @@ export function getTspAggregateDiagnostics(scopeInput) {
     },
     trueValueSource: summary.hasRawSummary
       ? '真实值直接按当前参与聚合记录中的 original_missing / original_score 统计'
-      : '当前记录缺少原始字段，真实值退化为基于上报值的近似统计',
+      : '当前记录缺少原始字段，真实值退化为基于扰动后编码值的近似统计',
     rawMissingCounts,
     rawScoreCounts,
     reportMissingCounts: [

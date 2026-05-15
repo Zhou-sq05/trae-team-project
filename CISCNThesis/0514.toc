@@ -1,0 +1,76 @@
+\contentsline {section}{摘要}{1}{section*.1}%
+\contentsline {section}{\numberline {1}作品概述}{7}{section.1}%
+\contentsline {subsection}{\numberline {1\,.\,1}背景分析}{7}{subsection.1.1}%
+\contentsline {subsubsection}{\numberline {1\,.\,1\,.\,1}健康手环数据采集中的三方诉求}{7}{subsubsection.1.1.1}%
+\contentsline {subsubsection}{\numberline {1\,.\,1\,.\,2}从直接隐私泄露到间接隐私泄露}{7}{subsubsection.1.1.2}%
+\contentsline {subsubsection}{\numberline {1\,.\,1\,.\,3}本系统中的属性设定与风险关系}{8}{subsubsection.1.1.3}%
+\contentsline {subsubsection}{\numberline {1\,.\,1\,.\,4}传统本地差分隐私方案的困境}{8}{subsubsection.1.1.4}%
+\contentsline {subsection}{\numberline {1\,.\,2}相关工作与不足}{9}{subsection.1.2}%
+\contentsline {subsubsection}{\numberline {1\,.\,2\,.\,1}本地差分隐私与经典扰动协议}{9}{subsubsection.1.2.1}%
+\contentsline {subsubsection}{\numberline {1\,.\,2\,.\,2}面向间接推断风险的现有不足}{9}{subsubsection.1.2.2}%
+\contentsline {subsection}{\numberline {1\,.\,3}作品特色}{10}{subsection.1.3}%
+\contentsline {subsubsection}{\numberline {1\,.\,3\,.\,1}以健康手环为载体的场景化隐私建模}{10}{subsubsection.1.3.1}%
+\contentsline {subsubsection}{\numberline {1\,.\,3\,.\,2}内在不确定性驱动的按需加噪}{10}{subsubsection.1.3.2}%
+\contentsline {subsubsection}{\numberline {1\,.\,3\,.\,3}四类健康手环数据的差异化协议适配}{11}{subsubsection.1.3.3}%
+\contentsline {subsubsection}{\numberline {1\,.\,3\,.\,4}端云协同的轻量化系统架构}{11}{subsubsection.1.3.4}%
+\contentsline {subsection}{\numberline {1\,.\,4}应用前景分析}{11}{subsection.1.4}%
+\contentsline {section}{\numberline {2}作品设计与实现}{12}{section.2}%
+\contentsline {subsection}{\numberline {2\,.\,1}作品系统总体架构}{12}{subsection.2.1}%
+\contentsline {subsubsection}{\numberline {2\,.\,1\,.\,1}设计目标}{12}{subsubsection.2.1.1}%
+\contentsline {subsubsection}{\numberline {2\,.\,1\,.\,2}作品实现的核心功能}{13}{subsubsection.2.1.2}%
+\contentsline {subsubsection}{\numberline {2\,.\,1\,.\,3}系统架构}{14}{subsubsection.2.1.3}%
+\contentsline {subsection}{\numberline {2\,.\,2}核心技术实现}{15}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2\,.\,2\,.\,1}数据库存储实现}{15}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2\,.\,2\,.\,2}核心算法实现}{16}{subsubsection.2.2.2}%
+\contentsline {paragraph}{内在不确定参数计算}{16}{paragraph*.10}%
+\contentsline {paragraph}{ARR协议实现以及性能评估}{17}{paragraph*.11}%
+\contentsline {paragraph}{AGRR协议实现以及性能评估}{18}{paragraph*.12}%
+\contentsline {paragraph}{AOUE协议实现以及性能评估}{18}{paragraph*.13}%
+\contentsline {paragraph}{TSP协议实现以及性能评估}{19}{paragraph*.14}%
+\contentsline {subsubsection}{\numberline {2\,.\,2\,.\,3}前端演示与数据可视化实现}{20}{subsubsection.2.2.3}%
+\contentsline {paragraph}{管理端}{20}{paragraph*.15}%
+\contentsline {paragraph}{用户端}{20}{paragraph*.16}%
+\contentsline {section}{\numberline {3}作品测试与分析}{21}{section.3}%
+\contentsline {subsection}{\numberline {3\,.\,1}测试目标与测试方案}{21}{subsection.3.1}%
+\contentsline {subsubsection}{\numberline {3\,.\,1\,.\,1}测试目标}{21}{subsubsection.3.1.1}%
+\contentsline {subsubsection}{\numberline {3\,.\,1\,.\,2}测试范围}{21}{subsubsection.3.1.2}%
+\contentsline {subsubsection}{\numberline {3\,.\,1\,.\,3}测试方法与评价指标}{22}{subsubsection.3.1.3}%
+\contentsline {subsection}{\numberline {3\,.\,2}测试环境与测试数据}{22}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {3\,.\,2\,.\,1}软件与硬件环境}{22}{subsubsection.3.2.1}%
+\contentsline {subsubsection}{\numberline {3\,.\,2\,.\,2}数据集来源与预处理}{23}{subsubsection.3.2.2}%
+\contentsline {subsubsection}{\numberline {3\,.\,2\,.\,3}测试场景设置}{23}{subsubsection.3.2.3}%
+\contentsline {subsection}{\numberline {3\,.\,3}系统功能流程验证}{24}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3\,.\,3\,.\,1}总体流程设计}{25}{subsubsection.3.3.1}%
+\contentsline {subsubsection}{\numberline {3\,.\,3\,.\,2}ARR协议流程验证}{25}{subsubsection.3.3.2}%
+\contentsline {subsubsection}{\numberline {3\,.\,3\,.\,3}AGRR协议流程验证}{26}{subsubsection.3.3.3}%
+\contentsline {subsubsection}{\numberline {3\,.\,3\,.\,4}AOUE协议流程验证}{28}{subsubsection.3.3.4}%
+\contentsline {subsubsection}{\numberline {3\,.\,3\,.\,5}TSP协议流程验证}{30}{subsubsection.3.3.5}%
+\contentsline {subsection}{\numberline {3\,.\,4}隐私保护算法实验与对比}{31}{subsection.3.4}%
+\contentsline {subsubsection}{\numberline {3\,.\,4\,.\,1}ARR 算法测试}{31}{subsubsection.3.4.1}%
+\contentsline {subsubsection}{\numberline {3\,.\,4\,.\,2}AOUE 算法测试}{31}{subsubsection.3.4.2}%
+\contentsline {subsubsection}{\numberline {3\,.\,4\,.\,3}AGRR 算法测试}{31}{subsubsection.3.4.3}%
+\contentsline {subsubsection}{\numberline {3\,.\,4\,.\,4}TSP 算法测试}{31}{subsubsection.3.4.4}%
+\contentsline {subsection}{\numberline {3\,.\,5}测试结果分析}{31}{subsection.3.5}%
+\contentsline {subsubsection}{\numberline {3\,.\,5\,.\,1}功能完整性分析}{31}{subsubsection.3.5.1}%
+\contentsline {subsubsection}{\numberline {3\,.\,5\,.\,2}聚合精度分析}{31}{subsubsection.3.5.2}%
+\contentsline {subsubsection}{\numberline {3\,.\,5\,.\,3}不同隐私预算下的结果对比}{31}{subsubsection.3.5.3}%
+\contentsline {subsubsection}{\numberline {3\,.\,5\,.\,4}不同算法的性能对比}{31}{subsubsection.3.5.4}%
+\contentsline {subsubsection}{\numberline {3\,.\,5\,.\,5}系统稳定性与可用性分析}{31}{subsubsection.3.5.5}%
+\contentsline {subsection}{\numberline {3\,.\,6}本章小结}{31}{subsection.3.6}%
+\contentsline {section}{\numberline {4}创新性说明}{31}{section.4}%
+\contentsline {subsection}{\numberline {4\,.\,1}创新点一：面向健康手环间接泄露风险的内在不确定性度量}{32}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4\,.\,1\,.\,1}现有技术的不足}{32}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4\,.\,1\,.\,2}本作品的创新做法}{32}{subsubsection.4.1.2}%
+\contentsline {subsubsection}{\numberline {4\,.\,1\,.\,3}在系统中的落地方式}{33}{subsubsection.4.1.3}%
+\contentsline {subsection}{\numberline {4\,.\,2}创新点二：针对不同健康手环字段设计差异化协议}{33}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4\,.\,2\,.\,1}现有单一协议适配能力不足}{33}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4\,.\,2\,.\,2}四类协议与项目字段的对应关系}{34}{subsubsection.4.2.2}%
+\contentsline {subsubsection}{\numberline {4\,.\,2\,.\,3}混合隐私风险处理的独立创新}{34}{subsubsection.4.2.3}%
+\contentsline {subsection}{\numberline {4\,.\,3}创新点三：面向可部署系统的端云协同闭环}{35}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4\,.\,3\,.\,1}从算法到系统的落地难点}{35}{subsubsection.4.3.1}%
+\contentsline {subsubsection}{\numberline {4\,.\,3\,.\,2}架构创新的具体体现}{35}{subsubsection.4.3.2}%
+\contentsline {subsection}{\numberline {4\,.\,4}创新点四：形成“场景—风险—协议—系统”的完整闭环}{36}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4\,.\,5}创新性总结}{36}{subsection.4.5}%
+\contentsline {section}{\numberline {5}总结}{37}{section.5}%
+\contentsline {section}{参考文献}{37}{section*.39}%
+\contentsfinish 

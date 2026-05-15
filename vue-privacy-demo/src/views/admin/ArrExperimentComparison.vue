@@ -62,9 +62,6 @@
                 <div class="page-header">
                   <div>
                     <div class="page-title">误差评估</div>
-                    <div class="page-desc" v-if="!isTspExperiment">
-                      用于模拟实验效果验证，真实分布来自模拟数据生成过程。
-                    </div>
                   </div>
                   <div class="header-actions">
                     <div class="task-picker">

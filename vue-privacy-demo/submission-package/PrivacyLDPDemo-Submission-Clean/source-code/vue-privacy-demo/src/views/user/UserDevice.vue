@@ -326,7 +326,7 @@
               <div class="summary-block">
                 <div class="summary-heading">
                   <h4>待上报扰动结果</h4>
-                  <span class="section-tip">两阶段输出汇总后的待上报值</span>
+                  <span class="section-tip">两阶段输出汇总后的待上传扰动后编码值</span>
                 </div>
                 <div class="tsp-final-layout">
                   <div class="summary-card preview-card tsp-flow-card tsp-final-value-card">
@@ -413,7 +413,7 @@
 
               <div v-else class="summary-block">
                 <div class="summary-heading">
-                  <h4>原始输入</h4>
+                  <h4>输入与编码</h4>
                   <el-button
                     v-if="currentTaskDetail?.scenario === 'agrr'"
                     type="primary"
@@ -565,7 +565,7 @@
                       <div class="summary-heading">
                         <div class="summary-heading__copy">
                           <h4>样本预览</h4>
-                          <span class="section-tip">展示前 10 条连续采集样本，重点标记最终上报值</span>
+                          <span class="section-tip">展示前 10 条连续采集样本，重点标记扰动后编码值</span>
                         </div>
                       </div>
                       <div class="tsp-table-wrap">
@@ -658,7 +658,7 @@
                         <tr>
                           <th>状态</th>
                           <th>原始值</th>
-                          <th>上报值</th>
+                          <th>扰动后编码值</th>
                           <th>变化</th>
                         </tr>
                       </thead>
@@ -1251,7 +1251,7 @@ const arrRawCards = computed(() => [
 
 const arrInputEncodingCards = computed(() => [
   { label: '原始值', value: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒' },
-  { label: '编码值', value: arrEncodingRevealed.value ? String(dynamicForm.fallAlarm) : '--' }
+  { label: '原始编码值', value: arrEncodingRevealed.value ? String(dynamicForm.fallAlarm) : '--' }
 ]);
 
 const agrrRawCards = computed(() => [
@@ -1288,7 +1288,7 @@ const aoueParameterCards = computed(() => [
 
 const arrResultCards = computed(() => [
   {
-    label: '扰动后值',
+    label: '扰动后编码值',
     value: arrSimulationResult.value
       ? `${arrSimulationResult.value.reportValue}（${arrSimulationResult.value.perturbedLabel}）`
       : '--'
@@ -1297,11 +1297,7 @@ const arrResultCards = computed(() => [
 
 const agrrResultCards = computed(() => [
   {
-    label: '扰动后档位',
-    value: agrrSimulationResult.value ? agrrSimulationResult.value.perturbedLabel : '--'
-  },
-  {
-    label: '上报值',
+    label: '扰动后编码值',
     value: agrrSimulationResult.value ? String(agrrSimulationResult.value.reportValue) : '--'
   }
 ]);
@@ -2232,7 +2228,7 @@ const aoueBatchViewModel = computed(() => ({
 
 const currentBatchResultTip = computed(() => {
   if (currentTaskDetail.value?.scenario === 'tsp') {
-    return '当前结果为手环端连续生成缺失/非缺失样本；非缺失样本先执行第一阶段评分扰动，随后所有样本统一进入 {0,1,2,3,4,5} 的第二阶段扰动并生成最终上报值。';
+    return '当前结果为手环端连续生成缺失/非缺失样本；非缺失样本先执行第一阶段评分扰动，随后所有样本统一进入 {0,1,2,3,4,5} 的第二阶段扰动并生成扰动后编码值。';
   }
   if (currentTaskDetail.value?.scenario === 'agrr') {
     return `${currentPerturbationStatus.value?.description || '当前结果为单个客户端采集原始分钟数、映射到活动分档后，再执行 AGRR 本地扰动得到的上报结果。'} 原始分钟数仅用于映射分档，真正执行扰动与上报的是分档后的档位编码。`;
@@ -2251,7 +2247,7 @@ const batchPreviewColumns = computed(() => {
       { key: 'rawScoreDisplay', label: '原始评分' },
       { key: 'stageOneLabel', label: '第一阶段结果' },
       { key: 'stageTwoInputDisplay', label: '第二阶段输入' },
-      { key: 'reportValueDisplay', label: '最终上报值' }
+      { key: 'reportValueDisplay', label: '扰动后编码值' }
     ];
   }
   if (currentTaskDetail.value?.scenario === 'agrr') {
@@ -2259,8 +2255,7 @@ const batchPreviewColumns = computed(() => {
       { key: 'index', label: '#' },
       { key: 'rawMinutes', label: '原始分钟数' },
       { key: 'rawLabel', label: '原始档位' },
-      { key: 'perturbedLabel', label: '扰动后档位' },
-      { key: 'reportValue', label: '上报值' }
+      { key: 'reportValue', label: '扰动后编码值' }
     ];
   }
 
@@ -2279,7 +2274,7 @@ const batchPreviewColumns = computed(() => {
     { key: 'rawLabel', label: '原始值' },
     { key: 'rawValue', label: '原始编码' },
     { key: 'perturbedLabel', label: '扰动结果' },
-    { key: 'reportValue', label: '上报值' }
+    { key: 'reportValue', label: '扰动后编码值' }
   ];
 });
 
@@ -2304,7 +2299,7 @@ const processPreviewCards = computed(() => {
       ];
     case 'tsp':
       return [
-        { label: '处理链路', value: '缺失状态/评分 -> 第一阶段 -> 第二阶段 -> 上报值' },
+        { label: '处理链路', value: '缺失状态/评分 -> 第一阶段 -> 第二阶段 -> 扰动后编码值' },
         { label: '当前状态', value: dynamicForm.sleepMissing === 1 ? '仅上报缺失状态' : `评分 ${dynamicForm.sleepScore ?? '--'}` }
       ];
     default:
@@ -2521,13 +2516,10 @@ async function refreshData() {
 
   formTouched.value = true;
   systemStatus.value = 0;
-  // 采集手环数据后自动切换到单次扰动上报标签页
+  // 采集只刷新原始输入，扰动必须由用户显式触发。
   activeDemoTab.value = 'single';
   clearSimulationState();
   batchUploadState.value = null;
-  if (currentTaskDetail.value.scenario === 'arr' && arrParametersReady.value) {
-    simulateArrPerturbation(false);
-  }
   if (currentTaskDetail.value.scenario === 'aoue' && aoueParametersReady.value) {
     simulateAouePerturbation(false);
   }
@@ -2553,9 +2545,6 @@ function handleArrOptionClick(value) {
   arrBatchResult.value = null;
   batchUploadState.value = null;
   systemStatus.value = 0;
-  if (arrParametersReady.value) {
-    simulateArrPerturbation(false);
-  }
 }
 
 function revealArrEncoding() {
