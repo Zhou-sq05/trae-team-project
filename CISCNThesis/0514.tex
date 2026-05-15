@@ -770,20 +770,27 @@ AOUE 协议主要用于取值域较大的离散属性，例如步数分桶、活
 
 \begin{figure}[htbp]
 \centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering AOUE属性域配置与一元编码截图}}
-\caption{AOUE协议：属性域配置与一元编码}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering AOUE扰动上传与聚合频率估计截图}}
-\caption{AOUE协议：扰动向量上传与聚合频率估计}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering AOUE协议误差评估截图：可放置高基数字段的一元编码聚合误差、MSE/MAE 以及与 AGRR 的对比图}}
-\caption{AOUE协议：误差评估结果}
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-估计条件分布矩阵.png}
+  \\
+  {\small (a) 条件分布矩阵}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-计算内在不确定性参数.png}
+  \\
+  {\small (b) 内在不确定性参数}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-扰动参数重校准.png}
+  \\
+  {\small (c) 扰动参数重校准}
+\end{minipage}
+\caption{AOUE协议：管理端参数计算流程}
 \end{figure}
 
 \subsubsection{TSP协议流程验证}

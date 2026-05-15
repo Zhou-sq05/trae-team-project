@@ -270,6 +270,18 @@
           </div>
 
           <div class="module-group">
+            <h3 class="module-title">隐私预算 ε</h3>
+            <div class="epsilon-card">
+              <div class="epsilon-item">
+                <span class="epsilon-label">当前隐私预算</span>
+                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
+              </div>
+              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
+            </div>
+            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
+          </div>
+
+          <div class="module-group">
             <h3 class="module-title">计算依据</h3>
             <div v-if="columnStats.length" class="basis-card">
               <table class="basis-table">
@@ -332,18 +344,6 @@
             <div v-else class="empty-state-panel">
               <p>条件分布矩阵估计完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
             </div>
-          </div>
-
-          <div class="module-group">
-            <h3 class="module-title">隐私预算 ε</h3>
-            <div class="epsilon-card">
-              <div class="epsilon-item">
-                <span class="epsilon-label">当前隐私预算</span>
-                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
-              </div>
-              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
-            </div>
-            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
           </div>
 
           <div class="module-group">
@@ -447,6 +447,18 @@
           </div>
 
           <div class="module-group">
+            <h3 class="module-title">隐私预算 ε</h3>
+            <div class="epsilon-card">
+              <div class="epsilon-item">
+                <span class="epsilon-label">当前隐私预算</span>
+                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
+              </div>
+              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
+            </div>
+            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
+          </div>
+
+          <div class="module-group">
             <h3 class="module-title">计算依据</h3>
             <div v-if="standColumnStats.length" class="basis-card">
               <table class="basis-table">
@@ -521,18 +533,6 @@
             <div v-else class="empty-state-panel">
               <p>条件分布矩阵估计完成后，这里会自动展示 α、β 的结果，无需额外点击计算。</p>
             </div>
-          </div>
-
-          <div class="module-group">
-            <h3 class="module-title">隐私预算 ε</h3>
-            <div class="epsilon-card">
-              <div class="epsilon-item">
-                <span class="epsilon-label">当前隐私预算</span>
-                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
-              </div>
-              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
-            </div>
-            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
           </div>
 
           <div class="module-group">
@@ -953,6 +953,18 @@
           </div>
 
           <div class="module-group">
+            <h3 class="module-title">隐私预算 ε</h3>
+            <div class="epsilon-card">
+              <div class="epsilon-item">
+                <span class="epsilon-label">当前隐私预算</span>
+                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
+              </div>
+              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
+            </div>
+            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
+          </div>
+
+          <div class="module-group">
             <h3 class="module-title">内在不确定性参数计算依据</h3>
             <div v-if="sleepMissingColumnStats.length" class="basis-card">
               <table class="basis-table">
@@ -1011,18 +1023,6 @@
             <div v-else class="empty-state-panel">
               <p>缺失状态条件分布矩阵估计完成后，这里会自动展示 α、β。</p>
             </div>
-          </div>
-
-          <div class="module-group">
-            <h3 class="module-title">隐私预算 ε</h3>
-            <div class="epsilon-card">
-              <div class="epsilon-item">
-                <span class="epsilon-label">当前隐私预算</span>
-                <el-input v-model.number="dialogPrivacyBudget" placeholder="请输入隐私预算" style="width: 200px" />
-              </div>
-              <el-button type="primary" @click="savePrivacyBudget">保存 ε</el-button>
-            </div>
-            <div class="epsilon-hint">当前校准将使用 ε = {{ savedPrivacyBudget }}</div>
           </div>
 
           <div class="module-group">
