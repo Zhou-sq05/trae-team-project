@@ -12,7 +12,7 @@ export const WEIGHT_STATUS_ORDER = ['正常', '超重', '肥胖'];
 
 export const MISSING_STATUS_ORDER = ['未缺失', '缺失'];
 
-export const SLEEP_QUALITY_BUCKET_ORDER = ['低质量', '中质量', '高质量'];
+export const SLEEP_QUALITY_BUCKET_ORDER = ['评分1', '评分2', '评分3', '评分4', '评分5'];
 
 export const AGE_GROUP_DISPLAY = [
   { name: '青年', range: '18-44岁' },

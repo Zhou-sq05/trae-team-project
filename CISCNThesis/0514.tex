@@ -550,7 +550,7 @@ q^{*}=p_1q_2+q_1p_2+(d-2)q_1q_2,
 身体活动水平 & S：BMI 类别；A：身体活动水平分档；条件分布：P(A|S) & 参考 NHANES 中 BMI 与身体活动水平的统计趋势，用于 AGRR 多值分档采集和关联属性分析。 \\ \hline
 每日步数分布 & S：BMI 类别；A：每日步数分档；条件分布：P(A|S) & 结合 Kaggle 步数字段经验分布和 BMI-活动水平趋势校准，用于 AOUE 高维离散编码测试。 \\ \hline
 睡眠质量缺失 & S：年龄段；M：睡眠质量评分是否缺失；条件分布：P(M|S) & 参考 NHANES 睡眠问卷有效响应情况和年龄相关缺失趋势，用于 TSP 缺失状态模拟。 \\ \hline
-睡眠质量有效值 & A：睡眠质量评分分档；先验分布：P(A) & 参考 Kaggle Quality of Sleep 字段分布并进行平滑校准，用于生成非缺失用户的真实睡眠质量对照值。 \\ \hline
+睡眠质量有效值 & A：睡眠质量评分有效值；先验分布：P(A) & 参考 Kaggle Sleep Health and Lifestyle Dataset 中 Quality of Sleep 字段分布，将原始睡眠质量评分重标定到 1--5 有效评分域后进行平滑校准，用于生成非缺失用户的真实睡眠质量对照值。 \\ \hline
 \end{tabularx}
 \end{table}
 
@@ -604,21 +604,21 @@ ARR 协议主要用于二值事件型字段，例如夜间是否触发异常提�
 
 \begin{figure}[htbp]
 \centering
-\begin{minipage}[b]{0.32\textwidth}
+\begin{minipage}[b]{0.23\textwidth}
   \centering
   \includegraphics[width=\linewidth]{figures/ARR-估计条件分布矩阵.png}
   \\
   {\small (a) 条件分布矩阵}
 \end{minipage}
 \hfill
-\begin{minipage}[b]{0.32\textwidth}
+\begin{minipage}[b]{0.23\textwidth}
   \centering
   \includegraphics[width=\linewidth]{figures/ARR-计算内在不确定性参数.png}
   \\
   {\small (b) 内在不确定性参数}
 \end{minipage}
 \hfill
-\begin{minipage}[b]{0.32\textwidth}
+\begin{minipage}[b]{0.23\textwidth}
   \centering
   \includegraphics[width=\linewidth]{figures/ARR-扰动参数重校准.png}
   \\
@@ -774,7 +774,7 @@ AOUE 协议主要用于取值域较大的离散属性，例如步数分桶、活
 \hfill
 \begin{minipage}[b]{0.32\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{figures/AOUE-扰动参数标准.png}
+  \includegraphics[width=\linewidth]{figures/AOUE-扰动参数重校准.png}
   \\
   {\small (c) 扰动参数计算}
 \end{minipage}
@@ -830,13 +830,51 @@ TSP 协议用于混合隐私风险场景，即同一字段中既可能包含直�
 
 \begin{figure}[htbp]
 \centering
-\fbox{\parbox[c][0.22\textheight][c]{0.86\linewidth}{\centering TSP管理端参数计算流程截图：缺失机制、条件分布矩阵、两阶段扰动参数}}
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/TSP-估计条件分布矩阵.png}
+  \\
+  {\small (a) 条件分布矩阵}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/TSP-计算内在不确定性参数.png}
+  \\
+  {\small (b) 内在不确定性参数}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/TSP-扰动参数重标准.png}
+  \\
+  {\small (c) 两阶段扰动参数}
+\end{minipage}
 \caption{TSP协议：管理端参数计算流程}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\fbox{\parbox[c][0.22\textheight][c]{0.86\linewidth}{\centering TSP客户端本地扰动流程截图：采集、缺失值处理、两阶段扰动与上传}}
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/TSP-采集.png}
+  \\
+  {\small (a) 采集}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/TSP-编码.png}
+  \\
+  {\small (b) 编码}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/TSP-扰动.png}
+  \\
+  {\small (c) 两阶段扰动}
+\end{minipage}
 \caption{TSP协议：客户端本地扰动与上传流程}
 \end{figure}
 
@@ -855,14 +893,14 @@ ARR 协议对应二值事件型采集场景，本章以“是否触发睡眠异�
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.86\linewidth]{figures/ARR-误差评估总览.png}
+\includegraphics[width=0.86\linewidth]{figures/ARR-聚合误差指标对比.png}
 \caption{ARR协议：聚合精度分析}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.86\linewidth]{figures/ARR-分布估计结果对照.png}
-\caption{ARR协议：分布估计结果对照}
+\includegraphics[width=0.86\linewidth]{figures/ARR-真实分布与估计分布对比.png}
+\caption{ARR协议：真实分布与估计分布对比}
 \end{figure}
 
 从误差评估结果可以看出，ARR 新方案的估计结果整体更接近真实分布。对于二值属性，一类上的高估通常会对应另一类上的低估，因此仅观察单个柱状图容易产生片面判断；结合 MAE 和误差明细表可以更直观地反映整体偏差大小。若新方案在两个类别上的偏差绝对值均小于或接近传统方案，且总体 MAE 更低，则说明根据 \(\alpha,\beta\) 重校准后的扰动参数在当前间接隐私场景中保留了更多统计可用性。
@@ -873,14 +911,14 @@ AGRR 协议对应多值离散属性场景，例如站立时长分档、活动等
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.86\linewidth]{figures/AGRR-误差评估总览.png}
+\includegraphics[width=0.86\linewidth]{figures/AGRR-聚合误差指标对比.png}
 \caption{AGRR协议：聚合精度分析}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.86\linewidth]{figures/ARR-分布估计结果对照.png}
-\caption{ARR协议：分布估计结果对照}
+\includegraphics[width=0.86\linewidth]{figures/AGRR-真实分布与估计分布对比.png}
+\caption{AGRR协议：真实分布与估计分布对比}
 \end{figure}
 
 从 AGRR 的聚合结果看，新方案能够根据条件分布反映出的间接泄露风险调整 \(p\) 和 \(q\)，从而在满足隐私预算约束的同时减少不必要噪声。若图中真实分布与新方案估计分布的柱形走势基本一致，说明系统对多值属性的频数恢复较为稳定；若传统方案在某些类别上出现明显高估或低估，而新方案偏差较小，则可以说明内在不确定性参数对多值场景的统计精度具有改善作用。
@@ -891,8 +929,14 @@ AOUE 协议适用于步数分桶等取值域较大的离散属性。该协议先
 
 \begin{figure}[htbp]
 \centering
-\fbox{\parbox[c][0.24\textheight][c]{0.86\linewidth}{\centering AOUE误差评估截图：建议放“高基数字段真实/估计分布对比、MAE/MSE 指标、误差明细表”}}
-\caption{AOUE协议：聚合误差分析}
+\includegraphics[width=0.86\linewidth]{figures/AOUE-聚合误差指标对比.png}
+\caption{AOUE协议：聚合精度分析}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.86\linewidth]{figures/AOUE-真实分布与估计分布对比.png}
+\caption{AOUE协议：真实分布与估计分布对比}
 \end{figure}
 
 从 AOUE 的测试结果可以分析高基数场景下不同方案的稳定性。若新方案估计分布能够较好跟随真实分布的峰值位置和整体趋势，说明一元编码扰动后的聚合估计仍具备可用性。由于 AOUE 对每一位分别扰动，低频类别可能更容易受随机噪声影响，因此报告中不宜只强调某个类别的偏差，而应结合 MAE、MSE 和分布趋势综合判断。若新方案整体误差低于传统方案，则说明基于内在不确定性的参数设置能够缓解高基数属性下的估计波动。
@@ -903,49 +947,42 @@ TSP 协议用于包含缺失值或混合隐私风险的采集场景，例如睡�
 
 \begin{figure}[htbp]
 \centering
-\begin{minipage}[b]{0.23\textwidth}
-  \centering
-  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图1}}
-  \\
-  {\small (a) 缺失值估计}
-\end{minipage}
-\hfill
-\begin{minipage}[b]{0.23\textwidth}
-  \centering
-  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图2}}
-  \\
-  {\small (b) 非缺失分布}
-\end{minipage}
-\hfill
-\begin{minipage}[b]{0.23\textwidth}
-  \centering
-  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图3}}
-  \\
-  {\small (c) 偏差对比}
-\end{minipage}
-\hfill
-\begin{minipage}[b]{0.23\textwidth}
-  \centering
-  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图4}}
-  \\
-  {\small (d) 误差指标}
-\end{minipage}
-\caption{TSP协议：聚合误差分析}
+\includegraphics[width=0.92\linewidth]{figures/TSP-综合.png}
+\caption{TSP协议：真实分布与新方案估计结果对比}
 \end{figure}
 
-从 TSP 的测试结果可以观察缺失值类别和非缺失类别的估计差异。如果缺失值估计接近真实缺失数量，说明第二阶段统一扰动后的校正公式能够有效恢复缺失状态；如果非缺失评分分布与真实分布趋势一致，说明第一阶段对非缺失取值的扰动没有破坏主要统计特征。由于 TSP 同时处理直接隐私和间接隐私风险，其误差通常会受到缺失率、属性域大小和隐私预算共同影响，因此报告中应结合图表说明该协议更适合存在缺失机制或混合敏感性的字段。
+从 TSP 的测试结果可以观察缺失值类别和非缺失类别的估计差异。图中以真实分布作为参照，只展示新方案估计分布与真实值之间的偏差，不再设置传统方案对照。如果缺失值估计接近真实缺失数量，说明第二阶段统一扰动后的校正公式能够有效恢复缺失状态；如果非缺失评分分布与真实分布趋势一致，说明第一阶段对非缺失取值的扰动没有破坏主要统计特征。由于 TSP 同时处理直接隐私和间接隐私风险，其误差通常会受到缺失率、属性域大小和隐私预算共同影响，因此该协议更适合存在缺失机制或混合敏感性的字段。
 
-\subsubsection{不同隐私预算下的结果对比}
+\subsubsection{改进方案与传统方案对比}
 
-隐私预算 \(\varepsilon\) 是影响扰动强度和统计精度的关键参数。一般而言，\(\varepsilon\) 越小，隐私保护越强，扰动噪声越大，聚合估计误差也可能越高；\(\varepsilon\) 越大，扰动强度降低，估计结果更接近真实分布，但隐私保护强度相应下降。因此，本系统通过切换不同隐私预算，观察 MAE、MSE 和分布偏差的变化趋势，用于验证隐私保护与统计可用性之间的权衡关系。
+为验证条件分布和内在不确定性参数重校准的有效性，本节选取 ARR、AGRR 和 AOUE 三类具有传统基线方案的协议进行对比。图中同时展示真实分布、改进方案估计分布和传统方案估计分布，用于观察不同方案在同一任务下的估计偏差。TSP 协议主要面向缺失值和混合隐私风险场景，其流程中包含两阶段扰动和缺失状态估计，缺少可直接对应的传统单阶段基线，因此不纳入图 \ref{fig:scheme-comparison} 的新旧方案对比，而在 TSP 协议测试结果中单独分析。
 
 \begin{figure}[htbp]
 \centering
-\fbox{\parbox[c][0.24\textheight][c]{0.86\linewidth}{\centering 不同隐私预算对比截图：建议放“同一协议在多个 \(\varepsilon\) 下的 MAE/MSE 折线图或柱状图”}}
-\caption{不同隐私预算下的聚合误差对比}
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/ARR-真实分布与估计分布对比.png}
+  \\
+  {\small (a) ARR}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AGRR-真实分布与估计分布对比.png}
+  \\
+  {\small (b) AGRR}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-真实分布与估计分布对比.png}
+  \\
+  {\small (c) AOUE}
+\end{minipage}
+\caption{改进方案与传统方案的分布估计结果对比}
+\label{fig:scheme-comparison}
 \end{figure}
-
-从对比结果可以看出，随着 \(\varepsilon\) 增大，扰动结果通常会更加接近真实分布，误差指标整体呈下降趋势。但在实际应用中，并不能简单选择最大的 \(\varepsilon\)，而需要结合数据敏感程度和统计任务需求进行折中。本作品的意义在于，系统不仅允许用户调节 \(\varepsilon\)，还进一步结合条件分布和内在不确定性对扰动参数进行重校准，使低风险字段不必承受过强噪声，高风险字段则能够获得更充分保护。
+从对比结果可以看出，改进方案的估计分布整体更接近真实分布，传统方案在部分类别上容易出现高估或低估。其原因在于传统方案通常只依据统一隐私预算进行扰动，而改进方案进一步利用敏感属性与非敏感属性之间的条件关系，对扰动参数进行重校准，使低风险取值减少不必要噪声，高风险取值维持更充分的扰动保护。该结果说明，本作品并不是单纯追求较小扰动，而是在隐私保护约束下提高聚合统计的可用性。
 
 \subsubsection{不同算法的适用性分析}
 
@@ -972,7 +1009,6 @@ TSP & 缺失值或混合隐私风险字段 & 缺失比例估计、非缺失分�
 
 从可用性角度看，系统将复杂的条件分布估计、参数重校准和无偏聚合计算封装在管理端和算法模块中，用户端只需要选择任务、输入或模拟采集值并执行扰动上传。这种设计降低了使用门槛，也便于在比赛展示中说明每一步的隐私保护含义。综合功能流程和误差评估结果，系统能够较完整地展示健康手环数据在本地差分隐私保护下的采集、扰动、聚合和分析过程。
 
-\subsection{本章小结}
 
 \section{创新性说明}
 

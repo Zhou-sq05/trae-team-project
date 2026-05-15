@@ -243,36 +243,36 @@ const isTspExperiment = computed(() => currentProtocol.value === 'TSP');
 const showTraditionalComparison = computed(() => !isTspExperiment.value);
 const comparisonRows = computed(() => buildComparisonRows());
 const comparisonDetailRows = computed(() => buildComparisonDetailRows());
-const newMAE = computed(() => average(comparisonDetailRows.value.map(row => row.newAbsError)));
-const traditionalMAE = computed(() => average(
+const newMSE = computed(() => average(comparisonDetailRows.value.map(row => row.newSquaredError)));
+const traditionalMSE = computed(() => average(
   comparisonDetailRows.value
-    .filter(row => row.traditionalAbsError != null)
-    .map(row => row.traditionalAbsError)
+    .filter(row => row.traditionalSquaredError != null)
+    .map(row => row.traditionalSquaredError)
 ));
 const improvementRate = computed(() => {
-  const traditional = Number(traditionalMAE.value);
-  const current = Number(newMAE.value);
+  const traditional = Number(traditionalMSE.value);
+  const current = Number(newMSE.value);
   if (!Number.isFinite(traditional) || traditional <= 0 || !Number.isFinite(current)) {
     return 0;
   }
   return ((traditional - current) / traditional) * 100;
 });
 const betterOverallScheme = computed(() => {
-  if (traditionalMAE.value == null) {
+  if (traditionalMSE.value == null) {
     return '新方案';
   }
-  return Number(newMAE.value) <= Number(traditionalMAE.value) ? '新方案' : '传统方案';
+  return Number(newMSE.value) <= Number(traditionalMSE.value) ? '新方案' : '传统方案';
 });
 const comparisonMetricCards = computed(() => {
   const cards = [
-    { label: '新方案 MAE', value: formatDetailNumber(newMAE.value), type: 'new' }
+    { label: '新方案 MSE', value: formatDetailNumber(newMSE.value), type: 'new' }
   ];
   if (!showTraditionalComparison.value) {
     return cards;
   }
   return [
     ...cards,
-    { label: '传统方案 MAE', value: formatOptionalDetailNumber(traditionalMAE.value), type: 'traditional' },
+    { label: '传统方案 MSE', value: formatOptionalDetailNumber(traditionalMSE.value), type: 'traditional' },
     { label: '误差下降', value: `${formatPercent(improvementRate.value)}%`, type: 'improvement' },
     { label: '当前更优方案', value: betterOverallScheme.value, type: 'best', isTag: true }
   ];
@@ -295,10 +295,10 @@ const chartConclusionText = computed(() => {
   if (!showTraditionalComparison.value) {
     return '';
   }
-  if (traditionalMAE.value == null) {
-    return `当前任务暂未配置传统方案估计结果，仅展示新方案估计效果。新方案 MAE = ${formatDetailNumber(newMAE.value)}。`;
+  if (traditionalMSE.value == null) {
+    return `当前任务暂未配置传统方案估计结果，仅展示新方案估计效果。新方案 MSE = ${formatDetailNumber(newMSE.value)}。`;
   }
-  return `当前任务下，新方案聚合估计结果更接近真实分布。新方案 MAE = ${formatDetailNumber(newMAE.value)}，传统方案 MAE = ${formatDetailNumber(traditionalMAE.value)}，误差下降约 ${formatPercent(improvementRate.value)}%。`;
+  return `当前任务下，新方案聚合估计结果更接近真实分布。新方案 MSE = ${formatDetailNumber(newMSE.value)}，传统方案 MSE = ${formatDetailNumber(traditionalMSE.value)}，误差下降约 ${formatPercent(improvementRate.value)}%。`;
 });
 const emptyText = computed(() => {
   if (!experimentTasks.value.length) {
@@ -521,7 +521,9 @@ function buildComparisonDetailRows() {
       : Number((traditionalEstimate - referenceValue).toFixed(4));
     const newAbsError = Math.abs(newBias);
     const traditionalAbsError = traditionalBias == null ? null : Math.abs(traditionalBias);
-    const betterScheme = traditionalAbsError == null || newAbsError <= traditionalAbsError ? '新方案' : '传统方案';
+    const newSquaredError = Number((newBias ** 2).toFixed(6));
+    const traditionalSquaredError = traditionalBias == null ? null : Number((traditionalBias ** 2).toFixed(6));
+    const betterScheme = traditionalSquaredError == null || newSquaredError <= traditionalSquaredError ? '新方案' : '传统方案';
     return {
       label: row.label,
       referenceValue,
@@ -529,9 +531,11 @@ function buildComparisonDetailRows() {
       newEstimate,
       newBias,
       newAbsError,
+      newSquaredError,
       traditionalEstimate,
       traditionalBias,
       traditionalAbsError,
+      traditionalSquaredError,
       betterScheme
     };
   });
@@ -559,16 +563,11 @@ function calculateTraditionalMetrics() {
     ? buildArrErrorMetrics(rows)
     : [
         {
-          label: '传统方案 MAE',
-          value: average(rows.map(row => Math.abs(Number(row.traditionalError || 0))))?.toFixed(4) ?? '--'
-        },
-        {
           label: '传统方案 MSE',
           value: average(rows.map(row => Number(row.traditionalError || 0) ** 2))?.toFixed(4) ?? '--'
         }
       ];
   return {
-    mae: metrics.find(item => item.label === '传统方案 MAE')?.value ?? '--',
     mse: metrics.find(item => item.label === '传统方案 MSE')?.value ?? '--'
   };
 }
@@ -588,7 +587,6 @@ function buildMetricCards() {
 
   const rows = comparisonRows.value;
   const newErrors = rows.map(row => Number(row.newError));
-  const newMae = average(newErrors.map(Math.abs));
   const newMse = average(newErrors.map(value => value ** 2));
   const traditional = calculateTraditionalMetrics();
 
@@ -596,18 +594,15 @@ function buildMetricCards() {
     { label: '样本规模', value: String(currentResult.value.sampleCount || 0) },
     { label: '隐私预算 epsilon', value: String(currentResult.value.epsilon ?? '--') },
     { label: '扰动参数 p/q', value: formatParamCard() },
-    { label: '新方案 MAE', value: formatOptionalNumber(newMae) },
     { label: '新方案 MSE', value: formatOptionalNumber(newMse) }
   ];
 
   if (traditional) {
     cards.push(
-      { label: '传统方案 MAE', value: traditional.mae },
       { label: '传统方案 MSE', value: traditional.mse }
     );
   } else {
     cards.push(
-      { label: '传统方案 MAE', value: '--' },
       { label: '传统方案 MSE', value: '--' }
     );
   }

@@ -526,22 +526,6 @@ function createAggregateViewModel({
         }
       },
       {
-        label: '频率 MAE',
-        value: metrics.freqMae.toFixed(6),
-        helper: '按论文定义计算的平均绝对频率误差',
-        cardClass: 'core-card--highlight core-card--soft',
-        tooltip: {
-          formula: 'MAE_f = (1 / |Ω_A|) * Σ_i |f_i - f̂_i|',
-          notes: [
-            'f_i = 真实频率',
-            'f̂_i = 聚合估计频率',
-            `当前 ${algorithm} 场景中 |Ω_A| = ${labels.length}`,
-            'f_i = true_count_i / N',
-            'f̂_i = estimated_count_i / N'
-          ]
-        }
-      },
-      {
         label: '一致性指标',
         value: metrics.consistencyLevel,
         helper: '根据各分类频率误差的整体稳定性给出一致性判断',
@@ -551,7 +535,6 @@ function createAggregateViewModel({
     ],
     detailMetricCards: [
       { label: 'Count-MSE', value: metrics.countMse.toFixed(4), description: '计数均方误差，仅用于辅助观察恢复计数偏差。' },
-      { label: 'Count-MAE', value: metrics.countMae.toFixed(4), description: '计数平均绝对误差，用于补充查看计数层面的整体偏移。' },
       { label: '聚合估计方差', value: metrics.estimateVariance.toFixed(4), description: '用于观察聚合估计结果的离散程度，不替代频率误差指标。' },
       { label: '估计误差上界', value: metrics.maxCountError.toFixed(4), description: '展示当前类别中最大的计数误差绝对值。' },
       { label: 'α', value: config.alpha.toFixed(4), description: '当前任务配置中保存的内在不确定性参数 α。' },

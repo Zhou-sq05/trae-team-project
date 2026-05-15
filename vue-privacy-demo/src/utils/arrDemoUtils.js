@@ -184,16 +184,12 @@ export function buildArrErrorMetrics(rows) {
     return [];
   }
 
-  const newAbsErrors = rows.map(row => Math.abs(row.newError));
-  const traditionalAbsErrors = rows.map(row => Math.abs(row.traditionalError));
   const newSquaredErrors = rows.map(row => row.newError ** 2);
   const traditionalSquaredErrors = rows.map(row => row.traditionalError ** 2);
 
   const average = values => values.reduce((sum, value) => sum + value, 0) / values.length;
 
   return [
-    { label: '新方案 MAE', value: average(newAbsErrors).toFixed(4) },
-    { label: '传统方案 MAE', value: average(traditionalAbsErrors).toFixed(4) },
     { label: '新方案 MSE', value: average(newSquaredErrors).toFixed(4) },
     { label: '传统方案 MSE', value: average(traditionalSquaredErrors).toFixed(4) }
   ];

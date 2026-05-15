@@ -577,22 +577,6 @@ function createAggregateViewModel({
         }
       },
       {
-        label: '频率 MAE',
-        value: metrics.freqMae.toFixed(6),
-        helper: '按论文定义计算的平均绝对频率误差',
-        cardClass: 'core-card--highlight core-card--soft',
-        tooltip: {
-          formula: 'MAE_f = (1 / |A|) * Σ_i |f_i - f̂_i|',
-          notes: [
-            'f_i = 真实频率',
-            'f̂_i = 聚合估计频率',
-            `当前 ${algorithm} 场景中 |A| = ${labels.length}`,
-            'f_i = true_count_i / N',
-            'f̂_i = estimated_count_i / N'
-          ]
-        }
-      },
-      {
         label: '一致性指标',
         value: metrics.consistencyLevel,
         helper: '根据各分类频率误差的整体稳定性给出一致性判断',
@@ -602,7 +586,6 @@ function createAggregateViewModel({
     ],
     detailMetricCards: detailMetricCards || [
       { label: 'Count-MSE', value: metrics.countMse.toFixed(4), description: '计数均方误差，仅用于辅助观察恢复计数偏差。' },
-      { label: 'Count-MAE', value: metrics.countMae.toFixed(4), description: '计数平均绝对误差，用于补充查看计数层面的整体偏移。' },
       { label: '聚合估计方差', value: metrics.estimateVariance.toFixed(4), description: '用于观察聚合估计结果的离散程度，不替代频率误差指标。' },
       { label: '估计误差上界', value: metrics.maxCountError.toFixed(4), description: '展示当前类别中最大的计数误差绝对值。' },
       { label: 'α', value: config.alpha.toFixed(4), description: '当前任务配置中的内在不确定性参数 α。' },
@@ -772,9 +755,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: 'α / β', value: `${config.alpha.toFixed(4)} / ${config.beta.toFixed(4)}` }
     ],
     detailMetricCards: [
-      { label: '统一域频率 MAE', value: overallMetrics.freqMae.toFixed(6), description: '辅助实验指标。基于真实频率与估计频率的绝对误差均值，只用于展示本次实验恢复误差，不作为 TSP 理论主指标。' },
       { label: '统一域频率 MSE', value: overallMetrics.freqMse.toFixed(6), description: '辅助实验指标。基于真实频率与估计频率的均方误差，只用于展示本次实验恢复误差，不作为 TSP 理论主指标。' },
-      { label: 'Count-MAE', value: overallMetrics.countMae.toFixed(4), description: '辅助实验指标。计数平均绝对误差，用于补充查看恢复计数层面的整体偏移。' },
       { label: 'Count-MSE', value: overallMetrics.countMse.toFixed(4), description: '辅助实验指标。计数均方误差，用于补充观察恢复计数偏差。' },
       { label: '统一域平均方差', value: varianceMetrics.avgVariance.toFixed(8), description: '核心理论口径。将统一域 {0,1,2,3,4,5} 中各类别频率估计方差取平均，衡量 TSP 频率估计器的整体波动大小。' },
       { label: '统一域总方差', value: varianceMetrics.totalVariance.toFixed(8), description: '将每个类别频率估计方差求和得到的总方差，可用于辅助观察整体波动规模。' },
@@ -789,9 +770,7 @@ function getTspAggregateResults(records, task, taskId, scope) {
       { label: '约束后缺失块估计值', value: formatCountSnapshot(['缺失', '非缺失'], displayMissingSection?.metrics?.estimatedCounts || []), description: '表格与图表当前默认展示这一版约束后结果：先做非负截断，再归一化到总样本数 N。' },
       { label: '约束后评分块估计值', value: formatCountSnapshot(['1 分', '2 分', '3 分', '4 分', '5 分'], displayScoreSection?.metrics?.estimatedCounts || []), description: '表格与图表当前默认展示这一版约束后结果：先做非负截断，再归一化到有效评分样本数 N_valid。' },
       { label: '缺失状态块频率 MSE', value: missingSection?.metrics?.freqMse?.toFixed(6) || '0.000000', description: '仅对“缺失 / 非缺失”二分类结果块单独计算的频率 MSE。' },
-      { label: '缺失状态块频率 MAE', value: missingSection?.metrics?.freqMae?.toFixed(6) || '0.000000', description: '仅对“缺失 / 非缺失”二分类结果块单独计算的频率 MAE。' },
       { label: '评分分布块频率 MSE', value: scoreSection?.metrics?.freqMse?.toFixed(6) || '0.000000', description: '仅对有效评分 1~5 结果块单独计算的频率 MSE。该块频率以有效评分样本总数为分母。' },
-      { label: '评分分布块频率 MAE', value: scoreSection?.metrics?.freqMae?.toFixed(6) || '0.000000', description: '仅对有效评分 1~5 结果块单独计算的频率 MAE。' },
       { label: 'α', value: config.alpha.toFixed(4), description: '基于缺失状态 M 的条件分布 Pr(M|S) 学习得到的内在不确定性参数 α。' },
       { label: 'β', value: config.beta.toFixed(4), description: '基于缺失状态 M 的条件分布 Pr(M|S) 学习得到的内在不确定性参数 β。' },
       { label: 'p1', value: config.p1.toFixed(4), description: '第一阶段只在有效评分域 {1,2,3,4,5} 上扰动，d = 5；p1 是保留真实评分的概率。' },

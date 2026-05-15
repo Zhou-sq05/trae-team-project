@@ -782,7 +782,7 @@ const coreMetricCards = computed(() => {
 
 const coreSectionDescription = computed(() => {
   if (currentData.value?.algorithm === 'TSP') {
-    return '核心指标以频率估计方差衡量协议精度，MSE / MAE 仅用于辅助展示本次实验与真实分布之间的误差。'
+    return '核心指标以频率估计方差衡量协议精度，MSE 用于辅助展示本次实验与真实分布之间的误差。'
   }
   return ''
 })
@@ -797,7 +797,7 @@ const detailSectionTitle = computed(() => {
 
 const detailSectionDescription = computed(() => {
   if (currentData.value?.algorithm === 'TSP') {
-    return '这里保留 MSE / MAE、计数误差以及参数口径，用于实验对照、答辩补充和公式核查，不作为 TSP 的核心理论主指标。'
+    return '这里保留 MSE、计数均方误差以及参数口径，用于实验对照、答辩补充和公式核查，不作为 TSP 的核心理论主指标。'
   }
   return '这些指标用于补充评估和参数说明，不作为页面的第一视觉重点。'
 })

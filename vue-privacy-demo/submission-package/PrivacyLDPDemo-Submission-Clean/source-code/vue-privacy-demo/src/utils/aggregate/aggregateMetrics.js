@@ -17,17 +17,6 @@ export function calculateMeanSquaredError(actualValues = [], estimatedValues = [
   return actual.reduce((sum, value, index) => sum + ((value - estimated[index]) ** 2), 0) / actual.length;
 }
 
-export function calculateMeanAbsoluteError(actualValues = [], estimatedValues = []) {
-  const actual = toNumericArray(actualValues);
-  const estimated = toNumericArray(estimatedValues);
-
-  if (!actual.length || actual.length !== estimated.length) {
-    return 0;
-  }
-
-  return actual.reduce((sum, value, index) => sum + Math.abs(value - estimated[index]), 0) / actual.length;
-}
-
 export function calculateAggregateVariance(values = []) {
   const numericValues = toNumericArray(values);
   if (!numericValues.length) {
@@ -68,9 +57,7 @@ export function buildAggregateMetrics({
   const freqErrors = normalizedLabels.map((_, index) => estimatedFreqs[index] - trueFreqs[index]);
 
   const countMse = calculateMeanSquaredError(normalizedTrueCounts, normalizedEstimatedCounts);
-  const countMae = calculateMeanAbsoluteError(normalizedTrueCounts, normalizedEstimatedCounts);
   const freqMse = calculateMeanSquaredError(trueFreqs, estimatedFreqs);
-  const freqMae = calculateMeanAbsoluteError(trueFreqs, estimatedFreqs);
 
   const consistencyScore = normalizedLabels.length
     ? normalizedLabels.filter((_, index) => Math.abs(freqErrors[index]) <= consistencyThreshold).length / normalizedLabels.length
@@ -101,9 +88,7 @@ export function buildAggregateMetrics({
     estimatedFreqs: estimatedFreqs.map(value => roundValue(value, 6)),
     freqErrors: freqErrors.map(value => roundValue(value, 6)),
     countMse: roundValue(countMse, 4),
-    countMae: roundValue(countMae, 4),
     freqMse: roundValue(freqMse, 6),
-    freqMae: roundValue(freqMae, 6),
     consistencyScore: roundValue(consistencyScore, 4),
     consistencyLevel,
     estimateVariance: roundValue(estimateVariance, 4),

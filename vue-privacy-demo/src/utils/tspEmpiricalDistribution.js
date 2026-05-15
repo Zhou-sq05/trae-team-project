@@ -10,9 +10,11 @@ import {
 
 const SCORE_DOMAIN = [1, 2, 3, 4, 5];
 const QUALITY_SCORE_MAP = {
-  低质量: 2,
-  中质量: 3,
-  高质量: 5
+  评分1: 1,
+  评分2: 2,
+  评分3: 3,
+  评分4: 4,
+  评分5: 5
 };
 const distributionCache = new Map();
 
