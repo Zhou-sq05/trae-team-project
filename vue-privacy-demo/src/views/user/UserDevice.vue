@@ -325,7 +325,7 @@
 
               <div class="summary-block">
                 <div class="summary-heading">
-                  <h4>待上报扰动结果</h4>
+                  <h4>扰动后编码值</h4>
                   <span class="section-tip">两阶段输出汇总后的待上传扰动后编码值</span>
                 </div>
                 <div class="tsp-final-layout">
@@ -1351,8 +1351,7 @@ const tspStageOneMainCards = computed(() => [
 const tspStageOneMetaCards = computed(() => [
   { label: '第一阶段值域', value: 'd = 5，对应 {1,2,3,4,5}' },
   { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
-  { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' },
-  { label: '归一约束', value: 'p1 + (d - 1)q1 = 1' }
+  { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' }
 ]);
 
 const tspStageTwoMainCards = computed(() => [
@@ -1363,8 +1362,7 @@ const tspStageTwoMainCards = computed(() => [
 const tspStageTwoMetaCards = computed(() => [
   { label: '第二阶段值域', value: 'd + 1 = 6，对应 {0,1,2,3,4,5}' },
   { label: '参数 p2', value: tspParametersReady.value ? tspConfigParams.value.p2.toFixed(4) : '--' },
-  { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' },
-  { label: '归一约束', value: 'p2 + dq2 = 1' }
+  { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' }
 ]);
 
 const tspPendingReportValue = computed(() => (
@@ -3935,6 +3933,10 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
   gap: 12px;
   align-items: stretch;
+}
+
+.tsp-stage-layout {
+  align-items: start;
 }
 
 .tsp-stage-main {

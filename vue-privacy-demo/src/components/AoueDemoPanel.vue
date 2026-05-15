@@ -58,11 +58,7 @@
             </div>
           </div>
 
-          <div v-if="demo.animationStatus === 'encoding'" class="aoue-encoding-banner">
-            <span>初始编码向量生成中</span>
-            <span>根据当前分桶位置，将目标位从 0 置为 1</span>
-          </div>
-          <div v-else class="aoue-transition-row">
+          <div v-if="demo.animationStatus !== 'encoding'" class="aoue-transition-row">
             <div v-for="cell in demo.vectorColumns" :key="`transition-${cell.index}`" class="aoue-transition-cell">
               <div class="aoue-transition-badge" :class="[`is-${cell.transitionKey}`, `is-${cell.state}`]">
                 {{ cell.transitionLabel }}
@@ -613,20 +609,6 @@ defineProps({
   line-height: 1.4;
   text-align: center;
   color: #64748b;
-}
-
-.aoue-encoding-banner {
-  margin: 12px 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px dashed #f3c969;
-  background: #fffaf0;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #9a6700;
 }
 
 .aoue-transition-badge {

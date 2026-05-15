@@ -674,12 +674,6 @@ ARR 协议主要用于二值事件型字段，例如夜间是否触发异常提�
 \caption{ARR协议：多客户端上传与聚合结果展示}
 \end{figure}
 
-\begin{figure}[htbp]
-\centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering ARR协议误差评估截图：可放置不同隐私预算下的 MSE、MAE 或真实/估计分布误差对比图}}
-\caption{ARR协议：误差评估结果}
-\end{figure}
-
 \subsubsection{AGRR协议流程验证}
 
 AGRR 协议面向具有条件分布关系的多值属性。系统先根据公开数据集估计条件分布矩阵，再计算内在不确定性，并在此基础上重校准扰动参数。与普通随机响应相比，AGRR 的流程多了条件分布估计和参数重校准环节，因此需要单独展示管理端参数计算过程以及客户端采集、编码、扰动过程。
@@ -758,12 +752,6 @@ AGRR 协议面向具有条件分布关系的多值属性。系统先根据公开
 \caption{AGRR协议：多客户端上传与聚合结果展示}
 \end{figure}
 
-\begin{figure}[htbp]
-\centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering AGRR协议误差评估截图：可放置多值属性在不同 \(\varepsilon\)、不同样本批次下的 MSE、MAE 对比图}}
-\caption{AGRR协议：误差评估结果}
-\end{figure}
-
 \subsubsection{AOUE协议流程验证}
 
 AOUE 协议主要用于取值域较大的离散属性，例如步数分桶、活动等级或其他多类别行为字段。该协议需要先将原始类别转换为一元编码向量，再对向量中的每一位进行随机扰动，因此测试时应重点展示属性域配置、一元编码结果、扰动向量上传以及服务端频率估计结果。
@@ -786,11 +774,54 @@ AOUE 协议主要用于取值域较大的离散属性，例如步数分桶、活
 \hfill
 \begin{minipage}[b]{0.32\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{figures/AOUE-扰动参数重校准.png}
+  \includegraphics[width=\linewidth]{figures/AOUE-扰动参数标准.png}
   \\
-  {\small (c) 扰动参数重校准}
+  {\small (c) 扰动参数计算}
 \end{minipage}
 \caption{AOUE协议：管理端参数计算流程}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-采集.png}
+  \\
+  {\small (a) 采集}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-编码.png}
+  \\
+  {\small (b) 一元编码}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-扰动.png}
+  \\
+  {\small (c) 逐比特扰动}
+\end{minipage}
+\caption{AOUE协议：客户端本地扰动与上传流程}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\begin{minipage}[b]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-多客户端上报.png}
+  \\
+  {\small (a) 多客户端上报}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{figures/AOUE-聚合.png}
+  \\
+  {\small (b) 聚合结果}
+\end{minipage}
+\caption{AOUE协议：多客户端上传与聚合结果展示}
 \end{figure}
 
 \subsubsection{TSP协议流程验证}
@@ -799,43 +830,147 @@ TSP 协议用于混合隐私风险场景，即同一字段中既可能包含直�
 
 \begin{figure}[htbp]
 \centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering TSP敏感/非敏感取值划分与参数配置截图}}
-\caption{TSP协议：取值集合划分与参数配置}
+\fbox{\parbox[c][0.22\textheight][c]{0.86\linewidth}{\centering TSP管理端参数计算流程截图：缺失机制、条件分布矩阵、两阶段扰动参数}}
+\caption{TSP协议：管理端参数计算流程}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering TSP两阶段扰动上传与聚合结果截图}}
-\caption{TSP协议：两阶段扰动上传与聚合结果展示}
+\fbox{\parbox[c][0.22\textheight][c]{0.86\linewidth}{\centering TSP客户端本地扰动流程截图：采集、缺失值处理、两阶段扰动与上传}}
+\caption{TSP协议：客户端本地扰动与上传流程}
 \end{figure}
 
-\begin{figure}[htbp]
-\centering
-\fbox{\parbox[c][0.22\textheight][c]{0.82\linewidth}{\centering TSP协议误差评估截图：可放置缺失值比例估计、非缺失取值估计以及两阶段扰动总体误差图}}
-\caption{TSP协议：误差评估结果}
-\end{figure}
-
-\subsection{隐私保护算法实验与对比}
-
-\subsubsection{ARR 算法测试}
-
-\subsubsection{AOUE 算法测试}
-
-\subsubsection{AGRR 算法测试}
-
-\subsubsection{TSP 算法测试}
 
 \subsection{测试结果分析}
 
 \subsubsection{功能完整性分析}
 
-\subsubsection{聚合精度分析}
+从功能流程测试结果看，系统能够完成从管理端任务配置、客户端本地扰动、多客户端批量上传到管理端聚合展示的完整闭环。ARR、AGRR、AOUE 和 TSP 四类协议均能够根据任务配置读取对应的隐私预算、属性域、条件分布和扰动参数，并在客户端侧完成随机化处理后再上传结果。管理端能够区分不同协议和任务批次，对扰动后数据执行对应的聚合估计，并通过图表和明细表展示真实分布、估计分布以及误差指标。
+
+需要说明的是，本系统中的测试结果分析并不以单个页面是否能够打开作为重点，而是关注系统能否支撑隐私保护算法的完整验证过程。测试结果表明，系统在不同协议之间切换时，任务参数、上传记录和聚合结果能够保持一致；在多客户端模拟上传时，系统能够保留每条记录的任务归属和扰动结果；在聚合分析阶段，系统能够根据协议差异调用不同估计方法。这说明作品不仅实现了前端演示页面，也具备对本地差分隐私采集流程进行实验验证的能力。
+
+\subsubsection{ARR聚合精度分析}
+
+ARR 协议对应二值事件型采集场景，本章以“是否触发睡眠异常提醒”等二值字段为例进行测试。由于该类字段只有两个取值，聚合结果的主要观察点是两个类别的估计数量是否接近真实数量，以及估计偏差是否相互抵消。测试页面中同时展示了真实分布、新方案估计分布和传统方案估计分布，可用于比较引入内在不确定性后的参数重校准是否提升统计精度。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.86\linewidth]{figures/ARR-误差评估总览.png}
+\caption{ARR协议：聚合精度分析}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.86\linewidth]{figures/ARR-分布估计结果对照.png}
+\caption{ARR协议：分布估计结果对照}
+\end{figure}
+
+从误差评估结果可以看出，ARR 新方案的估计结果整体更接近真实分布。对于二值属性，一类上的高估通常会对应另一类上的低估，因此仅观察单个柱状图容易产生片面判断；结合 MAE 和误差明细表可以更直观地反映整体偏差大小。若新方案在两个类别上的偏差绝对值均小于或接近传统方案，且总体 MAE 更低，则说明根据 \(\alpha,\beta\) 重校准后的扰动参数在当前间接隐私场景中保留了更多统计可用性。
+
+\subsubsection{AGRR聚合精度分析}
+
+AGRR 协议对应多值离散属性场景，例如站立时长分档、活动等级等。与 ARR 相比，AGRR 的属性域更大，扰动后的取值可能落入多个非真实类别，因此估计误差不仅体现在总体 MAE 上，也体现在不同类别之间的分布形态是否保持一致。测试时应重点观察高频类别是否能够被正确识别，低频类别是否出现明显虚高，以及新方案相较传统 GRR 是否减少了大幅偏差。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.86\linewidth]{figures/AGRR-误差评估总览.png}
+\caption{AGRR协议：聚合精度分析}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.86\linewidth]{figures/ARR-分布估计结果对照.png}
+\caption{ARR协议：分布估计结果对照}
+\end{figure}
+
+从 AGRR 的聚合结果看，新方案能够根据条件分布反映出的间接泄露风险调整 \(p\) 和 \(q\)，从而在满足隐私预算约束的同时减少不必要噪声。若图中真实分布与新方案估计分布的柱形走势基本一致，说明系统对多值属性的频数恢复较为稳定；若传统方案在某些类别上出现明显高估或低估，而新方案偏差较小，则可以说明内在不确定性参数对多值场景的统计精度具有改善作用。
+
+\subsubsection{AOUE聚合精度分析}
+
+AOUE 协议适用于步数分桶等取值域较大的离散属性。该协议先将原始类别编码为一元向量，再对每一位进行扰动，因此相比 AGRR 更适合高基数字段。测试结果分析时，应重点观察两个方面：一是估计分布是否能够保留主要类别的趋势，二是在高维编码下误差是否仍然保持在可解释范围内。
+
+\begin{figure}[htbp]
+\centering
+\fbox{\parbox[c][0.24\textheight][c]{0.86\linewidth}{\centering AOUE误差评估截图：建议放“高基数字段真实/估计分布对比、MAE/MSE 指标、误差明细表”}}
+\caption{AOUE协议：聚合误差分析}
+\end{figure}
+
+从 AOUE 的测试结果可以分析高基数场景下不同方案的稳定性。若新方案估计分布能够较好跟随真实分布的峰值位置和整体趋势，说明一元编码扰动后的聚合估计仍具备可用性。由于 AOUE 对每一位分别扰动，低频类别可能更容易受随机噪声影响，因此报告中不宜只强调某个类别的偏差，而应结合 MAE、MSE 和分布趋势综合判断。若新方案整体误差低于传统方案，则说明基于内在不确定性的参数设置能够缓解高基数属性下的估计波动。
+
+\subsubsection{TSP聚合精度分析}
+
+TSP 协议用于包含缺失值或混合隐私风险的采集场景，例如睡眠质量评分既存在具体评分取值，也可能存在缺失记录。该协议通过两阶段扰动分别处理非缺失取值和统一取值域，因此测试结果需要同时关注缺失值估计和非缺失类别估计。相比 ARR、AGRR 和 AOUE，TSP 的分析重点不只是总体误差，还包括缺失比例是否被合理恢复，以及两阶段扰动后各类别分布是否仍能反映真实趋势。
+
+\begin{figure}[htbp]
+\centering
+\begin{minipage}[b]{0.23\textwidth}
+  \centering
+  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图1}}
+  \\
+  {\small (a) 缺失值估计}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.23\textwidth}
+  \centering
+  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图2}}
+  \\
+  {\small (b) 非缺失分布}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.23\textwidth}
+  \centering
+  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图3}}
+  \\
+  {\small (c) 偏差对比}
+\end{minipage}
+\hfill
+\begin{minipage}[b]{0.23\textwidth}
+  \centering
+  \fbox{\parbox[c][0.15\textheight][c]{0.92\linewidth}{\centering TSP误差评估图4}}
+  \\
+  {\small (d) 误差指标}
+\end{minipage}
+\caption{TSP协议：聚合误差分析}
+\end{figure}
+
+从 TSP 的测试结果可以观察缺失值类别和非缺失类别的估计差异。如果缺失值估计接近真实缺失数量，说明第二阶段统一扰动后的校正公式能够有效恢复缺失状态；如果非缺失评分分布与真实分布趋势一致，说明第一阶段对非缺失取值的扰动没有破坏主要统计特征。由于 TSP 同时处理直接隐私和间接隐私风险，其误差通常会受到缺失率、属性域大小和隐私预算共同影响，因此报告中应结合图表说明该协议更适合存在缺失机制或混合敏感性的字段。
 
 \subsubsection{不同隐私预算下的结果对比}
 
-\subsubsection{不同算法的性能对比}
+隐私预算 \(\varepsilon\) 是影响扰动强度和统计精度的关键参数。一般而言，\(\varepsilon\) 越小，隐私保护越强，扰动噪声越大，聚合估计误差也可能越高；\(\varepsilon\) 越大，扰动强度降低，估计结果更接近真实分布，但隐私保护强度相应下降。因此，本系统通过切换不同隐私预算，观察 MAE、MSE 和分布偏差的变化趋势，用于验证隐私保护与统计可用性之间的权衡关系。
+
+\begin{figure}[htbp]
+\centering
+\fbox{\parbox[c][0.24\textheight][c]{0.86\linewidth}{\centering 不同隐私预算对比截图：建议放“同一协议在多个 \(\varepsilon\) 下的 MAE/MSE 折线图或柱状图”}}
+\caption{不同隐私预算下的聚合误差对比}
+\end{figure}
+
+从对比结果可以看出，随着 \(\varepsilon\) 增大，扰动结果通常会更加接近真实分布，误差指标整体呈下降趋势。但在实际应用中，并不能简单选择最大的 \(\varepsilon\)，而需要结合数据敏感程度和统计任务需求进行折中。本作品的意义在于，系统不仅允许用户调节 \(\varepsilon\)，还进一步结合条件分布和内在不确定性对扰动参数进行重校准，使低风险字段不必承受过强噪声，高风险字段则能够获得更充分保护。
+
+\subsubsection{不同算法的适用性分析}
+
+四类协议虽然都服务于本地差分隐私采集，但适用场景并不相同。ARR 适合二值事件型字段，流程简单、解释性强；AGRR 适合中低维多值离散属性，能够在多类别场景下进行随机响应；AOUE 更适合高基数离散属性，通过一元编码降低传统多值随机响应在高维场景中的误差；TSP 则适合存在缺失值或混合隐私风险的字段，能够同时处理缺失状态和非缺失取值。
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\hline
+协议 & 适用场景 & 测试结果关注点 \\ \hline
+ARR & 二值事件型字段 & 两个类别的估计偏差、MAE 是否降低 \\ \hline
+AGRR & 中低维多值离散属性 & 多类别分布趋势是否保持，高频类别是否估计准确 \\ \hline
+AOUE & 高基数离散属性 & 一元编码后的整体误差、低频类别波动和趋势一致性 \\ \hline
+TSP & 缺失值或混合隐私风险字段 & 缺失比例估计、非缺失分布估计和两阶段误差 \\ \hline
+\end{tabularx}
+\end{table}
+
+综合来看，不同协议并不存在绝对意义上的优劣，而是需要与数据类型和测试目标匹配。若字段只有两个取值，ARR 已经能够提供足够清晰的扰动和聚合流程；若字段取值较多但维度不高，AGRR 更便于解释；若字段取值域较大，AOUE 在高维频数估计中更有优势；若字段存在缺失机制或直接敏感取值，则 TSP 更能贴合实际采集场景。
 
 \subsubsection{系统稳定性与可用性分析}
+
+在多轮测试过程中，系统能够支持不同协议任务的切换、不同隐私预算的配置以及多客户端批量上传。测试结果表明，任务配置、扰动上传记录和聚合结果之间能够保持对应关系，页面刷新后主要任务状态能够通过本地持久化机制恢复，聚合图表和误差指标也能够随任务切换重新计算。
+
+从可用性角度看，系统将复杂的条件分布估计、参数重校准和无偏聚合计算封装在管理端和算法模块中，用户端只需要选择任务、输入或模拟采集值并执行扰动上传。这种设计降低了使用门槛，也便于在比赛展示中说明每一步的隐私保护含义。综合功能流程和误差评估结果，系统能够较完整地展示健康手环数据在本地差分隐私保护下的采集、扰动、聚合和分析过程。
 
 \subsection{本章小结}
 
