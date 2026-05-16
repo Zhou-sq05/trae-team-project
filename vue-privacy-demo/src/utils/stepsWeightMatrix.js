@@ -53,16 +53,16 @@ export function buildStepsMatrixRows(matrixData) {
 }
 
 function getPairwiseSupportCandidates(matrixData, epsilon = 0.5) {
-  const pairs = [
-    ['正常', '超重'],
-    ['正常', '肥胖'],
-    ['超重', '肥胖']
-  ];
+  const pairs = WEIGHT_STATUS_ORDER.flatMap(left =>
+    WEIGHT_STATUS_ORDER
+      .filter(right => right !== left)
+      .map(right => [left, right])
+  );
   const expEpsilon = Math.exp(epsilon);
   const defaultAlpha = expEpsilon / (1 + expEpsilon);
   const defaultBeta = 1 / (1 + expEpsilon);
 
-  return pairs.map(([left, right]) => {
+  return pairs.map(([left, right], pairIndex) => {
     const diffEntries = STEP_BUCKET_ORDER.map(bucket => {
       const leftProb = matrixData.conditionalProbs?.[left]?.[bucket] ?? 0;
       const rightProb = matrixData.conditionalProbs?.[right]?.[bucket] ?? 0;
@@ -89,6 +89,8 @@ function getPairwiseSupportCandidates(matrixData, epsilon = 0.5) {
     return {
       label: `${left} vs ${right}`,
       sourcePair: [left, right],
+      orderedPairIndex: pairIndex,
+      isDirectedPair: true,
       supportRule: '按论文规则构造 C_ij = { a | Pr(A=a|s_i) / Pr(A=a|s_j) >= e^ε }。',
       buckets: supportBuckets,
       bucketText: supportBuckets.length ? supportBuckets.join('、') : '∅',
@@ -182,7 +184,9 @@ export function calculateStepsAlphaBeta(matrixData, epsilon = 0.5) {
     selectedLabel: selectedSupportSet?.label ?? null,
     selectedSupportSet,
     supportStats,
-    selectionRule: '系统先按论文中的支持集规则构造各个 C_ij，再计算每个 (α_ij, β_ij)，最后使用 choose() 依据不确定性参数选择规则选出最终结果。',
+    candidatePairCount: supportStats.length,
+    orderedPairRule: '系统对所有有序敏感状态对 i != j 构造 C_ij，反方向 C_ji 会作为独立候选参与比较。',
+    selectionRule: '系统先按论文中的支持集规则构造所有有序状态对的 C_ij，再计算每个 (α_ij, β_ij)，最后使用 choose() 依据不确定性参数选择规则选出最终结果。',
     expEpsilon
   };
 }

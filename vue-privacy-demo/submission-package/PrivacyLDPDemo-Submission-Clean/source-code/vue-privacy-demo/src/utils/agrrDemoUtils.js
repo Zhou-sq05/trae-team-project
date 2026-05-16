@@ -8,6 +8,7 @@ import {
   getStandBucketCode,
   getStandBucketLabelByCode
 } from './standDurationBuckets';
+import { appendSubmissionRecords } from './submissionStorage';
 
 export const AGRR_DEMO_SAMPLE_COUNT = 500;
 
@@ -78,6 +79,5 @@ export function formatAgrrCode(value) {
 }
 
 export function appendAgrrSubmissionRecords(records) {
-  const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
-  localStorage.setItem('submittedData', JSON.stringify([...storedData, ...records]));
+  appendSubmissionRecords(records);
 }

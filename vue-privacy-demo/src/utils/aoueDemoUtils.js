@@ -8,6 +8,7 @@ import {
   getStepsBucketCode,
   getStepsBucketLabelByCode
 } from './stepsBuckets';
+import { appendSubmissionRecords } from './submissionStorage';
 
 export const AOUE_DEMO_SAMPLE_COUNT = 500;
 
@@ -95,6 +96,5 @@ export function formatAoueTransitions(bitSteps = []) {
 }
 
 export function appendAoueSubmissionRecords(records) {
-  const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
-  localStorage.setItem('submittedData', JSON.stringify([...storedData, ...records]));
+  appendSubmissionRecords(records);
 }

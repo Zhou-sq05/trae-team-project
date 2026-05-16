@@ -3,6 +3,7 @@ import {
   CONDITION_DISTRIBUTION_KEYS,
   sampleObservedValue
 } from './conditionDistributionPresets';
+import { appendSubmissionRecords, readSubmittedData } from './submissionStorage';
 
 export const ARR_LABELS = ['未触发提醒', '触发提醒'];
 export const ARR_DEMO_SAMPLE_COUNT = 500;
@@ -128,12 +129,11 @@ export function simulateArrClientUploads(task, params, sampleCount = ARR_DEMO_SA
 }
 
 export function appendArrSubmissionRecords(records) {
-  const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
-  localStorage.setItem('submittedData', JSON.stringify([...storedData, ...records]));
+  appendSubmissionRecords(records);
 }
 
 export function getArrRecords(taskId = '') {
-  const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
+  const storedData = readSubmittedData();
   return storedData.filter(item => {
     const taskMatches = !taskId || String(item.task_id ?? item.taskId) === String(taskId);
     const protocol = item?.reportData?.protocol || item?.protocol;

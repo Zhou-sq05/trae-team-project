@@ -850,6 +850,7 @@ import {
   CONDITION_DISTRIBUTION_KEYS,
   sampleObservedValue
 } from '../../utils/conditionDistributionPresets.js';
+import { appendSubmissionRecords } from '../../utils/submissionStorage';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -3402,7 +3403,6 @@ function uploadCurrentBatchResult() {
   }
 
   try {
-    const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
     const uploadTime = new Date().toISOString();
     const userId = user.value?.username || '用户001';
     const batchSummary = buildBatchSummaryPayload();
@@ -3527,7 +3527,7 @@ function uploadCurrentBatchResult() {
       };
     });
 
-    localStorage.setItem('submittedData', JSON.stringify([...storedData, ...records]));
+    appendSubmissionRecords(records);
     batchUploadState.value = {
       batchId: currentBatchResult.value.batchId,
       status: '已上报',
@@ -3583,10 +3583,9 @@ function submitData() {
     systemStatus.value = 2;
 
     try {
-      const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
       const uploadTime = new Date().toISOString();
       const userId = user.value?.username || '用户001';
-      storedData.push({
+      const record = {
         userId,
         user_id: userId,
         taskId: currentTaskDetail.value.taskId,
@@ -3713,8 +3712,8 @@ function submitData() {
           reportScore: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportScore ?? null : null,
           reportScoreDisplay: currentTaskDetail.value.scenario === 'tsp' ? tspSimulationResult.value?.reportScoreDisplay ?? null : null
         }
-      });
-      localStorage.setItem('submittedData', JSON.stringify(storedData));
+      };
+      appendSubmissionRecords([record]);
       ElMessage.success('当前任务扰动结果已提交上报');
     } catch (error) {
       console.error('保存用户端采集数据失败:', error);

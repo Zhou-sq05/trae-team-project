@@ -719,7 +719,7 @@
                 <div class="final-selection-line">最终选中的敏感状态对：{{ stepsAlphaBetaResult?.selectedLabel }}</div>
                 <div class="final-selection-line">最终支持集：{{ stepsAlphaBetaResult?.selectedSupportSet?.bucketText }}</div>
                 <div class="final-selection-line">最终 α = {{ formatProbability(stepsAlphaBetaResult?.alpha) }}，β = {{ formatProbability(stepsAlphaBetaResult?.beta) }}</div>
-                <div class="final-selection-line">系统先按论文中的支持集规则构造各个 C<sub>ij</sub>，再计算每个 (α<sub>ij</sub>, β<sub>ij</sub>)，最后按专利中的不确定性参数选择规则进行候选对比较并选出最终结果。</div>
+                <div class="final-selection-line">系统先按论文中的支持集规则构造所有有序状态对的 C<sub>ij</sub>，再计算每个 (α<sub>ij</sub>, β<sub>ij</sub>)，最后按专利中的不确定性参数选择规则进行候选对比较并选出最终结果。</div>
               </div>
 
               <div class="support-detail-list">
@@ -830,14 +830,14 @@
                 <div class="result-subtext">{{ stepsAlphaBetaResult.selectedSupportSet?.bucketText }}</div>
               </div>
               <div class="result-panel">
-                <div class="result-label">α（最大条件概率）</div>
+                <div class="result-label">α（源状态支持集概率）</div>
                 <div class="result-value">{{ formatProbability(stepsAlphaBetaResult.alpha) }}</div>
-                <div class="result-subtext">在当前候选支持集对应的 sourcePair 内，对覆盖桶逐项求和后取较大值。</div>
+                <div class="result-subtext">对最终有序状态对的 s_i，在支持集覆盖桶上逐项求和得到。</div>
               </div>
               <div class="result-panel">
-                <div class="result-label">β（最小条件概率）</div>
+                <div class="result-label">β（参照状态支持集概率）</div>
                 <div class="result-value">{{ formatProbability(stepsAlphaBetaResult.beta) }}</div>
-                <div class="result-subtext">在当前候选支持集对应的 sourcePair 内，对覆盖桶逐项求和后取较小值。</div>
+                <div class="result-subtext">对最终有序状态对的 s_j，在同一支持集覆盖桶上逐项求和得到。</div>
               </div>
             </div>
             <div v-else class="empty-state-panel">
@@ -1794,10 +1794,9 @@ function savePrivacyBudget() {
     standColumnStats.value = nextStandResult.columnStats;
   }
   if (stepsMatrixData.value) {
-    const nextStepsResult = calculateStepsAlphaBeta(stepsMatrixData.value, nextValue);
-    stepsAlphaBetaResult.value = nextStepsResult;
-    stepsSupportStats.value = nextStepsResult.supportStats;
-    resetStepsSupportExpansion(nextStepsResult);
+    stepsAlphaBetaResult.value = null;
+    stepsSupportStats.value = [];
+    expandedStepsSupportLabels.value = new Set();
   }
   if (sleepMissingMatrixData.value) {
     const nextTspResult = calculateSleepMissingAlphaBeta(sleepMissingMatrixData.value, nextValue);
@@ -1807,12 +1806,7 @@ function savePrivacyBudget() {
   if (currentAttribute.value?.name === '每日步数分桶') {
     stepsAlphaBetaResult.value = null;
     stepsSupportStats.value = [];
-    if (stepsMatrixData.value) {
-      const nextStepsResult = calculateStepsAlphaBeta(stepsMatrixData.value, nextValue);
-      stepsAlphaBetaResult.value = nextStepsResult;
-      stepsSupportStats.value = nextStepsResult.supportStats;
-      resetStepsSupportExpansion(nextStepsResult);
-    }
+    expandedStepsSupportLabels.value = new Set();
   }
   ElMessage.success('隐私预算已保存');
 }

@@ -5,6 +5,7 @@ import {
   sampleObservedValue,
   samplePriorValue
 } from './conditionDistributionPresets.js';
+import { appendSubmissionRecords } from './submissionStorage';
 
 export const TSP_DEMO_SAMPLE_COUNT = 500;
 
@@ -101,6 +102,5 @@ export function perturbTspStageTwo(stageTwoInput, params) {
 }
 
 export function appendTspSubmissionRecords(records) {
-  const storedData = JSON.parse(localStorage.getItem('submittedData') || '[]');
-  localStorage.setItem('submittedData', JSON.stringify([...storedData, ...records]));
+  appendSubmissionRecords(records);
 }
