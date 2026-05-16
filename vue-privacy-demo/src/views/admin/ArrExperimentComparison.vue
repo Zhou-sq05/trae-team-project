@@ -128,7 +128,6 @@
                     <template #header>
                       <div class="block-heading block-heading--compact">
                         <h3>分布估计结果对照</h3>
-                        <span>{{ distributionChartDescription }}</span>
                       </div>
                     </template>
                     <div ref="chartRef" class="chart-box chart-box--distribution"></div>
@@ -138,7 +137,6 @@
                     <template #header>
                       <div class="block-heading block-heading--compact">
                         <h3>误差明细表</h3>
-                        <span>{{ detailTableDescription }}</span>
                       </div>
                     </template>
                     <el-table :data="comparisonDetailRows" border style="width: 100%">
@@ -198,7 +196,6 @@ import { useTaskStore } from '../../store/task';
 import { useAttributeConfigStore } from '../../store/attributeConfig';
 import { getAggregateResults } from '../../services/taskAggregateMetricsService';
 import {
-  buildArrErrorMetrics,
   buildArrExperimentRows,
   getArrParams,
   getArrRecords
@@ -243,11 +240,11 @@ const isTspExperiment = computed(() => currentProtocol.value === 'TSP');
 const showTraditionalComparison = computed(() => !isTspExperiment.value);
 const comparisonRows = computed(() => buildComparisonRows());
 const comparisonDetailRows = computed(() => buildComparisonDetailRows());
-const newMSE = computed(() => average(comparisonDetailRows.value.map(row => row.newSquaredError)));
+const newMSE = computed(() => average(comparisonDetailRows.value.map(row => row.newSquaredFreqError)));
 const traditionalMSE = computed(() => average(
   comparisonDetailRows.value
-    .filter(row => row.traditionalSquaredError != null)
-    .map(row => row.traditionalSquaredError)
+    .filter(row => row.traditionalSquaredFreqError != null)
+    .map(row => row.traditionalSquaredFreqError)
 ));
 const improvementRate = computed(() => {
   const traditional = Number(traditionalMSE.value);
@@ -265,29 +262,19 @@ const betterOverallScheme = computed(() => {
 });
 const comparisonMetricCards = computed(() => {
   const cards = [
-    { label: '新方案 MSE', value: formatDetailNumber(newMSE.value), type: 'new' }
+    { label: '新方案频率 MSE', value: formatMseNumber(newMSE.value), type: 'new' }
   ];
   if (!showTraditionalComparison.value) {
     return cards;
   }
   return [
     ...cards,
-    { label: '传统方案 MSE', value: formatOptionalDetailNumber(traditionalMSE.value), type: 'traditional' },
+    { label: '传统方案频率 MSE', value: formatOptionalMseNumber(traditionalMSE.value), type: 'traditional' },
     { label: '误差下降', value: `${formatPercent(improvementRate.value)}%`, type: 'improvement' },
     { label: '当前更优方案', value: betterOverallScheme.value, type: 'best', isTag: true }
   ];
 });
 const hasTraditionalEstimate = computed(() => comparisonRows.value.some(row => row.traditionalEstimate != null));
-const distributionChartDescription = computed(() => (
-  showTraditionalComparison.value
-    ? '展示真实分布、新方案估计分布与传统方案估计分布的数值差异。'
-    : '展示真实分布与新方案估计分布的数值差异。'
-));
-const detailTableDescription = computed(() => (
-  showTraditionalComparison.value
-    ? '逐类展示真实值、估计偏差和更优方案。'
-    : '逐类展示真实值与新方案估计偏差。'
-));
 const chartConclusionText = computed(() => {
   if (!currentResult.value) {
     return '';
@@ -296,9 +283,9 @@ const chartConclusionText = computed(() => {
     return '';
   }
   if (traditionalMSE.value == null) {
-    return `当前任务暂未配置传统方案估计结果，仅展示新方案估计效果。新方案 MSE = ${formatDetailNumber(newMSE.value)}。`;
+    return `当前任务暂未配置传统方案估计结果，仅展示新方案估计效果。新方案频率 MSE = ${formatMseNumber(newMSE.value)}。`;
   }
-  return `当前任务下，新方案聚合估计结果更接近真实分布。新方案 MSE = ${formatDetailNumber(newMSE.value)}，传统方案 MSE = ${formatDetailNumber(traditionalMSE.value)}，误差下降约 ${formatPercent(improvementRate.value)}%。`;
+  return `当前任务下，新方案聚合估计结果更接近真实分布。新方案频率 MSE = ${formatMseNumber(newMSE.value)}，传统方案频率 MSE = ${formatMseNumber(traditionalMSE.value)}，误差下降约 ${formatPercent(improvementRate.value)}%。`;
 });
 const emptyText = computed(() => {
   if (!experimentTasks.value.length) {
@@ -511,6 +498,7 @@ function buildComparisonRows() {
 }
 
 function buildComparisonDetailRows() {
+  const sampleCount = getComparisonSampleCount(comparisonRows.value);
   return comparisonRows.value.map(row => {
     const referenceValue = Number(row.trueCount || 0);
     const newEstimate = Number(row.newEstimate || 0);
@@ -523,7 +511,11 @@ function buildComparisonDetailRows() {
     const traditionalAbsError = traditionalBias == null ? null : Math.abs(traditionalBias);
     const newSquaredError = Number((newBias ** 2).toFixed(6));
     const traditionalSquaredError = traditionalBias == null ? null : Number((traditionalBias ** 2).toFixed(6));
-    const betterScheme = traditionalSquaredError == null || newSquaredError <= traditionalSquaredError ? '新方案' : '传统方案';
+    const newFreqError = Number((newBias / sampleCount).toFixed(8));
+    const traditionalFreqError = traditionalBias == null ? null : Number((traditionalBias / sampleCount).toFixed(8));
+    const newSquaredFreqError = Number((newFreqError ** 2).toFixed(10));
+    const traditionalSquaredFreqError = traditionalFreqError == null ? null : Number((traditionalFreqError ** 2).toFixed(10));
+    const betterScheme = traditionalSquaredFreqError == null || newSquaredFreqError <= traditionalSquaredFreqError ? '新方案' : '传统方案';
     return {
       label: row.label,
       referenceValue,
@@ -532,13 +524,26 @@ function buildComparisonDetailRows() {
       newBias,
       newAbsError,
       newSquaredError,
+      newFreqError,
+      newSquaredFreqError,
       traditionalEstimate,
       traditionalBias,
       traditionalAbsError,
       traditionalSquaredError,
+      traditionalFreqError,
+      traditionalSquaredFreqError,
       betterScheme
     };
   });
+}
+
+function getComparisonSampleCount(rows = []) {
+  const explicitCount = Number(currentResult.value?.sampleCount);
+  if (Number.isFinite(explicitCount) && explicitCount > 0) {
+    return explicitCount;
+  }
+  const inferredCount = rows.reduce((sum, row) => sum + Number(row?.trueCount || 0), 0);
+  return Number.isFinite(inferredCount) && inferredCount > 0 ? inferredCount : 1;
 }
 
 function average(values) {
@@ -559,16 +564,15 @@ function calculateTraditionalMetrics() {
   if (!rows.length) {
     return null;
   }
-  const metrics = currentProtocol.value === 'ARR'
-    ? buildArrErrorMetrics(rows)
-    : [
-        {
-          label: '传统方案 MSE',
-          value: average(rows.map(row => Number(row.traditionalError || 0) ** 2))?.toFixed(4) ?? '--'
-        }
-      ];
+  const sampleCount = getComparisonSampleCount(rows);
+  const metrics = [
+    {
+      label: '传统方案频率 MSE',
+      value: average(rows.map(row => (Number(row.traditionalError || 0) / sampleCount) ** 2))?.toFixed(6) ?? '--'
+    }
+  ];
   return {
-    mse: metrics.find(item => item.label === '传统方案 MSE')?.value ?? '--'
+    mse: metrics.find(item => item.label === '传统方案频率 MSE')?.value ?? '--'
   };
 }
 
@@ -586,24 +590,25 @@ function buildMetricCards() {
   }
 
   const rows = comparisonRows.value;
+  const sampleCount = getComparisonSampleCount(rows);
   const newErrors = rows.map(row => Number(row.newError));
-  const newMse = average(newErrors.map(value => value ** 2));
+  const newMse = average(newErrors.map(value => (value / sampleCount) ** 2));
   const traditional = calculateTraditionalMetrics();
 
   const cards = [
     { label: '样本规模', value: String(currentResult.value.sampleCount || 0) },
     { label: '隐私预算 epsilon', value: String(currentResult.value.epsilon ?? '--') },
     { label: '扰动参数 p/q', value: formatParamCard() },
-    { label: '新方案 MSE', value: formatOptionalNumber(newMse) }
+    { label: '新方案频率 MSE', value: formatOptionalMseNumber(newMse) }
   ];
 
   if (traditional) {
     cards.push(
-      { label: '传统方案 MSE', value: traditional.mse }
+      { label: '传统方案频率 MSE', value: traditional.mse }
     );
   } else {
     cards.push(
-      { label: '传统方案 MSE', value: '--' }
+      { label: '传统方案频率 MSE', value: '--' }
     );
   }
 
@@ -798,6 +803,18 @@ function formatDetailNumber(value) {
 
 function formatOptionalDetailNumber(value) {
   return value == null ? '--' : formatDetailNumber(value);
+}
+
+function formatMseNumber(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '--';
+  }
+  return numeric.toFixed(6);
+}
+
+function formatOptionalMseNumber(value) {
+  return value == null ? '--' : formatMseNumber(value);
 }
 
 function formatSignedDetail(value) {

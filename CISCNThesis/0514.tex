@@ -13,22 +13,27 @@
 \email{}
 \yearinput{2026}
 \monthinput{5}
-\dayinput{15}
+\dayinput{16}
 
 \begin{document}
 \maketitle
 \newpage
+\setcounter{tocdepth}{2}
 \tableofcontents
 \newpage
 
 \begin{cnabstract}
 
-% 摘要内容待补充。
+随着智能手环和移动健康平台的普及，睡眠质量、步数、站立时长和异常提醒等行为数据逐渐成为群体健康分析的重要依据。然而，这类数据虽然表面上多为非敏感属性，仍可能通过统计相关性间接推断用户的心理健康、BMI 类别、代谢风险等敏感状态。针对健康手环数据采集中的间接隐私泄露问题，本文设计并实现了一套基于本地差分隐私的健康手环数据采集与聚合分析系统。
 
-\end{cnabstract}
+本作品以“原始数据不出端”为基本原则，在用户端完成数据编码、扰动和上传，在管理端完成任务配置、参数计算、聚合估计和误差分析。系统结合公开健康与行为数据集的统计规律，构造符合真实分布特征的测试数据，并针对二值属性、多值离散属性、高基数离散属性以及含缺失值的混合隐私风险字段，分别实现 ARR、AGRR、AOUE 和 TSP 四类本地差分隐私协议。与传统统一加噪方案相比，本作品引入敏感属性与非敏感属性之间的条件分布关系，通过内在不确定性度量对扰动参数进行重校准，使低风险场景减少不必要噪声，高风险场景保持充分隐私保护。
+
+测试结果表明，系统能够完成管理端任务配置、客户端本地扰动、多客户端批量上传、服务端聚合统计和误差可视化分析等完整流程。在 ARR、AGRR 和 AOUE 协议测试中，改进方案相较传统方案能够在多个场景下取得更接近真实分布的聚合估计结果；在 TSP 协议测试中，系统能够针对缺失值和有效评分值分别完成估计，体现出对混合隐私风险字段的适配能力。整体来看，本作品在本地差分隐私保护、健康手环场景建模和可部署系统实现之间形成了较完整的闭环。
+
 \cnkeywords{本地差分隐私；健康手环；隐私保护；聚合统计}
-\newpage
+\end{cnabstract}
 
+\clearpage
 \section{作品概述}
 
 \subsection{背景分析}
@@ -73,7 +78,7 @@
 
 本地差分隐私是一类适用于不可信聚合方场景的隐私保护技术。其基本思想是：用户不直接上传真实值，而是在本地设备上先通过随机机制进行扰动，再将扰动后的结果发送给平台。这样，即使平台后台不完全可信，也难以从单个上报值中确定用户真实输入。
 
-对任意两个可能输入 v₁、v₂ 以及任意输出集合 O，若随机机制 M 满足 Pr[M(v₁)∈O] ≤ e\textasciicircum{}ε·Pr[M(v₂)∈O]，则称该机制满足 ε-本地差分隐私。其中，ε 是隐私预算，ε 越小，隐私保护越强，扰动通常也越大。在随机响应类协议中，p 通常表示真实值被如实上报的概率，q 表示真实值被扰动为其他取值的概率。
+对任意两个可能输入 \(v_1\)、\(v_2\) 以及任意输出集合 \(O\)，若随机机制 \(M\) 满足 \(\Pr[M(v_1)\in O]\le e^{\varepsilon}\cdot \Pr[M(v_2)\in O]\)，则称该机制满足 \(\varepsilon\)-本地差分隐私。其中，\(\varepsilon\) 是隐私预算，\(\varepsilon\) 越小，隐私保护越强，扰动通常也越大。在随机响应类协议中，\(p\) 通常表示真实值被如实上报的概率，\(q\) 表示真实值被扰动为其他取值的概率。
 
 如果把健康手环中所有与敏感属性相关的非敏感属性 A 都简单地“当作完全敏感属性”处理，那么传统 LDP 可以提供保守的保护思路，但会带来明显效用损失。原因在于，传统参数设计通常主要依赖 ε 和属性域大小 d，而不显式区分 A 与 S 的实际相关性强弱。例如，睡眠时长状态与心理健康风险之间可能只有弱相关，攻击者本来就难以通过该字段推断 S；若仍按最坏情况强行加噪，会使平台获得的群体统计结果严重失真。
 
@@ -151,17 +156,18 @@ TSP & 两阶段扰动 & 混合隐私风险字段 & 夜间异常状况字段 & �
 
 因此，本作品的价值不仅在于完成一个健康手环隐私保护原型，更在于提供一种可迁移的设计思路：先识别非敏感采集属性 A 与敏感保护属性 S 的关系，再利用条件分布度量内在不确定性，最后根据具体数据类型选择合适的本地扰动和聚合方案。
 
+\clearpage
 \section{作品设计与实现}
 
 \subsection{作品系统总体架构}
 
 \subsubsection{设计目标}
 
-针对传统本地差分隐私（LDP）机制在收集与非敏感属性统计相关的属性时存在过度扰动、效用低下的问题，本作品设计并实现了一个基于内在不确定性的本地差分隐私演示系统。系统以健康手环数据采集为应用场景，主要实现的目标包括：
+针对传统本地差分隐私（LDP）机制在收集与非敏感属性统计相关的属性时存在过度扰动、效用低下的问题，本作品设计并实现了基于内在不确定性的健康手环数据采集与聚合分析系统。系统以健康手环数据采集为应用场景，主要实现的目标包括：
 
 隐私保护——通过ARR、AGRR、AOUE、TSP四种协议，对不同类型属性提供隐私保障
 
-效用优化——利用内在不确定性()动态校准扰动参数，降低噪声、提升收集方的数据可用性
+效用优化——利用内在不确定性动态校准扰动参数，降低噪声、提升收集方的数据可用性
 
 完整闭环——覆盖属性配置→策略下发→用户端采集→本地扰动→服务端聚合估计的全流程
 
@@ -169,7 +175,7 @@ TSP & 两阶段扰动 & 混合隐私风险字段 & 夜间异常状况字段 & �
 
 \subsubsection{作品实现的核心功能}
 
-本作品以健康手环数据采集为应用场景，在用户端收集用户是否触发睡眠异常提醒、日均站立时长、每日步数、睡眠质量评分等非敏感属性，计算其与年龄段、BMI等敏感属性的内在不确定性，利用ARR等协议对参数进行扰动，并在管理端对数据进行聚合攻击，分析比较聚合估计的效用并进行可视化演示交互。整个实现流程图如下。
+本作品以健康手环数据采集为应用场景，在用户端收集用户是否触发睡眠异常提醒、日均站立时长、每日步数、睡眠质量评分等非敏感属性，计算其与年龄段、BMI等敏感属性的内在不确定性，利用 ARR 等协议对上报数据进行本地扰动，并在管理端完成聚合估计、误差分析和可视化展示。整个实现流程图如下。
 
 \begin{figure}[htbp]
 \centering
@@ -474,9 +480,8 @@ q^{*}=p_1q_2+q_1p_2+(d-2)q_1q_2,
 
 用户端主要负责上传数据以及可视化扰动后的数据结果。用户可以根据在管理端发布的任务ID选择要上传的非敏感数据以及隐私保护系数等。用户选择完任务后，输入自己采集属性的值，并执行一次扰动，界面会显示出扰动后的结果（对于AOUE协议还会有逐比特向量翻转的过程）。扰动完成后可以选择上报结果，这样管理端就可以收到扰动后的结果并进行一系列的处理。此外，用户端还可以实现模拟演示多客户端数据上报，从而可以实现聚合，形成对比柱状图，比较参数，并分析效果。
 
+\clearpage
 \section{作品测试与分析}
-
-（建议包括测试方案、测试环境搭建、测试设备、测试数据、结果分析等）
 
 本章围绕作品的实际运行效果展开测试与分析。测试内容主要包括系统功能测试和隐私保护算法测试两部分：前者用于验证系统从用户登录、数据集配置、客户端扰动上传到管理端聚合展示的完整业务流程；后者用于验证 ARR、AOUE、AGRR 和 TSP 等本地差分隐私算法在不同测试场景下的扰动、上传与聚合效果。通过对功能完整性、聚合精度、隐私预算影响和系统稳定性的综合分析，可以较为全面地评价作品的可用性和实际应用价值。
 
@@ -578,8 +583,6 @@ S5 & 聚合结果展示与对比分析 & 管理端能够展示真实分布、估
 
 \subsubsection{总体流程设计}
 
-【插入-系统流程图】
-
 系统功能流程可以抽象为五个阶段。首先，管理端根据公开数据集估计得到的条件分布生成或加载测试样本；其次，系统根据测试需求选择协议、隐私预算和样本批次等任务参数；随后，客户端按照对应协议完成采集、编码、扰动和上报；接着，系统汇总多个客户端或多个样本批次的上传数据；最后，管理端对扰动数据进行聚合估计。为便于比赛演示和算法验证，系统在测试模式下展示真实分布、估计分布和误差对比结果，在正式应用中该部分仅用于内部评估，不作为实际采集流程的必要环节。
 
 \begin{table}[htbp]
@@ -669,7 +672,7 @@ ARR 协议主要用于二值事件型字段，例如夜间是否触发异常提�
   \centering
   \includegraphics[width=\linewidth]{figures/ARR-聚合.png}
   \\
-  {\small (c) 聚合结果}
+  {\small (b) 聚合结果}
 \end{minipage}
 \caption{ARR协议：多客户端上传与聚合结果展示}
 \end{figure}
@@ -747,7 +750,7 @@ AGRR 协议面向具有条件分布关系的多值属性。系统先根据公开
   \centering
   \includegraphics[width=\linewidth]{figures/AGRR-聚合.png}
   \\
-  {\small (c) 聚合结果}
+  {\small (b) 聚合结果}
 \end{minipage}
 \caption{AGRR协议：多客户端上传与聚合结果展示}
 \end{figure}
@@ -889,39 +892,39 @@ TSP 协议用于混合隐私风险场景，即同一字段中既可能包含直�
 
 \subsubsection{ARR聚合精度分析}
 
-ARR 协议对应二值事件型采集场景，本章以“是否触发睡眠异常提醒”等二值字段为例进行测试。由于该类字段只有两个取值，聚合结果的主要观察点是两个类别的估计数量是否接近真实数量，以及估计偏差是否相互抵消。测试页面中同时展示了真实分布、新方案估计分布和传统方案估计分布，可用于比较引入内在不确定性后的参数重校准是否提升统计精度。
+ARR 协议对应二值事件型采集场景，本章以“是否触发睡眠异常提醒”等二值字段为例进行测试。由于该类字段只有两个取值，聚合结果的主要观察点是两个类别的估计数量是否接近真实数量，以及估计偏差是否相互抵消。测试页面中同时展示了真实分布、改进方案估计分布和传统方案估计分布，可用于比较引入内在不确定性后的参数重校准是否提升统计精度。
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/ARR-聚合误差指标对比.png}
-\caption{ARR协议：聚合精度分析}
+\caption{ARR协议：聚合误差指标}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/ARR-真实分布与估计分布对比.png}
-\caption{ARR协议：真实分布与估计分布对比}
+\caption{ARR协议：真实分布与聚合估计对比}
 \end{figure}
 
-从误差评估结果可以看出，ARR 新方案的估计结果整体更接近真实分布。对于二值属性，一类上的高估通常会对应另一类上的低估，因此仅观察单个柱状图容易产生片面判断；结合 MAE 和误差明细表可以更直观地反映整体偏差大小。若新方案在两个类别上的偏差绝对值均小于或接近传统方案，且总体 MAE 更低，则说明根据 \(\alpha,\beta\) 重校准后的扰动参数在当前间接隐私场景中保留了更多统计可用性。
+从误差评估结果可以看出，ARR 改进方案的估计结果整体更接近真实分布。对于二值属性，一类上的高估通常会对应另一类上的低估，因此仅观察单个柱状图容易产生片面判断；结合 MAE 和误差明细表可以更直观地反映整体偏差大小。若改进方案在两个类别上的偏差绝对值均小于或接近传统方案，且总体 MAE 更低，则说明根据 \(\alpha,\beta\) 重校准后的扰动参数在当前间接隐私场景中保留了更多统计可用性。
 
 \subsubsection{AGRR聚合精度分析}
 
-AGRR 协议对应多值离散属性场景，例如站立时长分档、活动等级等。与 ARR 相比，AGRR 的属性域更大，扰动后的取值可能落入多个非真实类别，因此估计误差不仅体现在总体 MAE 上，也体现在不同类别之间的分布形态是否保持一致。测试时应重点观察高频类别是否能够被正确识别，低频类别是否出现明显虚高，以及新方案相较传统 GRR 是否减少了大幅偏差。
+AGRR 协议对应多值离散属性场景，例如站立时长分档、活动等级等。与 ARR 相比，AGRR 的属性域更大，扰动后的取值可能落入多个非真实类别，因此估计误差不仅体现在总体 MAE 上，也体现在不同类别之间的分布形态是否保持一致。测试时应重点观察高频类别是否能够被正确识别，低频类别是否出现明显虚高，以及改进方案相较传统 GRR 是否减少了大幅偏差。
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/AGRR-聚合误差指标对比.png}
-\caption{AGRR协议：聚合精度分析}
+\caption{AGRR协议：聚合误差指标}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/AGRR-真实分布与估计分布对比.png}
-\caption{AGRR协议：真实分布与估计分布对比}
+\caption{AGRR协议：真实分布与聚合估计对比}
 \end{figure}
 
-从 AGRR 的聚合结果看，新方案能够根据条件分布反映出的间接泄露风险调整 \(p\) 和 \(q\)，从而在满足隐私预算约束的同时减少不必要噪声。若图中真实分布与新方案估计分布的柱形走势基本一致，说明系统对多值属性的频数恢复较为稳定；若传统方案在某些类别上出现明显高估或低估，而新方案偏差较小，则可以说明内在不确定性参数对多值场景的统计精度具有改善作用。
+从 AGRR 的聚合结果看，改进方案能够根据条件分布反映出的间接泄露风险调整 \(p\) 和 \(q\)，从而在满足隐私预算约束的同时减少不必要噪声。若图中真实分布与改进方案估计分布的柱形走势基本一致，说明系统对多值属性的频数恢复较为稳定；若传统方案在某些类别上出现明显高估或低估，而改进方案偏差较小，则可以说明内在不确定性参数对多值场景的统计精度具有改善作用。
 
 \subsubsection{AOUE聚合精度分析}
 
@@ -930,16 +933,16 @@ AOUE 协议适用于步数分桶等取值域较大的离散属性。该协议先
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/AOUE-聚合误差指标对比.png}
-\caption{AOUE协议：聚合精度分析}
+\caption{AOUE协议：聚合误差指标}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/AOUE-真实分布与估计分布对比.png}
-\caption{AOUE协议：真实分布与估计分布对比}
+\caption{AOUE协议：真实分布与聚合估计对比}
 \end{figure}
 
-从 AOUE 的测试结果可以分析高基数场景下不同方案的稳定性。若新方案估计分布能够较好跟随真实分布的峰值位置和整体趋势，说明一元编码扰动后的聚合估计仍具备可用性。由于 AOUE 对每一位分别扰动，低频类别可能更容易受随机噪声影响，因此报告中不宜只强调某个类别的偏差，而应结合 MAE、MSE 和分布趋势综合判断。若新方案整体误差低于传统方案，则说明基于内在不确定性的参数设置能够缓解高基数属性下的估计波动。
+从 AOUE 的测试结果可以分析高基数场景下不同方案的稳定性。若改进方案估计分布能够较好跟随真实分布的峰值位置和整体趋势，说明一元编码扰动后的聚合估计仍具备可用性。由于 AOUE 对每一位分别扰动，低频类别可能更容易受随机噪声影响，因此报告中不宜只强调某个类别的偏差，而应结合 MAE、MSE 和分布趋势综合判断。若改进方案整体误差低于传统方案，则说明基于内在不确定性的参数设置能够缓解高基数属性下的估计波动。
 
 \subsubsection{TSP聚合精度分析}
 
@@ -948,10 +951,10 @@ TSP 协议用于包含缺失值或混合隐私风险的采集场景，例如睡�
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.92\linewidth]{figures/TSP-综合.png}
-\caption{TSP协议：真实分布与新方案估计结果对比}
+\caption{TSP协议：睡眠质量评分聚合估计结果}
 \end{figure}
 
-从 TSP 的测试结果可以观察缺失值类别和非缺失类别的估计差异。图中以真实分布作为参照，只展示新方案估计分布与真实值之间的偏差，不再设置传统方案对照。如果缺失值估计接近真实缺失数量，说明第二阶段统一扰动后的校正公式能够有效恢复缺失状态；如果非缺失评分分布与真实分布趋势一致，说明第一阶段对非缺失取值的扰动没有破坏主要统计特征。由于 TSP 同时处理直接隐私和间接隐私风险，其误差通常会受到缺失率、属性域大小和隐私预算共同影响，因此该协议更适合存在缺失机制或混合敏感性的字段。
+从 TSP 的测试结果可以观察缺失值类别和非缺失类别的估计差异。图中以真实分布作为参照，只展示改进方案估计分布与真实值之间的偏差，不再设置传统方案对照。如果缺失值估计接近真实缺失数量，说明第二阶段统一扰动后的校正公式能够有效恢复缺失状态；如果非缺失评分分布与真实分布趋势一致，说明第一阶段对非缺失取值的扰动没有破坏主要统计特征。由于 TSP 同时处理直接隐私和间接隐私风险，其误差通常会受到缺失率、属性域大小和隐私预算共同影响，因此该协议更适合存在缺失机制或混合敏感性的字段。
 
 \subsubsection{改进方案与传统方案对比}
 
@@ -979,7 +982,7 @@ TSP 协议用于包含缺失值或混合隐私风险的采集场景，例如睡�
   \\
   {\small (c) AOUE}
 \end{minipage}
-\caption{改进方案与传统方案的分布估计结果对比}
+\caption{改进方案与传统方案的聚合估计对比}
 \label{fig:scheme-comparison}
 \end{figure}
 从对比结果可以看出，改进方案的估计分布整体更接近真实分布，传统方案在部分类别上容易出现高估或低估。其原因在于传统方案通常只依据统一隐私预算进行扰动，而改进方案进一步利用敏感属性与非敏感属性之间的条件关系，对扰动参数进行重校准，使低风险取值减少不必要噪声，高风险取值维持更充分的扰动保护。该结果说明，本作品并不是单纯追求较小扰动，而是在隐私保护约束下提高聚合统计的可用性。
@@ -1010,6 +1013,7 @@ TSP & 缺失值或混合隐私风险字段 & 缺失比例估计、非缺失分�
 从可用性角度看，系统将复杂的条件分布估计、参数重校准和无偏聚合计算封装在管理端和算法模块中，用户端只需要选择任务、输入或模拟采集值并执行扰动上传。这种设计降低了使用门槛，也便于在比赛展示中说明每一步的隐私保护含义。综合功能流程和误差评估结果，系统能够较完整地展示健康手环数据在本地差分隐私保护下的采集、扰动、聚合和分析过程。
 
 
+\clearpage
 \section{创新性说明}
 
 本章围绕“风险如何度量、协议如何设计、系统如何落地”三个层次说明作品创新性。与专利说明书中的通用流程不同，本章以健康手环系统为表达对象，说明内在不确定性、本地扰动、参数重校准和混合隐私防护如何具体服务于睡眠、活动和夜间异常监测数据的隐私保护。
@@ -1139,11 +1143,67 @@ TSP & 两阶段扰动 & 夜间异常状况等混合字段 & 先区分泄露模�
 
 与简单照搬传统 LDP 或把所有字段视为完全敏感相比，本作品更强调“在满足隐私要求的前提下减少不必要噪声”。它既保留了本地差分隐私“原始数据不出端”的基本优势，也利用健康手环数据中的条件相关性提升统计效用，为可穿戴设备、智能家居、电商平台、车联网等相似场景提供了可迁移的设计思路。
 
+\clearpage
 \section{总结}
+
+本文围绕健康手环数据采集中的间接隐私泄露问题，设计并实现了一套基于本地差分隐私的健康手环数据采集与聚合分析系统。系统以“原始数据不出端”为基本原则，将用户端本地扰动、服务端参数计算、聚合校正和误差可视化结合起来，形成从数据建模、任务配置、客户端采集到结果分析的完整流程。
+
+在算法设计方面，本文没有简单地将所有采集字段都视为同等敏感，而是根据非敏感属性 $A$ 与敏感属性 $S$ 之间的条件分布关系，引入内在不确定性度量，对扰动参数进行重校准。针对不同数据形态，系统分别实现 ARR、AGRR、AOUE 和 TSP 四类协议：ARR 用于二值事件型字段，AGRR 用于多值离散字段，AOUE 用于高基数离散字段，TSP 用于存在缺失值或混合隐私风险的字段。该设计使系统能够根据字段类型和推断风险选择更合适的本地差分隐私机制。
+
+在系统实现方面，本文完成了管理端任务配置、公开数据分布参考、客户端本地采集与扰动、多客户端批量上传、服务端聚合估计和误差评估展示等功能。测试结果表明，系统能够稳定完成多协议数据采集与聚合流程；在 ARR、AGRR 和 AOUE 协议中，结合内在不确定性重校准后的方案相较传统基线能够在多个测试场景中获得更接近真实分布的估计结果；在 TSP 协议中，系统能够对缺失状态和有效评分值进行统一建模与估计，体现出对混合隐私风险数据的适配能力。
+
+当然，本文仍存在可以继续完善的方向。首先，当前条件分布主要依据公开数据集和模拟场景估计得到，后续可以结合更大规模、更多来源的真实健康数据对分布参数进行持续校准。其次，系统目前主要关注频数估计和分布恢复，后续可进一步扩展到均值估计、趋势分析和时序健康行为分析等任务。最后，系统可以进一步完善客户端性能评估和隐私预算推荐策略，使其更接近真实可穿戴设备和移动健康平台的部署需求。
+
+总体而言，本作品将本地差分隐私、间接隐私风险建模和健康手环数据采集场景结合起来，在保证原始数据不出端的前提下，提高了群体统计分析的可用性。该系统不仅验证了多类本地差分隐私协议在健康数据场景中的适配方式，也为可穿戴设备、移动健康平台和其他存在间接隐私泄露风险的数据采集系统提供了一种可参考的设计思路。
 
 \begin{thebibliography}{99}
 
-\bibitem{ref1}李建华.网络空间威胁情报感知、共享与分析技术综述[J] .网络与信息安全学报，2016, Vol. 2(2): 16-29. （样例，参考国标GB/T7714-2015）
+\bibitem{sun2023ldp}孙一帆, 张锐, 陶杨, 高碧柔, 秦诗涵, 安超. 本地化差分隐私综述[J]. 数据与计算发展前沿, 2023, 5(5): 74-97.
+
+\bibitem{wang2020survey}Wang T, Zhang X, Feng J, Yang X. A comprehensive survey on local differential privacy toward data statistics and analysis[J]. Sensors, 2020, 20(24): Article 7030.
+
+\bibitem{yang2024ldp}Yang M, Guo T, Zhu T, Tjuawinata I, Zhao J, Lam K Y. Local differential privacy and its applications: A comprehensive survey[J]. Computer Standards \& Interfaces, 2024, 89: 103827.
+
+\bibitem{fu2019dp}付钰, 俞艺涵, 吴晓平. 大数据环境下差分隐私保护技术及应用[J]. 通信学报, 2019, 40(10): 157-168.
+
+\bibitem{zhao2023dp}赵禹齐, 杨敏. 差分隐私研究进展综述[J]. 计算机科学, 2023, 50(4): 265-276.
+
+\bibitem{unsal2023itdp}Ünsal A, Önen M. Information-theoretic approaches to differential privacy[J]. ACM Computing Surveys, 2023, 56(3): Article 76.
+
+\bibitem{wang2019multidimensional}Wang N, Xiao X, Yang Y, Zhao J, Hui S C, Shin H, Shin J, Yu G. Collecting and analyzing multidimensional data with local differential privacy[C]//2019 IEEE 35th International Conference on Data Engineering. IEEE, 2019: 638-649.
+
+\bibitem{murakami2019utility}Murakami T, Kawamoto Y. Utility-optimized local differential privacy mechanisms for distribution estimation[C]//28th USENIX Security Symposium. Berkeley: USENIX Association, 2019: 1877-1894.
+
+\bibitem{murakami2023budget}Murakami T, Sei Y. Automatic tuning of privacy budgets in input-discriminative local differential privacy[J]. IEEE Internet of Things Journal, 2023, 10(18): 15990-16005.
+
+\bibitem{kuang2025relaxed}
+Kuang X, Zhu Y, Liu R, Zhang S. Frequency estimation under relaxed input-discriminative local differential privacy[J]. Information Sciences, 2025, 718: 122351.
+
+\bibitem{zheng2025jrr}
+Zheng Y, Seeam S R, Hu Y, Zhang R, Zhang Y. Locally differentially private frequency estimation via joint randomized response[J]. Proceedings on Privacy Enhancing Technologies, 2025, 2025(3): 242-260.
+
+\bibitem{fang2025frequency}
+Fang H, Chen L, Liu S. Further study on frequency estimation under local differential privacy[C]//34th USENIX Security Symposium. Berkeley: USENIX Association, 2025: 2771-2787.
+
+\bibitem{raab2025sok}
+Raab R, Berrang P, Gerhart P, Schröder D. SoK: Descriptive statistics under local differential privacy[J]. Proceedings on Privacy Enhancing Technologies, 2025, 2025(1): 118-149.
+
+\bibitem{jiang2023dp2pub}Jiang H, Yu H, Cheng X, Pei J, Pless R, Yu J. DP2-Pub: Differentially private high-dimensional data publication with invariant post randomization[J]. IEEE Transactions on Knowledge and Data Engineering, 2023, 35(10): 10831-10844.
+
+\bibitem{zhang2023privpj}Zhang H, Li K, Huang T, Zhang X, Li W, Jin Z, Gao F, Gao M. Publishing locally private high-dimensional synthetic data efficiently[J]. Information Sciences, 2023, 633: 343-356.
+
+\bibitem{li2026graph}
+Li K, Zhang H, Li J, Ma X, Li Q, Xu Y, Yan Y. A publishing scheme for high-dimensional graph data under personalized local differential privacy[J]. Neurocomputing, 2026, 664: 132082.
+
+\bibitem{wang2023iomt}Wang J, Li X. Secure medical data collection in the Internet of Medical Things based on local differential privacy[J]. Electronics, 2023, 12(2): Article 307.
+
+\bibitem{powell2023wearables}Powell D, Godfrey A. Considerations for integrating wearables into the everyday healthcare practice[J]. npj Digital Medicine, 2023, 6: Article 70.
+
+\bibitem{dobson2023wearables}Dobson R, Stowell M, Warren J, Tane T, Ni L, Gu Y, McCool J, Whittaker R. Use of consumer wearables in health research: Issues and considerations[J]. Journal of Medical Internet Research, 2023, 25: Article e52444.
+
+\bibitem{nhanes2020}National Center for Health Statistics. NHANES 2017-March 2020 Pre-pandemic Data Files[DS/OL]. 2021[2026-05-16]. \url{https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020}.
+
+\bibitem{kaggle_sleep}Kaggle. Sleep, Health, and Lifestyle Dataset[DS/OL]. [2026-05-16]. \url{https://www.kaggle.com/datasets/henryshan/sleep-health-and-lifestyle}.
 
 \end{thebibliography}
 

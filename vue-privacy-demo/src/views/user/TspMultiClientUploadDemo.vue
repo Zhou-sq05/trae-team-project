@@ -24,9 +24,9 @@
         <template #header>
           <div class="page-header">
             <div>
-              <div class="page-title">演示：TSP 多客户端上报</div>
+              <div class="page-title">TSP 多客户端上报</div>
               <div class="page-desc">
-                本页面为答辩演示用的 TSP 多客户端模拟器。由于演示环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟 500 个客户端分别完成一次 TSP 本地采集、客户端本地编码、两阶段扰动与最终上报。
+                本页面为答辩用的 TSP 多客户端模拟器。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟 500 个客户端分别完成一次 TSP 本地采集、客户端本地编码、两阶段扰动与最终上报。
                 表格中的本地采集值和本地编码状态仅用于展示客户端本地处理过程，不代表服务器或管理员能够获得用户原始数据；真实系统中服务器只接收最终扰动后的上传值。
               </div>
             </div>
@@ -111,7 +111,6 @@
           <el-button type="primary" plain :disabled="!selectedTask" @click="completeAllSteps">
             一键完成
           </el-button>
-          <el-button @click="resetDemo">重置演示</el-button>
         </section>
 
         <el-alert
@@ -155,7 +154,7 @@
         </section>
 
         <div class="page-actions">
-          <el-button @click="goToUserDevice">返回单用户上报演示</el-button>
+          <el-button @click="goToUserDevice">返回单用户上报</el-button>
         </div>
       </el-card>
     </main>

@@ -366,11 +366,11 @@ Just choose `xelatex', no `pdflatex' or `latex' and so on.}
   \thispagestyle{empty}
   \vspace{2.1cm}
   \begin{center}
-  	{\zihao{1}\heiti \textbf{2022年全国大学生信息安全竞赛} \par}%
+  	{\zihao{1}\heiti \textbf{山东大学网络安全创新竞赛} \par}%
   	{\zihao{1}\heiti \textbf{作品报告} \par}%
   	\vspace{6.2cm}
   	{\zihao{3}\heiti \textbf{作品名称：\fontsize{13pt}{\baselineskip}\selectfont \uline{\hfill \mcm@tokens@titlename \hfill}} \par}%
-  	{\zihao{3}\heiti \textbf{电子邮箱：\uline{\hfill \mcm@tokens@email \hfill}} \par}%
+  	%{\zihao{3}\heiti \textbf{电子邮箱：\uline{\hfill \mcm@tokens@email \hfill}} \par}%
   	{\zihao{3}\heiti \textbf{提交日期：\uline{\hfill \mcm@tokens@yearinput.\mcm@tokens@monthinput.\mcm@tokens@dayinput \hfill}} \par}%
 
   \end{center}

@@ -147,7 +147,7 @@
             plain
             @click="goToArrMultiClientDemo"
           >
-            演示：ARR 多客户端采集
+            ARR 多客户端采集
           </el-button>
           <el-button
             v-if="currentTaskDetail?.scenario === 'agrr'"
@@ -155,7 +155,7 @@
             plain
             @click="goToAgrrMultiClientDemo"
           >
-            演示：AGRR 多客户端采集
+            AGRR 多客户端采集
           </el-button>
           <el-button
             v-if="currentTaskDetail?.scenario === 'aoue'"
@@ -163,7 +163,7 @@
             plain
             @click="goToAoueMultiClientDemo"
           >
-            演示：AOUE 多客户端采集
+            AOUE 多客户端采集
           </el-button>
           <el-button
             v-if="currentTaskDetail?.scenario === 'tsp'"
@@ -171,14 +171,14 @@
             plain
             @click="goToTspMultiClientDemo"
           >
-            演示：TSP 多客户端采集
+            TSP 多客户端采集
           </el-button>
           <el-button @click="goToDashboard">返回首页</el-button>
         </div>
       </div>
 
       <div class="right-section">
-        <h3>演示调试区域</h3>
+        <h3>调试区域</h3>
         <template v-if="['arr', 'agrr', 'aoue', 'tsp'].includes(currentTaskDetail?.scenario)">
           <template v-if="true">
             <template v-if="currentTaskDetail?.scenario === 'aoue'">
@@ -384,9 +384,6 @@
                     <div class="card-label">{{ item.label }}</div>
                     <div class="card-value">{{ item.value }}</div>
                   </div>
-                </div>
-                <div v-if="currentPerturbationStatus" class="perturbation-status-banner" :class="`is-${currentPerturbationStatus.statusKey}`">
-                  <div class="perturbation-status-title">{{ currentPerturbationStatus.title }}</div>
                 </div>
                 <div v-if="(currentTaskDetail?.scenario === 'arr' && !arrParametersReady) || (currentTaskDetail?.scenario === 'agrr' && !agrrParametersReady)" class="preview-tip">
                   当前任务尚未在管理端完成 {{ currentTaskDetail?.protocol }} 参数保存，暂时无法执行本地扰动。
@@ -1350,8 +1347,10 @@ const tspStageOneMainCards = computed(() => [
 
 const tspStageOneMetaCards = computed(() => [
   { label: '第一阶段值域', value: 'd = 5，对应 {1,2,3,4,5}' },
-  { label: '参数 p1', value: tspParametersReady.value ? tspConfigParams.value.p1.toFixed(4) : '--' },
-  { label: '参数 q1', value: tspParametersReady.value ? tspConfigParams.value.q1.toFixed(4) : '--' }
+  {
+    label: '第一阶段参数',
+    value: tspParametersReady.value ? `p1=${tspConfigParams.value.p1.toFixed(4)}，q1=${tspConfigParams.value.q1.toFixed(4)}` : '--'
+  }
 ]);
 
 const tspStageTwoMainCards = computed(() => [
@@ -1361,8 +1360,10 @@ const tspStageTwoMainCards = computed(() => [
 
 const tspStageTwoMetaCards = computed(() => [
   { label: '第二阶段值域', value: 'd + 1 = 6，对应 {0,1,2,3,4,5}' },
-  { label: '参数 p2', value: tspParametersReady.value ? tspConfigParams.value.p2.toFixed(4) : '--' },
-  { label: '参数 q2', value: tspParametersReady.value ? tspConfigParams.value.q2.toFixed(4) : '--' }
+  {
+    label: '第二阶段参数',
+    value: tspParametersReady.value ? `p2=${tspConfigParams.value.p2.toFixed(4)}，q2=${tspConfigParams.value.q2.toFixed(4)}` : '--'
+  }
 ]);
 
 const tspPendingReportValue = computed(() => (
@@ -3933,10 +3934,6 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
   gap: 12px;
   align-items: stretch;
-}
-
-.tsp-stage-layout {
-  align-items: start;
 }
 
 .tsp-stage-main {
