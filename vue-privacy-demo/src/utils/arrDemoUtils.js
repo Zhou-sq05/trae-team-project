@@ -1,4 +1,4 @@
-import { ARR, aggregateARR, calculateARRParameters } from './ldpAlgorithms';
+﻿import { ARR, aggregateARR, calculateARRParameters } from './ldpAlgorithms';
 import {
   CONDITION_DISTRIBUTION_KEYS,
   sampleObservedValue
@@ -6,7 +6,7 @@ import {
 import { appendSubmissionRecords, readSubmittedData } from './submissionStorage';
 
 export const ARR_LABELS = ['未触发提醒', '触发提醒'];
-export const ARR_DEMO_SAMPLE_COUNT = 500;
+export const ARR_DEMO_SAMPLE_COUNT = 2000;
 
 export function getArrLabel(value) {
   return Number(value) === 1 ? ARR_LABELS[1] : ARR_LABELS[0];
@@ -195,3 +195,4 @@ export function buildArrErrorMetrics(rows) {
     { label: '传统方案频率 MSE', value: average(traditionalSquaredErrors).toFixed(6) }
   ];
 }
+

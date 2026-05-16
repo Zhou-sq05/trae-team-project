@@ -1,9 +1,0 @@
-data/raw/
-.history/
-src/our_method/correlation_perturbation/AGRR_slow.py
-src/our_method/correlation_perturbation/ARR_slow.py
-src/our_method/correlation_perturbation/AOUE_slow.py
-figures/theoretical_TSP_abc.eps
-figures/theoretical_TSP_de.eps
-eval/visualization/theoretical_TSP_abc.m
-eval/visualization/theoretical_TSP_de.m

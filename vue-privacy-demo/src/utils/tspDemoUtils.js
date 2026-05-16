@@ -1,4 +1,4 @@
-import { applyTSP, tspFirstPerturb, tspSecondPerturb } from './ldpAlgorithms';
+﻿import { applyTSP, tspFirstPerturb, tspSecondPerturb } from './ldpAlgorithms';
 import { resolveTspTaskConfig } from './tspProtocol.js';
 import {
   CONDITION_DISTRIBUTION_KEYS,
@@ -7,7 +7,7 @@ import {
 } from './conditionDistributionPresets.js';
 import { appendSubmissionRecords } from './submissionStorage';
 
-export const TSP_DEMO_SAMPLE_COUNT = 500;
+export const TSP_DEMO_SAMPLE_COUNT = 2000;
 
 const QUALITY_SCORE_MAP = {
   评分1: 1,
@@ -104,3 +104,4 @@ export function perturbTspStageTwo(stageTwoInput, params) {
 export function appendTspSubmissionRecords(records) {
   appendSubmissionRecords(records);
 }
+

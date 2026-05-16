@@ -1,4 +1,4 @@
-import { Encode, calculateAOUEParameters, perturbAOUEWithDetails } from './ldpAlgorithms';
+﻿import { Encode, calculateAOUEParameters, perturbAOUEWithDetails } from './ldpAlgorithms';
 import { STEP_BUCKET_ORDER } from './constants';
 import {
   CONDITION_DISTRIBUTION_KEYS,
@@ -10,7 +10,7 @@ import {
 } from './stepsBuckets';
 import { appendSubmissionRecords } from './submissionStorage';
 
-export const AOUE_DEMO_SAMPLE_COUNT = 500;
+export const AOUE_DEMO_SAMPLE_COUNT = 2000;
 
 export function isAoueTask(task) {
   const attribute = task?.attributes?.[0];
@@ -98,3 +98,4 @@ export function formatAoueTransitions(bitSteps = []) {
 export function appendAoueSubmissionRecords(records) {
   appendSubmissionRecords(records);
 }
+

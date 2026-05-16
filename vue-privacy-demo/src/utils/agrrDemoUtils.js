@@ -1,4 +1,4 @@
-import { AGRR, calculateAGRParameters } from './ldpAlgorithms';
+﻿import { AGRR, calculateAGRParameters } from './ldpAlgorithms';
 import { STAND_BUCKET_ORDER } from './constants';
 import {
   CONDITION_DISTRIBUTION_KEYS,
@@ -10,7 +10,7 @@ import {
 } from './standDurationBuckets';
 import { appendSubmissionRecords } from './submissionStorage';
 
-export const AGRR_DEMO_SAMPLE_COUNT = 500;
+export const AGRR_DEMO_SAMPLE_COUNT = 2000;
 
 export function isAgrrTask(task) {
   const attribute = task?.attributes?.[0];
@@ -81,3 +81,4 @@ export function formatAgrrCode(value) {
 export function appendAgrrSubmissionRecords(records) {
   appendSubmissionRecords(records);
 }
+

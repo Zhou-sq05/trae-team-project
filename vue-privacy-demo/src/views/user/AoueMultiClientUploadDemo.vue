@@ -25,7 +25,7 @@
             <div>
               <div class="page-title">AOUE 多客户端上报</div>
               <div class="page-desc">
-                本页面为答辩用的 AOUE 多客户端模拟器。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟 500 个客户端分别完成一次 AOUE 本地采集、初始编码向量生成、逐位随机扰动与上报。
+                本页面为答辩用的 AOUE 多客户端模拟器。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟 2000 个客户端分别完成一次 AOUE 本地采集、初始编码向量生成、逐位随机扰动与上报。
                 表格中的本地采集值和初始编码向量仅用于展示客户端的本地扰动过程，不代表服务器或管理员能够获得用户原始数据；真实系统中服务器只接收扰动后的编码向量。
               </div>
             </div>
@@ -58,7 +58,7 @@
           </div>
           <div class="summary-item">
             <span>样本规模</span>
-            <strong>500 个客户端各上报一次</strong>
+            <strong>2000 个客户端各上报一次</strong>
           </div>
         </div>
         <el-empty v-else description="暂无 AOUE 任务，请先在管理端属性配置页下发 AOUE 场景" />
@@ -86,7 +86,7 @@
 
         <section class="step-actions">
           <el-button type="primary" :disabled="!selectedTask || isAnimating" @click="startClientStartup">
-            启动 500 个客户端
+            启动 2000 个客户端
           </el-button>
           <el-button :disabled="!canEncode" @click="startLocalEncoding">
             客户端生成初始编码向量
@@ -103,7 +103,6 @@
           <el-button type="primary" plain :disabled="!selectedTask" @click="completeAllSteps">
             一键完成
           </el-button>
-          <el-button @click="resetDemo">重置演示</el-button>
         </section>
 
         <el-alert
@@ -124,28 +123,27 @@
             <span>共 {{ simulationRows.length }} 条，批次 ID：{{ batchId || '待生成' }}</span>
           </div>
 
-          <el-table
-            ref="tableRef"
-            :data="simulationRows"
-            :row-class-name="getRowClassName"
-            height="560"
-            border
-            style="width: 100%"
-            empty-text="请先启动 500 个客户端"
-          >
-            <el-table-column prop="userNo" label="客户端编号" width="150" />
-            <el-table-column prop="rawDisplay" label="客户端本地采集值" min-width="220" />
-            <el-table-column prop="encodedVectorDisplay" label="初始编码向量" min-width="210" />
-            <el-table-column prop="aoueTransition" label="AOUE 扰动结果" min-width="240" />
-            <el-table-column prop="uploadedVectorDisplay" label="扰动后上传向量" min-width="210" />
-            <el-table-column prop="uploadStatus" label="上报状态" width="120">
-              <template #default="scope">
-                <el-tag :type="scope.row.uploadStatus === '已上报' ? 'success' : 'info'">
-                  {{ scope.row.uploadStatus }}
-                </el-tag>
+          <div class="client-table-v2-shell">
+            <el-auto-resizer>
+              <template #default="{ width, height }">
+                <el-table-v2
+                  v-if="simulationRows.length > 0"
+                  :columns="tableColumns"
+                  :data="simulationRows"
+                  :width="width"
+                  :height="height"
+                  :row-height="48"
+                  :header-height="48"
+                  row-key="userNo"
+                  :row-class="getRowClassName"
+                  fixed
+                  scrollbar-always-on
+                  class="client-table-v2"
+                />
+                <div v-else class="client-table-empty">请先启动 2000 个客户端</div>
               </template>
-            </el-table-column>
-          </el-table>
+            </el-auto-resizer>
+          </div>
         </section>
 
         <div class="page-actions">
@@ -157,9 +155,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElTag } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 import { useUserStore } from '../../store/user';
 import { useTaskStore } from '../../store/task';
@@ -180,7 +178,7 @@ import {
 const FLOW_STEPS = [
   {
     title: '启动客户端',
-    description: '模拟 500 个客户端各自完成一次每日步数本地采集'
+    description: '模拟 2000 个客户端各自完成一次每日步数本地采集'
   },
   {
     title: '生成初始编码向量',
@@ -213,24 +211,24 @@ const STAGE_STEP = {
 const STAGE_TEXT = {
   [STAGES.START]: {
     running: '正在接入客户端',
-    done: '已启动 500 个客户端，可继续生成初始编码向量。'
+    done: '已启动 2000 个客户端，可继续生成初始编码向量。'
   },
   [STAGES.ENCODE]: {
     running: '正在生成初始编码向量',
-    done: '已完成 500 个客户端初始编码向量生成。'
+    done: '已完成 2000 个客户端初始编码向量生成。'
   },
   [STAGES.PERTURB]: {
     running: '正在执行 AOUE 逐位扰动',
-    done: '已完成 500 个客户端 AOUE 扰动。'
+    done: '已完成 2000 个客户端 AOUE 扰动。'
   },
   [STAGES.UPLOAD]: {
     running: '正在上传扰动后编码向量',
-    done: '已模拟 500 个客户端分别完成一次 AOUE 本地扰动上报。'
+    done: '已模拟 2000 个客户端分别完成一次 AOUE 本地扰动上报。'
   }
 };
 
 const ANIMATION_INTERVAL_MS = 150;
-const ANIMATION_BATCH_SIZE = 5;
+const ANIMATION_BATCH_SIZE = 20;
 const HIGHLIGHT_MS = 560;
 
 const router = useRouter();
@@ -258,6 +256,43 @@ const isAnimating = computed(() => Boolean(activeStage.value));
 const canEncode = computed(() => !isAnimating.value && completedStep.value === 1);
 const canPerturb = computed(() => !isAnimating.value && completedStep.value === 2);
 const canUpload = computed(() => !isAnimating.value && completedStep.value === 3);
+
+function renderTextCell({ cellData }) {
+  const text = cellData ?? '';
+  return h('span', { class: 'client-table-v2-text', title: String(text) }, String(text));
+}
+
+function renderStatusCell({ rowData }) {
+  const status = rowData.uploadStatus || '';
+  return h(ElTag, { type: status === '已上报' ? 'success' : 'info' }, () => status);
+}
+
+function createTextColumn(key, title, width) {
+  return {
+    key,
+    dataKey: key,
+    title,
+    width,
+    cellRenderer: renderTextCell
+  };
+}
+
+const tableColumns = [
+  createTextColumn('userNo', '客户端编号', 150),
+  createTextColumn('rawDisplay', '客户端本地采集值', 300),
+  createTextColumn('encodedVectorDisplay', '初始编码向量', 260),
+  createTextColumn('aoueTransition', 'AOUE 扰动结果', 360),
+  createTextColumn('uploadedVectorDisplay', '扰动后上传向量', 280),
+  {
+    key: 'uploadStatus',
+    dataKey: 'uploadStatus',
+    title: '上报状态',
+    width: 160,
+    cellRenderer: renderStatusCell
+  }
+];
+
+
 const flowSteps = computed(() => FLOW_STEPS.map((step, index) => {
   const stepNo = index + 1;
   const activeStep = STAGE_STEP[activeStage.value] || 0;
@@ -302,20 +337,7 @@ function createClientRow(index) {
   };
 }
 
-function scrollTableToIndex(index) {
-  nextTick(() => {
-    const wrapper = tableRef.value?.$el?.querySelector?.('.el-scrollbar__wrap');
-    if (wrapper) {
-      if (index <= 0) {
-        wrapper.scrollTo({ top: 0, behavior: 'auto' });
-      }
-      return;
-    }
-    if (index <= 0 && typeof tableRef.value?.setScrollTop === 'function') {
-      tableRef.value.setScrollTop(0);
-    }
-  });
-}
+function scrollTableToIndex() {}
 
 function markRows(startIndex, endIndex) {
   const marked = simulationRows.value
@@ -331,8 +353,8 @@ function markRows(startIndex, endIndex) {
   }, HIGHLIGHT_MS);
 }
 
-function getRowClassName({ row }) {
-  return highlightedRows.value.includes(row.userNo) ? 'is-row-active' : '';
+function getRowClassName({ rowData }) {
+  return highlightedRows.value.includes(rowData.userNo) ? 'is-row-active' : '';
 }
 
 function replaceRows(startIndex, endIndex, updater) {
@@ -380,7 +402,7 @@ function finishStage(onComplete) {
   activeStage.value = '';
   stageProgress.value = AOUE_DEMO_SAMPLE_COUNT;
   progressNotice.value = stage === STAGES.UPLOAD
-    ? '已完成 500 个客户端的 AOUE 本地扰动上报'
+    ? '已完成 2000 个客户端的 AOUE 本地扰动上报'
     : STAGE_TEXT[stage]?.done || '';
   onComplete?.();
 }
@@ -480,7 +502,12 @@ function startClientStartup() {
 
   resetDemo();
   batchId.value = createBatchId();
-  runStage(STAGES.START, appendClientRows);
+  appendClientRows(0, AOUE_DEMO_SAMPLE_COUNT);
+  completedStep.value = STAGE_STEP[STAGES.START];
+  stageProgress.value = AOUE_DEMO_SAMPLE_COUNT;
+  progressNotice.value = STAGE_TEXT[STAGES.START].done;
+  currentBatchText.value = `已一次性接入客户端 001—${String(AOUE_DEMO_SAMPLE_COUNT).padStart(3, '0')}`;
+  markRows(Math.max(AOUE_DEMO_SAMPLE_COUNT - ANIMATION_BATCH_SIZE, 0), AOUE_DEMO_SAMPLE_COUNT);
 }
 
 function startLocalEncoding() {
@@ -556,7 +583,7 @@ function completeAllSteps() {
   completedStep.value = 4;
   activeStage.value = '';
   stageProgress.value = AOUE_DEMO_SAMPLE_COUNT;
-  progressNotice.value = '已一键完成 500 个客户端的 AOUE 本地扰动上报。';
+  progressNotice.value = '已一键完成 2000 个客户端的 AOUE 本地扰动上报。';
   currentBatchText.value = `一键完成：客户端 001—${String(AOUE_DEMO_SAMPLE_COUNT).padStart(3, '0')}`;
   markRows(Math.max(AOUE_DEMO_SAMPLE_COUNT - ANIMATION_BATCH_SIZE, 0), AOUE_DEMO_SAMPLE_COUNT);
   persistSubmissionRecords();
@@ -858,6 +885,35 @@ onUnmounted(() => {
   color: #64748b;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+.client-table-v2-shell {
+  width: 100%;
+  height: 560px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.client-table-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  background: #fff;
+}
+
+.client-table-v2-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.client-table-v2 .el-table-v2__row.is-row-active) {
+  background: #fff7ed !important;
+  transition: background 0.6s ease;
 }
 
 :deep(.el-table__row.is-row-active > td) {

@@ -26,7 +26,7 @@
             <div>
               <div class="page-title">TSP 多客户端上报</div>
               <div class="page-desc">
-                本页面为答辩用的 TSP 多客户端模拟器。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟 500 个客户端分别完成一次 TSP 本地采集、客户端本地编码、两阶段扰动与最终上报。
+                本页面为答辩用的 TSP 多客户端模拟器。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟 2000 个客户端分别完成一次 TSP 本地采集、客户端本地编码、两阶段扰动与最终上报。
                 表格中的本地采集值和本地编码状态仅用于展示客户端本地处理过程，不代表服务器或管理员能够获得用户原始数据；真实系统中服务器只接收最终扰动后的上传值。
               </div>
             </div>
@@ -63,7 +63,7 @@
           </div>
           <div class="summary-item">
             <span>样本规模</span>
-            <strong>500 个客户端各上报一次</strong>
+            <strong>2000 个客户端各上报一次</strong>
           </div>
         </div>
         <el-empty v-else description="暂无 TSP 任务，请先在管理端属性配置页下发 TSP 场景" />
@@ -91,7 +91,7 @@
 
         <section class="step-actions">
           <el-button type="primary" :disabled="!selectedTask || isAnimating" @click="startClientStartup">
-            启动 500 个客户端
+            启动 2000 个客户端
           </el-button>
           <el-button :disabled="!canDetectMissing" @click="startMissingDetection">
             客户端本地编码
@@ -128,29 +128,27 @@
             <span>共 {{ simulationRows.length }} 条，批次 ID：{{ batchId || '待生成' }}</span>
           </div>
 
-          <el-table
-            ref="tableRef"
-            :data="simulationRows"
-            :row-class-name="getRowClassName"
-            height="560"
-            border
-            style="width: 100%"
-            empty-text="请先启动 500 个客户端"
-          >
-            <el-table-column prop="userNo" label="客户端编号" width="150" />
-            <el-table-column prop="rawDisplay" label="客户端本地采集值" min-width="190" />
-            <el-table-column prop="missingStatusDisplay" label="本地编码状态" min-width="190" />
-            <el-table-column prop="stageOneDisplay" label="第一阶段结果" min-width="210" />
-            <el-table-column prop="stageTwoInputDisplay" label="第二阶段输入" min-width="170" />
-            <el-table-column prop="finalReportDisplay" label="第二阶段结果/扰动后编码值" min-width="230" />
-            <el-table-column prop="uploadStatus" label="上报状态" width="120">
-              <template #default="scope">
-                <el-tag :type="scope.row.uploadStatus === '已上报' ? 'success' : 'info'">
-                  {{ scope.row.uploadStatus }}
-                </el-tag>
+          <div class="client-table-v2-shell">
+            <el-auto-resizer>
+              <template #default="{ width, height }">
+                <el-table-v2
+                  v-if="simulationRows.length > 0"
+                  :columns="tableColumns"
+                  :data="simulationRows"
+                  :width="width"
+                  :height="height"
+                  :row-height="48"
+                  :header-height="48"
+                  row-key="userNo"
+                  :row-class="getRowClassName"
+                  fixed
+                  scrollbar-always-on
+                  class="client-table-v2"
+                />
+                <div v-else class="client-table-empty">请先启动 2000 个客户端</div>
               </template>
-            </el-table-column>
-          </el-table>
+            </el-auto-resizer>
+          </div>
         </section>
 
         <div class="page-actions">
@@ -162,9 +160,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElTag } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 import { useUserStore } from '../../store/user';
 import { useTaskStore } from '../../store/task';
@@ -183,8 +181,8 @@ import {
 
 const FLOW_STEPS = [
   {
-    title: '启动 500 个客户端',
-    description: '模拟 500 个客户端各自完成一次睡眠质量评分本地采集'
+    title: '启动 2000 个客户端',
+    description: '模拟 2000 个客户端各自完成一次睡眠质量评分本地采集'
   },
   {
     title: '客户端本地编码',
@@ -223,28 +221,28 @@ const STAGE_STEP = {
 const STAGE_TEXT = {
   [STAGES.START]: {
     running: '正在接入客户端',
-    done: '已启动 500 个客户端，可继续执行客户端本地编码。'
+    done: '已启动 2000 个客户端，可继续执行客户端本地编码。'
   },
   [STAGES.MISSING]: {
     running: '正在执行客户端本地编码',
-    done: '已完成 500 个客户端本地编码。'
+    done: '已完成 2000 个客户端本地编码。'
   },
   [STAGES.STAGE_ONE]: {
     running: '正在执行 TSP 第一阶段有效值扰动',
-    done: '已完成 500 个客户端第一阶段处理，缺失值已保留为 0。'
+    done: '已完成 2000 个客户端第一阶段处理，缺失值已保留为 0。'
   },
   [STAGES.STAGE_TWO]: {
     running: '正在执行 TSP 第二阶段统一域扰动',
-    done: '已完成 500 个客户端第二阶段扰动。'
+    done: '已完成 2000 个客户端第二阶段扰动。'
   },
   [STAGES.UPLOAD]: {
     running: '正在上传扰动后编码值',
-    done: '已模拟 500 个客户端分别完成一次 TSP 两阶段本地扰动上报。'
+    done: '已模拟 2000 个客户端分别完成一次 TSP 两阶段本地扰动上报。'
   }
 };
 
 const ANIMATION_INTERVAL_MS = 150;
-const ANIMATION_BATCH_SIZE = 5;
+const ANIMATION_BATCH_SIZE = 20;
 const ROW_HEIGHT = 48;
 const HIGHLIGHT_MS = 560;
 
@@ -273,6 +271,44 @@ const canDetectMissing = computed(() => !isAnimating.value && completedStep.valu
 const canStageOne = computed(() => !isAnimating.value && completedStep.value === 2);
 const canStageTwo = computed(() => !isAnimating.value && completedStep.value === 3);
 const canUpload = computed(() => !isAnimating.value && completedStep.value === 4);
+
+function renderTextCell({ cellData }) {
+  const text = cellData ?? '';
+  return h('span', { class: 'client-table-v2-text', title: String(text) }, String(text));
+}
+
+function renderStatusCell({ rowData }) {
+  const status = rowData.uploadStatus || '';
+  return h(ElTag, { type: status === '已上报' ? 'success' : 'info' }, () => status);
+}
+
+function createTextColumn(key, title, width) {
+  return {
+    key,
+    dataKey: key,
+    title,
+    width,
+    cellRenderer: renderTextCell
+  };
+}
+
+const tableColumns = [
+  createTextColumn('userNo', '客户端编号', 150),
+  createTextColumn('rawDisplay', '客户端本地采集值', 260),
+  createTextColumn('missingStatusDisplay', '本地编码状态', 260),
+  createTextColumn('stageOneDisplay', '第一阶段结果', 300),
+  createTextColumn('stageTwoInputDisplay', '第二阶段输入', 220),
+  createTextColumn('finalReportDisplay', '第二阶段结果/扰动后编码值', 340),
+  {
+    key: 'uploadStatus',
+    dataKey: 'uploadStatus',
+    title: '上报状态',
+    width: 160,
+    cellRenderer: renderStatusCell
+  }
+];
+
+
 const flowSteps = computed(() => FLOW_STEPS.map((step, index) => {
   const stepNo = index + 1;
   const activeStep = STAGE_STEP[activeStage.value] || 0;
@@ -322,27 +358,12 @@ function createClientRow(index) {
   };
 }
 
-function scrollTableToIndex(index) {
-  nextTick(() => {
-    const wrapper = tableRef.value?.$el?.querySelector?.('.el-scrollbar__wrap');
-    if (wrapper) {
-      const middleOffset = wrapper.clientHeight * 0.62;
-      const top = Math.max(0, index * ROW_HEIGHT - middleOffset);
-      wrapper.scrollTo({ top, behavior: 'smooth' });
-      return;
-    }
-    if (typeof tableRef.value?.setScrollTop === 'function') {
-      const top = Math.max(0, index * ROW_HEIGHT - ROW_HEIGHT * 7);
-      tableRef.value.setScrollTop(top);
-    }
-  });
-}
+function scrollTableToIndex() {}
 
 function markRows(startIndex, endIndex) {
-  const marked = simulationRows.value
+  highlightedRows.value = simulationRows.value
     .slice(startIndex, endIndex)
     .map(row => row.userNo);
-  highlightedRows.value = marked;
   scrollTableToIndex(Math.max(endIndex - 1, 0));
 
   clearHighlightTimer();
@@ -352,8 +373,8 @@ function markRows(startIndex, endIndex) {
   }, HIGHLIGHT_MS);
 }
 
-function getRowClassName({ row }) {
-  return highlightedRows.value.includes(row.userNo) ? 'is-row-active' : '';
+function getRowClassName({ rowData }) {
+  return highlightedRows.value.includes(rowData.userNo) ? 'is-row-active' : '';
 }
 
 function replaceRows(startIndex, endIndex, updater) {
@@ -522,7 +543,11 @@ function startClientStartup() {
 
   resetDemo();
   batchId.value = createBatchId();
-  runStage(STAGES.START, appendClientRows);
+  appendClientRows(0, TSP_DEMO_SAMPLE_COUNT);
+  completedStep.value = STAGE_STEP[STAGES.START];
+  stageProgress.value = TSP_DEMO_SAMPLE_COUNT;
+  progressNotice.value = STAGE_TEXT[STAGES.START].done;
+  markRows(Math.max(TSP_DEMO_SAMPLE_COUNT - ANIMATION_BATCH_SIZE, 0), TSP_DEMO_SAMPLE_COUNT);
 }
 
 function startMissingDetection() {
@@ -612,7 +637,7 @@ function completeAllSteps() {
   completedStep.value = 5;
   activeStage.value = '';
   stageProgress.value = TSP_DEMO_SAMPLE_COUNT;
-  progressNotice.value = '已一键完成 500 个客户端的 TSP 两阶段本地扰动上报。';
+  progressNotice.value = '已一键完成 2000 个客户端的 TSP 两阶段本地扰动上报。';
   markRows(Math.max(TSP_DEMO_SAMPLE_COUNT - ANIMATION_BATCH_SIZE, 0), TSP_DEMO_SAMPLE_COUNT);
   persistSubmissionRecords();
 }
@@ -902,6 +927,35 @@ onUnmounted(() => {
   color: #64748b;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+.client-table-v2-shell {
+  width: 100%;
+  height: 560px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.client-table-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  background: #fff;
+}
+
+.client-table-v2-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.client-table-v2 .el-table-v2__row.is-row-active) {
+  background: #fff7ed !important;
+  transition: background 0.6s ease;
 }
 
 :deep(.el-table__row.is-row-active > td) {
