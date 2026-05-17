@@ -31,6 +31,10 @@ function safeParse(key, fallback) {
   }
 }
 
+function normalizeProtocol(value) {
+  return String(value || '').toUpperCase();
+}
+
 function loadSubmissions(taskId) {
   const allData = safeParse('submittedData', []);
   if (!taskId) {
@@ -114,7 +118,8 @@ function getProtectionMode(task) {
 }
 
 function collectProtocolRecords(records, protocol) {
-  return records.filter(item => (item?.reportData?.protocol || item?.protocol) === protocol);
+  const targetProtocol = normalizeProtocol(protocol);
+  return records.filter(item => normalizeProtocol(item?.reportData?.protocol || item?.protocol) === targetProtocol);
 }
 
 function collectBatchSummaries(records) {
@@ -128,6 +133,41 @@ function collectBatchSummaries(records) {
   });
 
   return batchSummaryMap;
+}
+
+function resolveAoueReportVector(item) {
+  const candidates = [
+    item?.report_value,
+    item?.reportData?.reportValue,
+    item?.reportData?.perturbedValue,
+    item?.uploadedVector
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.map(bit => Number(bit) === 1 ? 1 : 0);
+    }
+
+    if (typeof candidate === 'string') {
+      try {
+        const parsed = JSON.parse(candidate);
+        if (Array.isArray(parsed)) {
+          return parsed.map(bit => Number(bit) === 1 ? 1 : 0);
+        }
+      } catch (error) {
+        // Ignore display-only labels such as "[1, 0, 0, 1]".
+      }
+    }
+  }
+
+  const code = Number(item?.perturbed_bucket_code ?? item?.reportData?.perturbedBucketCode);
+  if (Number.isInteger(code) && code >= 1 && code <= STEP_BUCKET_ORDER.length) {
+    const vector = new Array(STEP_BUCKET_ORDER.length).fill(0);
+    vector[code - 1] = 1;
+    return vector;
+  }
+
+  return null;
 }
 
 function buildArrSummary(arrRecords) {
@@ -227,6 +267,52 @@ function buildAoueSummary(aoueRecords) {
   const rawBucketCounts = createEmptyStepsBucketCounts();
   let hasRawSummary = false;
   const batchSummaryMap = collectBatchSummaries(aoueRecords);
+
+  aoueRecords.forEach(item => {
+    const batchId = item.batch_id ?? item.sampleMeta?.batchId;
+    if (batchId && batchSummaryMap.has(batchId)) {
+      return;
+    }
+
+    const rawBucket = item.original_bucket || item.rawData?.stepsBucket || item.reportData?.rawBucket;
+    const reportBucket = item.perturbed_bucket || item.reportData?.perturbedBucket;
+    const reportVector = resolveAoueReportVector(item);
+
+    if (rawBucket && Object.prototype.hasOwnProperty.call(rawBucketCounts, rawBucket)) {
+      rawBucketCounts[rawBucket] += 1;
+      hasRawSummary = true;
+    }
+
+    if (reportBucket && Object.prototype.hasOwnProperty.call(reportBucketCounts, reportBucket)) {
+      reportBucketCounts[reportBucket] += 1;
+    } else if (reportVector) {
+      reportVector.forEach((bit, index) => {
+        if (Number(bit) === 1) {
+          const label = getStepsBucketLabelByCode(index + 1);
+          if (label) reportBucketCounts[label] += 1;
+        }
+      });
+    }
+  });
+
+  if (batchSummaryMap.size > 0) {
+    hasRawSummary = true;
+    batchSummaryMap.forEach(summary => {
+      const normalizedRaw = normalizeStepsBucketCounts(summary?.rawBucketCounts);
+      const normalizedReport = normalizeStepsBucketCounts(summary?.reportBucketCounts);
+      STEP_BUCKET_ORDER.forEach(bucket => {
+        rawBucketCounts[bucket] += Number(normalizedRaw[bucket] ?? 0);
+        reportBucketCounts[bucket] += Number(normalizedReport[bucket] ?? 0);
+      });
+    });
+  }
+
+  return {
+    sampleCount,
+    rawCounts: STEP_BUCKET_ORDER.map(bucket => Number(rawBucketCounts[bucket] ?? 0)),
+    reportCounts: STEP_BUCKET_ORDER.map(bucket => Number(reportBucketCounts[bucket] ?? 0)),
+    hasRawSummary
+  };
 
   aoueRecords.forEach(item => {
     const batchId = item.batch_id ?? item.sampleMeta?.batchId;
@@ -623,7 +709,7 @@ function getAoueAggregateResults(records, task, taskId) {
   const summary = buildAoueSummary(aoueRecords);
   
   // 对于 AOUE，我们需要提取向量形式的上报数据
-  const perturbedData = aoueRecords.map(item => {
+  const perturbedData = aoueRecords.map(item => resolveAoueReportVector(item) || (() => {
     const val = item.report_value ?? item.reportData?.reportValue ?? item.reportData?.perturbedValue;
     if (Array.isArray(val)) return val;
     // 如果不是数组（可能是单条记录且某种原因没存成数组），尝试构造一个
@@ -634,7 +720,7 @@ function getAoueAggregateResults(records, task, taskId) {
       return arr;
     }
     return new Array(STEP_BUCKET_ORDER.length).fill(0);
-  });
+  })());
 
   const rawEstimatedCounts = aggregateAOUE(perturbedData, config.epsilon, STEP_BUCKET_ORDER.length, config.p, config.q)
     .map(value => Number(value.toFixed(4)));
@@ -715,7 +801,7 @@ export function getAggregateResults(taskId) {
 
     const resolvedTaskId = taskId || records[0]?.task_id || records[0]?.taskId;
     const task = getTaskById(resolvedTaskId);
-    const protocol = task?.protocol || records[0]?.reportData?.protocol || records[0]?.protocol;
+    const protocol = normalizeProtocol(task?.protocol || records[0]?.reportData?.protocol || records[0]?.protocol);
 
     if (protocol === 'AGRR') {
       return getAgrrAggregateResults(records, task, resolvedTaskId);

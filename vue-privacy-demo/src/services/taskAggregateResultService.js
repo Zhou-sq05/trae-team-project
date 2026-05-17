@@ -29,6 +29,10 @@ function safeParse(key, fallback) {
   }
 }
 
+function normalizeProtocol(value) {
+  return String(value || '').toUpperCase();
+}
+
 function resolveAggregateScope(scopeInput) {
   if (scopeInput && typeof scopeInput === 'object') {
     return {
@@ -51,7 +55,7 @@ function loadSubmissions(scopeInput) {
   return allData.filter(item => {
     const taskMatches = !scope.taskId || String(item.task_id ?? item.taskId) === scope.taskId;
     const batchMatches = !scope.batchId || String(item.batch_id ?? item.sampleMeta?.batchId ?? '') === scope.batchId;
-    const protocolMatches = !scope.protocol || String(item?.reportData?.protocol || item?.protocol || '') === scope.protocol;
+    const protocolMatches = !scope.protocol || normalizeProtocol(item?.reportData?.protocol || item?.protocol) === normalizeProtocol(scope.protocol);
     return taskMatches && batchMatches && protocolMatches;
   });
 }
@@ -106,7 +110,8 @@ function getProtectionMode(task) {
 }
 
 function collectProtocolRecords(records, protocol) {
-  return records.filter(item => (item?.reportData?.protocol || item?.protocol) === protocol);
+  const targetProtocol = normalizeProtocol(protocol);
+  return records.filter(item => normalizeProtocol(item?.reportData?.protocol || item?.protocol) === targetProtocol);
 }
 
 function collectBatchSummaries(records) {
@@ -828,7 +833,7 @@ export function getAggregateResults(scopeInput) {
 
     const resolvedTaskId = scope.taskId || records[0]?.task_id || records[0]?.taskId;
     const task = getTaskById(resolvedTaskId);
-    const protocol = task?.protocol || records[0]?.reportData?.protocol || records[0]?.protocol;
+    const protocol = normalizeProtocol(task?.protocol || records[0]?.reportData?.protocol || records[0]?.protocol);
 
     if (protocol === 'AGRR') {
       return getAgrrAggregateResults(records, task, resolvedTaskId);

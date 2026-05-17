@@ -10,6 +10,10 @@ function safeParse(key, fallback) {
   }
 }
 
+function normalizeProtocol(value) {
+  return String(value || '').toUpperCase();
+}
+
 function resolveScope(scopeInput) {
   if (scopeInput && typeof scopeInput === 'object') {
     return {
@@ -155,7 +159,7 @@ export function getTspAggregateDiagnostics(scopeInput) {
   const scope = resolveScope(scopeInput);
   const taskId = scope.taskId;
   const task = getTaskById(taskId);
-  const records = loadSubmissions(scope).filter(item => (item?.reportData?.protocol || item?.protocol) === 'TSP');
+  const records = loadSubmissions(scope).filter(item => normalizeProtocol(item?.reportData?.protocol || item?.protocol) === 'TSP');
 
   if (!records.length) {
     return null;
@@ -216,4 +220,3 @@ export function getTspAggregateDiagnostics(scopeInput) {
     recordsTable: buildRecordRows(records)
   };
 }
-
