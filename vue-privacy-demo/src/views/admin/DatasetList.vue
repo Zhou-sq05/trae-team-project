@@ -22,7 +22,7 @@
         <el-aside width="240px">
           <div class="sidebar-brand">
             <div class="sidebar-brand-title">隐私保护平台</div>
-            <div class="sidebar-brand-subtitle">数据采集与管理</div>
+            <div class="sidebar-brand-subtitle">风险自适应隐私保护数据采集系统</div>
           </div>
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/scenario-overview">

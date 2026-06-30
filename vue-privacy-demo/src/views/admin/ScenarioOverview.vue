@@ -24,7 +24,7 @@
         <el-aside width="240px">
           <div class="sidebar-brand">
             <div class="sidebar-brand-title">隐私保护平台</div>
-            <div class="sidebar-brand-subtitle">数据采集与管理</div>
+            <div class="sidebar-brand-subtitle">风险自适应隐私保护数据采集系统</div>
           </div>
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/scenario-overview">
@@ -61,7 +61,7 @@
               <div class="hero-copy">
                 <div class="page-title">数据属性与协议选择总览</div>
                 <p class="page-desc">
-                  本系统面向智能手环健康数据采集场景。平台需要收集部分健康行为或状态数据，用于群体统计分析、异常提醒评估和健康趋势观察。但部分待采集属性与用户敏感状态之间存在统计相关性，直接采集可能导致敏感属性被推断。因此，本系统在采集端本地完成编码与随机扰动，服务器仅接收扰动后编码值，并在管理端进行聚合分析。
+                  本系统面向智能手环健康数据采集场景。平台需要收集部分健康行为或状态数据，用于群体统计分析、异常提醒评估和健康趋势观察。但部分待采集属性与用户敏感状态之间存在统计相关性，直接采集可能导致敏感属性被推断。因此，本系统在用户端本地完成编码与随机扰动，服务器仅接收扰动后编码值，并在服务器端进行聚合分析。
                 </p>
               </div>
               <el-button type="primary" @click="goToAttrConfig">进入采集任务配置</el-button>
@@ -82,7 +82,7 @@
               show-icon
             >
               <template #title>
-                本页面将采集属性、敏感属性关系与协议选择合并展示。待采集属性在采集端完成编码与本地扰动，服务器仅接收扰动后的上报结果；年龄段和 BMI 类别不作为直接采集对象，而是用于条件分布风险建模的相关敏感属性。
+                本页面将采集属性、敏感属性关系与协议选择合并展示。待采集属性在用户端完成编码与本地扰动，服务器仅接收扰动后的上报结果；年龄段和 BMI 类别不作为直接采集对象，而是用于条件分布风险建模的相关敏感属性。
               </template>
             </el-alert>
 
@@ -216,8 +216,8 @@ const overviewCards = [
   },
   {
     label: '保护方式',
-    value: '采集端本地编码与扰动',
-    desc: '服务器仅接收扰动后值，并在管理端执行聚合分析。'
+    value: '用户端本地编码与扰动',
+    desc: '服务器仅接收扰动后值，并在服务器端执行聚合分析。'
   }
 ];
 
@@ -291,9 +291,9 @@ const sensitiveGroupingCards = [
 const processSteps = [
   '配置采集任务',
   '下发协议参数',
-  '采集端填报',
+  '用户端填报',
   '本地扰动上报',
-  '管理端聚合分析'
+  '服务器端聚合分析'
 ];
 
 function formatRiskText(text) {

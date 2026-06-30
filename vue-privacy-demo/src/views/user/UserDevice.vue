@@ -2,7 +2,7 @@
   <div class="user-device-container">
     <div class="header">
       <div class="header-left">
-        <h1>用户采集端</h1>
+        <h1>用户端</h1>
       </div>
       <div class="header-right">
         <el-dropdown>
@@ -345,7 +345,7 @@
                 </div>
                 <div v-else class="preview-tip">{{ processPreviewTip }}</div>
                 <div v-if="!tspParametersReady" class="preview-tip">
-                  当前任务尚未在管理端完成 TSP 参数保存，暂时无法执行两阶段本地扰动上报。
+                  当前任务尚未在服务器端完成 TSP 参数保存，暂时无法执行两阶段本地扰动上报。
                 </div>
                 <div class="action-row">
                   <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
@@ -377,7 +377,7 @@
               <div class="summary-block">
                 <div class="summary-heading">
                   <h4>扰动参数</h4>
-                  <span class="section-tip">从管理端当前任务的已保存配置中读取</span>
+                  <span class="section-tip">从服务器端当前任务的已保存配置中读取</span>
                 </div>
                 <div class="card-grid">
                   <div v-for="item in parameterCards" :key="item.label" class="summary-card">
@@ -386,7 +386,7 @@
                   </div>
                 </div>
                 <div v-if="(currentTaskDetail?.scenario === 'arr' && !arrParametersReady) || (currentTaskDetail?.scenario === 'agrr' && !agrrParametersReady)" class="preview-tip">
-                  当前任务尚未在管理端完成 {{ currentTaskDetail?.protocol }} 参数保存，暂时无法执行本地扰动。
+                  当前任务尚未在服务器端完成 {{ currentTaskDetail?.protocol }} 参数保存，暂时无法执行本地扰动。
                 </div>
               </div>
 
@@ -510,7 +510,7 @@
                   <section class="tsp-batch-card tsp-batch-card--actions">
                     <div class="tsp-action-copy">
                       <div class="tsp-action-title">批量上报</div>
-                      <div class="tsp-action-desc">将当前这批 AOUE 连续采集样本写入管理端提交数据，保留现有上报格式与字段。</div>
+                      <div class="tsp-action-desc">将当前这批 AOUE 连续采集样本写入服务器端提交数据，保留现有上报格式与字段。</div>
                       <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="tsp-action-status">
                         本次上报状态：{{ batchUploadState.status }}，记录数：{{ batchUploadState.count }}
                       </div>
@@ -613,7 +613,7 @@
                     <section class="tsp-batch-card tsp-batch-card--actions">
                       <div class="tsp-action-copy">
                         <div class="tsp-action-title">批量上报</div>
-                        <div class="tsp-action-desc">将当前这批 TSP 连续采集样本写入管理端提交数据，保留现有上报格式与字段。</div>
+                        <div class="tsp-action-desc">将当前这批 TSP 连续采集样本写入服务器端提交数据，保留现有上报格式与字段。</div>
                         <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="tsp-action-status">
                           本次上报状态：{{ batchUploadState.status }}，记录数：{{ batchUploadState.count }}
                         </div>
@@ -705,7 +705,7 @@
                   <section class="tsp-batch-card tsp-batch-card--actions">
                     <div class="tsp-action-copy">
                       <div class="tsp-action-title">批量上报</div>
-                      <div class="tsp-action-desc">将当前这批 {{ currentTaskDetail?.protocol || '--' }} 连续采集样本写入管理端提交数据，保留现有上报格式与字段。</div>
+                      <div class="tsp-action-desc">将当前这批 {{ currentTaskDetail?.protocol || '--' }} 连续采集样本写入服务器端提交数据，保留现有上报格式与字段。</div>
                       <div v-if="batchUploadState && batchUploadState.batchId === currentBatchResult.batchId" class="tsp-action-status">
                         本次上报状态：{{ batchUploadState.status }}，记录数：{{ batchUploadState.count }}
                       </div>
@@ -2562,7 +2562,7 @@ function revealAgrrEncoding() {
 
 function revealTspEncoding() {
   if (!canSimulateTsp.value) {
-    ElMessage.warning('请先采集有效手环数据，并确保管理端已保存当前 TSP 参数');
+    ElMessage.warning('请先采集有效手环数据，并确保服务器端已保存当前 TSP 参数');
     return;
   }
 
@@ -2599,7 +2599,7 @@ function handleSleepMissingChange(value) {
 function simulateArrPerturbation(showMessage = true) {
   if (!canSimulateArr.value) {
     if (showMessage) {
-      ElMessage.warning('请先完成填写，并确保管理端已保存当前 ARR 参数');
+      ElMessage.warning('请先完成填写，并确保服务器端已保存当前 ARR 参数');
     }
     return;
   }
@@ -2621,7 +2621,7 @@ function simulateArrPerturbation(showMessage = true) {
 function executeArrPerturbAndSubmit() {
   simulateArrPerturbation(false);
   if (!arrSimulationResult.value) {
-    ElMessage.warning('请先完成填写，并确保管理端已保存当前 ARR 参数');
+    ElMessage.warning('请先完成填写，并确保服务器端已保存当前 ARR 参数');
     return;
   }
   submitData();
@@ -2661,7 +2661,7 @@ function simulateAgrrPerturbation(showMessage = true) {
 
   if (!canSimulateAgrr.value) {
     if (showMessage) {
-      ElMessage.warning('请先填写原始分钟数，并确保管理端已保存当前 AGRR 参数');
+      ElMessage.warning('请先填写原始分钟数，并确保服务器端已保存当前 AGRR 参数');
     }
     return;
   }
@@ -2719,7 +2719,7 @@ function performAouePerturbation(rawSteps) {
 function prepareAoueDemo(showMessage = true) {
   if (!canSimulateAoue.value) {
     if (showMessage) {
-      ElMessage.warning('请先填写每日步数，并确保管理端已保存当前 AOUE 参数');
+      ElMessage.warning('请先填写每日步数，并确保服务器端已保存当前 AOUE 参数');
     }
     return null;
   }
@@ -2807,7 +2807,7 @@ function simulateAouePerturbation(showMessage = true) {
 
 function replayAoueAnimation() {
   if (!canSimulateAoue.value) {
-    ElMessage.warning('请先填写每日步数，并确保管理端已保存当前 AOUE 参数');
+    ElMessage.warning('请先填写每日步数，并确保服务器端已保存当前 AOUE 参数');
     return;
   }
 
@@ -2970,7 +2970,7 @@ function performTspPerturbation(rawMissingInput, rawScoreInput) {
 function simulateTspPerturbation(showMessage = true) {
   if (!canSimulateTsp.value) {
     if (showMessage) {
-      ElMessage.warning('请先完成 TSP 输入，并确保管理端已保存当前 TSP 参数');
+      ElMessage.warning('请先完成 TSP 输入，并确保服务器端已保存当前 TSP 参数');
     }
     return;
   }
@@ -2996,7 +2996,7 @@ function simulateTspPerturbation(showMessage = true) {
 
 function executeTspStageOne() {
   if (!canSimulateTsp.value) {
-    ElMessage.warning('请先采集有效手环数据，并确保管理端已保存当前 TSP 参数');
+    ElMessage.warning('请先采集有效手环数据，并确保服务器端已保存当前 TSP 参数');
     return;
   }
 
@@ -3393,7 +3393,7 @@ function uploadCurrentBatchResult() {
   }
 
   if (!currentBatchResult.value?.samples?.length) {
-    ElMessage.warning('请先模拟连续采集');
+    ElMessage.warning('请先完成连续采集');
     return;
   }
 
@@ -3534,7 +3534,7 @@ function uploadCurrentBatchResult() {
       count: currentBatchResult.value.samples.length
     };
     systemStatus.value = 2;
-    ElMessage.success(`已成功上报 ${currentBatchResult.value.samples.length} 条连续采集扰动记录到管理端`);
+    ElMessage.success(`已成功上报 ${currentBatchResult.value.samples.length} 条连续采集扰动记录到服务器端`);
   } catch (error) {
     console.error('批量上报连续采集结果失败:', error);
     if (isQuotaExceededError(error)) {

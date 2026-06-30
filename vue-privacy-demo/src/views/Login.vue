@@ -4,7 +4,7 @@
       <div class="brand">
         <img src="/logo.png" alt="山东大学" class="brand-logo" />
         <div>
-          <div class="system-name">隐私保护健康数据采集与管理平台</div>
+          <div class="system-name">风险自适应隐私保护数据采集系统</div>
           <div class="school-name">山东大学 网络空间安全学院</div>
         </div>
       </div>
@@ -93,13 +93,13 @@ const loginRules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
-const roleLabel = computed(() => (userType.value === 'admin' ? '管理控制台' : '采集端'))
+const roleLabel = computed(() => (userType.value === 'admin' ? '服务器端' : '用户端'))
 const pageTitle = computed(() => `${roleLabel.value}登录`)
 const workbenchTitle = computed(() => (userType.value === 'admin' ? '任务与聚合工作台' : '采集任务工作台'))
 const roleDesc = computed(() =>
   userType.value === 'admin'
     ? '完成采集任务配置、协议参数下发，并查看扰动上报后的聚合分析结果。'
-    : '接收绑定任务，填写或模拟健康数据，并在采集端本地完成扰动后提交。'
+    : '接收绑定任务，填写健康数据，并在用户端本地完成扰动后提交。'
 )
 const processItems = computed(() =>
   userType.value === 'admin'

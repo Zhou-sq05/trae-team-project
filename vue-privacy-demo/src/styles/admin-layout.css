@@ -52,8 +52,8 @@
 }
 
 .admin-container .sidebar-brand {
-  height: 88px;
-  padding: 20px 22px;
+  height: 104px;
+  padding: 18px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: #20344f;
   box-sizing: border-box;
@@ -69,14 +69,16 @@
 .admin-container .sidebar-brand-subtitle {
   margin-top: 6px;
   color: #9fb3ca;
-  font-size: 13px;
-  line-height: 1.2;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .admin-container .el-menu,
 .admin-container .el-menu-vertical-demo {
   width: 240px !important;
-  height: calc(100vh - 88px) !important;
+  height: calc(100vh - 104px) !important;
   border-right: none !important;
   background: #26384d !important;
 }

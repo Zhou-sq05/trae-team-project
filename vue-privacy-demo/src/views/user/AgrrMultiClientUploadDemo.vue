@@ -2,7 +2,7 @@
   <div class="client-demo-container">
     <header class="header">
       <div class="header-left">
-        <h1>用户采集端</h1>
+        <h1>用户端</h1>
       </div>
       <div class="header-right">
         <el-dropdown>
@@ -25,7 +25,7 @@
             <div>
               <div class="page-title">AGRR 多客户端上报</div>
               <div class="page-desc">
-                本页面为答辩用的多客户端模拟器。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟多个客户端分别完成一次本地采集、分档编码、AGRR 扰动与上报。
+                本页面为答辩用的多客户端上报页面。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作组织多个客户端分别完成一次本地采集、分档编码、AGRR 扰动与上报。
                 表格中的本地采集值和本地编码值仅用于展示客户端的本地扰动过程，不代表服务器或管理员能够获得用户原始数据；真实系统中服务器只接收扰动后上传值。
               </div>
             </div>
@@ -61,7 +61,7 @@
             <strong>2000 个客户端各上报一次</strong>
           </div>
         </div>
-        <el-empty v-else description="暂无 AGRR 任务，请先在管理端属性配置页下发 AGRR 场景" />
+        <el-empty v-else description="暂无 AGRR 任务，请先在服务器端属性配置页下发 AGRR 场景" />
 
         <section class="flow-section">
           <div class="flow-title">AGRR 客户端本地处理链路</div>
@@ -173,7 +173,7 @@ import { getStandBucketLabelByCode } from '../../utils/standDurationBuckets';
 const FLOW_STEPS = [
   {
     title: '启动客户端',
-    description: '模拟 2000 个客户端各自完成一次日均站立时长本地采集'
+    description: '生成 2000 个客户端各自完成一次日均站立时长本地采集'
   },
   {
     title: '客户端本地分档编码',
@@ -218,7 +218,7 @@ const STAGE_TEXT = {
   },
   [STAGES.UPLOAD]: {
     running: '正在上传扰动后值',
-    done: '已模拟 2000 个客户端分别完成一次 AGRR 本地扰动上报。'
+    done: '已完成 2000 个客户端分别进行一次 AGRR 本地扰动上报。'
   }
 };
 

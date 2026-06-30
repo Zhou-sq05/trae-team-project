@@ -24,7 +24,7 @@
         <el-aside width="240px">
           <div class="sidebar-brand">
             <div class="sidebar-brand-title">隐私保护平台</div>
-            <div class="sidebar-brand-subtitle">数据采集与管理</div>
+            <div class="sidebar-brand-subtitle">风险自适应隐私保护数据采集系统</div>
           </div>
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/scenario-overview">
@@ -62,7 +62,7 @@
                 <div class="card-header">
                   <div class="card-header-copy">
                     <span>采集任务配置</span>
-                    <p>新方案参数由内在不确定性建模结果计算得到，传统方案参数作为基线对比；配置下发后，采集端将按照对应协议完成本地扰动上报。</p>
+                    <p>新方案参数由内在不确定性建模结果计算得到，传统方案参数作为基线对比；配置下发后，用户端将按照对应协议完成本地扰动上报。</p>
                   </div>
                   <el-button
                     plain
@@ -1071,7 +1071,7 @@
 
               <div class="tsp-stage-card">
                 <div class="stage-title">组合恢复参数</div>
-                <div class="stage-desc">服务端聚合时使用 p<sup>*</sup>、q<sup>*</sup> 将两阶段扰动效果合成为最终恢复参数。</div>
+                <div class="stage-desc">服务器端聚合时使用 p<sup>*</sup>、q<sup>*</sup> 将两阶段扰动效果合成为最终恢复参数。</div>
                 <div class="result-grid compact-grid">
                   <div class="result-panel stage-result-panel">
                     <div class="result-label">p<sup>*</sup></div>
@@ -1216,7 +1216,7 @@
               </div>
             </div>
             <div class="overview-item overview-item-full">
-              <span class="overview-label">采集端处理方式摘要</span>
+              <span class="overview-label">用户端处理方式摘要</span>
               <span class="overview-value">{{ distributeSummary.userProcessSummary }}</span>
             </div>
           </div>
@@ -1298,7 +1298,7 @@ const hasGeneratedMatrix = ref(false);
 const privacyBudgetSaved = ref(false);
 
 const basicConfig = ref({
-  dataSource: '模拟数据',
+  dataSource: '内置数据',
   privacyBudget: 0.5
 });
 

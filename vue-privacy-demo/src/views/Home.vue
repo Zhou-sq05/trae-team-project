@@ -11,16 +11,16 @@
     <main class="home-main">
       <section class="intro-section">
         <p class="eyebrow">智能手环健康数据场景</p>
-        <h1>隐私保护健康数据采集与管理平台</h1>
+        <h1>基于内在不确定性的风险自适应隐私保护数据采集系统</h1>
         <p class="subtitle">
-          支持采集任务配置、协议参数下发、采集端本地扰动上报与管理端聚合结果分析。
+          支持采集任务配置、协议参数下发、用户端本地扰动上报与服务器端聚合结果分析。
         </p>
         <div class="workflow" aria-label="系统流程">
           <span>配置采集任务</span>
           <el-icon><ArrowRight /></el-icon>
           <span>下发协议参数</span>
           <el-icon><ArrowRight /></el-icon>
-          <span>采集端填报</span>
+          <span>用户端填报</span>
           <el-icon><ArrowRight /></el-icon>
           <span>本地扰动上报</span>
           <el-icon><ArrowRight /></el-icon>
@@ -34,15 +34,15 @@
             <el-icon><Monitor /></el-icon>
           </div>
           <div class="entry-copy">
-            <h2>采集端</h2>
-            <p>接收管理端下发的采集任务，模拟智能手环健康数据采集，并在本地完成隐私扰动后上报。</p>
+            <h2>用户端</h2>
+            <p>接收服务器端下发的采集任务，完成智能手环健康数据采集，并在本地完成隐私扰动后上报。</p>
           </div>
           <ul class="feature-list">
             <li>查看当前绑定任务</li>
-            <li>填写或模拟健康数据</li>
+            <li>填写健康数据</li>
             <li>本地扰动后提交</li>
           </ul>
-          <el-button type="primary" class="entry-button" @click="goToLogin('user')">进入采集端</el-button>
+          <el-button type="primary" class="entry-button" @click="goToLogin('user')">进入用户端</el-button>
         </article>
 
         <article class="entry-card">
@@ -50,7 +50,7 @@
             <el-icon><Setting /></el-icon>
           </div>
           <div class="entry-copy">
-            <h2>管理控制台</h2>
+            <h2>服务器端</h2>
             <p>配置待采集属性、选择隐私保护协议与参数，查看上报数据和聚合估计结果。</p>
           </div>
           <ul class="feature-list">
@@ -58,7 +58,7 @@
             <li>下发协议参数</li>
             <li>查看数据与聚合结果</li>
           </ul>
-          <el-button type="primary" class="entry-button" @click="goToLogin('admin')">进入管理控制台</el-button>
+          <el-button type="primary" class="entry-button" @click="goToLogin('admin')">进入服务器端</el-button>
         </article>
       </section>
 
@@ -70,8 +70,8 @@
 
     <el-dialog v-model="showRegisterDialog" title="选择注册类型" width="320px" :align-center="true">
       <div class="register-options">
-        <el-button type="primary" @click="goToRegister('user')">注册采集端账号</el-button>
-        <el-button @click="goToRegister('admin')">注册管理账号</el-button>
+        <el-button type="primary" @click="goToRegister('user')">注册用户端账号</el-button>
+        <el-button @click="goToRegister('admin')">注册服务器端账号</el-button>
       </div>
     </el-dialog>
   </div>
@@ -188,7 +188,7 @@ const goToRegister = async (type) => {
 }
 
 .intro-section {
-  max-width: 900px;
+  max-width: 1120px;
   text-align: left;
 }
 
@@ -206,6 +206,7 @@ const goToRegister = async (type) => {
   font-weight: 800;
   color: #162033;
   letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .subtitle {
@@ -388,6 +389,7 @@ const goToRegister = async (type) => {
 
   .intro-section h1 {
     font-size: 30px;
+    white-space: normal;
   }
 
   .entry-section {

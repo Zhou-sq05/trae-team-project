@@ -2,7 +2,7 @@
   <div class="client-demo-container">
     <header class="header">
       <div class="header-left">
-        <h1>用户采集端</h1>
+        <h1>用户端</h1>
         <span>客户端本地两阶段扰动演示</span>
       </div>
       <div class="header-right">
@@ -26,7 +26,7 @@
             <div>
               <div class="page-title">TSP 多客户端上报</div>
               <div class="page-desc">
-                本页面为答辩用的 TSP 多客户端模拟器。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作模拟 2000 个客户端分别完成一次 TSP 本地采集、客户端本地编码、两阶段扰动与最终上报。
+                本页面为答辩用的 TSP 多客户端上报页面。由于当前环境中无法同时打开多个真实用户端页面，因此通过分步骤操作组织 2000 个客户端分别完成一次 TSP 本地采集、客户端本地编码、两阶段扰动与最终上报。
                 表格中的本地采集值和本地编码状态仅用于展示客户端本地处理过程，不代表服务器或管理员能够获得用户原始数据；真实系统中服务器只接收最终扰动后的上传值。
               </div>
             </div>
@@ -66,7 +66,7 @@
             <strong>2000 个客户端各上报一次</strong>
           </div>
         </div>
-        <el-empty v-else description="暂无 TSP 任务，请先在管理端属性配置页下发 TSP 场景" />
+        <el-empty v-else description="暂无 TSP 任务，请先在服务器端属性配置页下发 TSP 场景" />
 
         <section class="flow-section">
           <div class="flow-title">TSP 客户端两阶段本地处理链路</div>
@@ -182,7 +182,7 @@ import {
 const FLOW_STEPS = [
   {
     title: '启动 2000 个客户端',
-    description: '模拟 2000 个客户端各自完成一次睡眠质量评分本地采集'
+    description: '生成 2000 个客户端各自完成一次睡眠质量评分本地采集'
   },
   {
     title: '客户端本地编码',
@@ -237,7 +237,7 @@ const STAGE_TEXT = {
   },
   [STAGES.UPLOAD]: {
     running: '正在上传扰动后编码值',
-    done: '已模拟 2000 个客户端分别完成一次 TSP 两阶段本地扰动上报。'
+    done: '已完成 2000 个客户端分别进行一次 TSP 两阶段本地扰动上报。'
   }
 };
 

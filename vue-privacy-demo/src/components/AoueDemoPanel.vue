@@ -23,7 +23,7 @@
     </div>
 
     <div v-if="!demo.parametersReady" class="preview-tip">
-      当前任务尚未在管理端完成 AOUE 参数保存，暂时无法执行本地扰动。
+      当前任务尚未在服务器端完成 AOUE 参数保存，暂时无法执行本地扰动。
     </div>
 
     <div class="aoue-stepper">

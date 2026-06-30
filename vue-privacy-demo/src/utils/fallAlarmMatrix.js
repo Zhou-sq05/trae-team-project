@@ -16,7 +16,7 @@ export const ARR_DEFAULT_DATA_SOURCE_MODE = CONDITION_PRESET_DATA_SOURCE_MODE;
 export const ARR_DATA_SOURCE_MODES = {
   [CONDITION_PRESET_DATA_SOURCE_MODE]: {
     label: '内置多源校准矩阵',
-    description: '当前条件分布采用内置校准矩阵，用于模拟年龄段与睡眠异常提醒之间的统计相关性，后续可替换为更大规模公共健康数据库计算结果。'
+    description: '当前条件分布采用内置校准矩阵，用于表示年龄段与睡眠异常提醒之间的统计相关性，后续可替换为更大规模公共健康数据库计算结果。'
   }
 };
 

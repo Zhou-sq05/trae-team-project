@@ -22,7 +22,7 @@
         <el-aside width="240px">
           <div class="sidebar-brand">
             <div class="sidebar-brand-title">隐私保护平台</div>
-            <div class="sidebar-brand-subtitle">数据采集与管理</div>
+            <div class="sidebar-brand-subtitle">风险自适应隐私保护数据采集系统</div>
           </div>
           <el-menu :default-active="activeMenu" class="el-menu-vertical-demo" router>
             <el-menu-item index="/admin/scenario-overview">
@@ -130,8 +130,8 @@
                 <section v-if="isArrAggregateView" class="summary-section">
                   <div class="section-heading section-heading--with-action">
                     <div>
-                      <h3>ARR 管理端统计与聚合估计</h3>
-                      <p>管理端先统计客户端上传的扰动后编码值，点击聚合估计后再基于 ARR 参数 p、q 得到群体估计人数和估计频率。</p>
+                      <h3>ARR 服务器端统计与聚合估计</h3>
+                      <p>服务器端先统计客户端上传的扰动后编码值，点击聚合估计后再基于 ARR 参数 p、q 得到群体估计人数和估计频率。</p>
                     </div>
                     <el-button type="primary" plain @click="arrEstimateVisible = true" :disabled="arrEstimateVisible">
                       聚合估计
@@ -165,7 +165,7 @@
                   </div>
                   <div class="formula-card">
                     <p>
-                      设管理端收到某一类别的最终上报数为 <strong>y</strong>，样本总数为 <strong>n</strong>。由于真实属于该类别的用户以概率 <strong>p</strong> 上报该类别，真实不属于该类别的用户也可能以概率 <strong>q</strong> 被扰动为该类别，因此有：
+                      设服务器端收到某一类别的最终上报数为 <strong>y</strong>，样本总数为 <strong>n</strong>。由于真实属于该类别的用户以概率 <strong>p</strong> 上报该类别，真实不属于该类别的用户也可能以概率 <strong>q</strong> 被扰动为该类别，因此有：
                     </p>
                     <div class="formula-expression">
                       <span>E[<span class="formula-var">y</span>]</span>
@@ -194,8 +194,8 @@
                 <section v-if="isAgrrAggregateView" class="summary-section">
                   <div class="section-heading section-heading--with-action">
                     <div>
-                      <h3>AGRR 管理端统计与聚合估计</h3>
-                      <p>管理端先统计客户端上传的扰动后编码值，点击聚合估计后再基于 AGRR 随机响应概率得到群体估计人数和估计频率。</p>
+                      <h3>AGRR 服务器端统计与聚合估计</h3>
+                      <p>服务器端先统计客户端上传的扰动后编码值，点击聚合估计后再基于 AGRR 随机响应概率得到群体估计人数和估计频率。</p>
                     </div>
                     <el-button type="primary" plain @click="agrrEstimateVisible = true" :disabled="agrrEstimateVisible">
                       聚合估计
@@ -259,7 +259,7 @@
                 <section v-if="isAoueAggregateView" class="summary-section">
                   <div class="section-heading section-heading--with-action">
                     <div>
-                      <h3>AOUE 管理端按维求和与校正估计</h3>
+                      <h3>AOUE 服务器端按维求和与校正估计</h3>
                     </div>
                     <el-button type="primary" plain @click="aoueEstimateVisible = true" :disabled="aoueEstimateVisible">
                       聚合估计
@@ -289,7 +289,7 @@
                       </tbody>
                     </table>
                   </div>
-                  <p class="arr-table-note">管理端先按 bit 维度累计最终上报数，再代入 x̂<sub>i</sub> = (y<sub>i</sub> - nq) / (p - q) 得到聚合估计人数。</p>
+                  <p class="arr-table-note">服务器端先按 bit 维度累计最终上报数，再代入 x̂<sub>i</sub> = (y<sub>i</sub> - nq) / (p - q) 得到聚合估计人数。</p>
                 </section>
 
                 <section v-if="isAoueAggregateView" class="summary-section compact-section">
@@ -298,7 +298,7 @@
                 </div>
                 <div class="formula-card">
                   <p>
-                      AOUE 中，客户端先将本地取值编码为 one-hot 向量，再对每一位独立扰动。管理端对第 i 个 one-hot 位置上报为 1 的次数求和，记为 y<sub>i</sub>。
+                      AOUE 中，客户端先将本地取值编码为 one-hot 向量，再对每一位独立扰动。服务器端对第 i 个 one-hot 位置上报为 1 的次数求和，记为 y<sub>i</sub>。
                     </p>
                     <p>设 x<sub>i</sub> 表示真实属于第 i 类的用户数，则 y<sub>i</sub> 的期望为：</p>
                     <div class="formula-expression">
@@ -337,8 +337,8 @@
                 <section v-if="isTspAggregateView" class="summary-section">
                   <div class="section-heading section-heading--with-action">
                     <div>
-                      <h3>TSP 管理端统计与聚合估计</h3>
-                      <p>管理端先统计第二阶段最终上传的扰动后编码值，点击聚合估计后再基于 TSP 的 p1、q1、p2、q2 参数反推缺失值和各有效取值的估计人数与估计频率。</p>
+                      <h3>TSP 服务器端统计与聚合估计</h3>
+                      <p>服务器端先统计第二阶段最终上传的扰动后编码值，点击聚合估计后再基于 TSP 的 p1、q1、p2、q2 参数反推缺失值和各有效取值的估计人数与估计频率。</p>
                     </div>
                     <el-button type="primary" plain @click="tspEstimateVisible = true" :disabled="tspEstimateVisible">
                       聚合估计
@@ -374,7 +374,7 @@
                   </div>
                   <div class="formula-card">
                     <p>
-                      设样本总数为 <strong>n</strong>，统一扰动后编码值域为 {0,1,2,...,K}，其中 <strong>0</strong> 表示缺失值，<strong>1~K</strong> 表示评分取值。记真实缺失计数为 <strong>x<sub>0</sub></strong>，真实第 <strong>v</strong> 类有效评分计数为 <strong>x<sub>v</sub></strong>，管理端观测到的扰动后计数分别为 <strong>y<sub>0</sub></strong>、<strong>y<sub>v</sub></strong>。TSP 协议采用两阶段扰动机制，参数为 <strong>p1</strong>、<strong>q1</strong>、<strong>p2</strong>、<strong>q2</strong>。
+                      设样本总数为 <strong>n</strong>，统一扰动后编码值域为 {0,1,2,...,K}，其中 <strong>0</strong> 表示缺失值，<strong>1~K</strong> 表示评分取值。记真实缺失计数为 <strong>x<sub>0</sub></strong>，真实第 <strong>v</strong> 类有效评分计数为 <strong>x<sub>v</sub></strong>，服务器端观测到的扰动后计数分别为 <strong>y<sub>0</sub></strong>、<strong>y<sub>v</sub></strong>。TSP 协议采用两阶段扰动机制，参数为 <strong>p1</strong>、<strong>q1</strong>、<strong>p2</strong>、<strong>q2</strong>。
                     </p>
                     <p>
                       对于缺失值 <strong>0</strong>，由于其不参与第一阶段，仅在第二阶段随机响应中以概率 <strong>p2</strong> 保持为 0、以概率 <strong>q2</strong> 扰动到其他值，因此有：
@@ -440,7 +440,7 @@
                   <template #title>
                     <div class="server-view-alert__content">
                       <span>
-                        真实系统中，管理端只能接收客户端上传的扰动后值，并基于协议参数进行频率估计。本页面不展示用户原始值、真实计数和误差指标；这些内容仅在误差评估页面中用于模拟验证。
+                        真实系统中，服务器端只能接收客户端上传的扰动后值，并基于协议参数进行频率估计。本页面不展示用户原始值、真实计数和误差指标；这些内容仅在误差评估页面中用于验证。
                       </span>
                       <el-button size="small" type="primary" plain @click="goToExperimentComparison">
                         查看误差评估
@@ -459,7 +459,7 @@
                   <template #title>
                     <div class="server-view-alert__content">
                       <span>
-                        真实系统中，管理端只能接收客户端上传的扰动后值，并基于 AGRR 协议参数进行频率估计。本页面不展示用户原始值、真实计数和误差指标；这些内容仅在误差评估页面中用于模拟验证。
+                        真实系统中，服务器端只能接收客户端上传的扰动后值，并基于 AGRR 协议参数进行频率估计。本页面不展示用户原始值、真实计数和误差指标；这些内容仅在误差评估页面中用于验证。
                       </span>
                       <el-button size="small" type="primary" plain @click="goToExperimentComparison">
                         查看误差评估
@@ -478,7 +478,7 @@
                   <template #title>
                     <div class="server-view-alert__content">
                       <span>
-                        管理端接收客户端上传的 AOUE 扰动后 one-hot 编码向量，并对每个 bit 维度上报为 1 的次数进行求和，再基于 AOUE 参数 p、q 进行频数校正。本页面仅展示管理端可见的扰动后向量统计与校正估计结果。
+                        服务器端接收客户端上传的 AOUE 扰动后 one-hot 编码向量，并对每个 bit 维度上报为 1 的次数进行求和，再基于 AOUE 参数 p、q 进行频数校正。本页面仅展示服务器端可见的扰动后向量统计与校正估计结果。
                       </span>
                       <el-button size="small" type="primary" plain @click="goToExperimentComparison">
                         查看误差评估
@@ -497,7 +497,7 @@
                   <template #title>
                     <div class="server-view-alert__content">
                       <span>
-                        管理端基于两阶段扰动后的观测结果和协议参数进行校正估计。本页面仅展示管理端可见的扰动观测统计与 TSP 聚合校正估计结果；用户原始值、真实计数和误差指标仅在误差评估页面中用于模拟验证。
+                        服务器端基于两阶段扰动后的观测结果和协议参数进行校正估计。本页面仅展示服务器端可见的扰动观测统计与 TSP 聚合校正估计结果；用户原始值、真实计数和误差指标仅在误差评估页面中用于验证。
                       </span>
                       <el-button size="small" type="primary" plain @click="goToExperimentComparison">
                         查看误差评估
@@ -538,8 +538,8 @@
 
                 <section v-if="!isArrAggregateView && !isAgrrAggregateView && !isAoueAggregateView && !isTspAggregateView && currentData.algorithm === 'TSP' && tspDiagnostics" class="summary-section">
                   <div class="section-heading">
-                    <h3>管理端接收计数</h3>
-                    <p>这里直接展示管理端收到的统一域计数 c0, c1, ..., c5，其中 c0 对应扰动后编码值 0，ci 对应扰动后编码值 i（i=1..5）。</p>
+                    <h3>服务器端接收计数</h3>
+                    <p>这里直接展示服务器端收到的统一域计数 c0, c1, ..., c5，其中 c0 对应扰动后编码值 0，ci 对应扰动后编码值 i（i=1..5）。</p>
                   </div>
                   <div class="summary-strip">
                     <div class="summary-card summary-card--adaptive" v-for="item in tspReportedCountCards" :key="item.label">
@@ -556,7 +556,7 @@
 
                 <section v-if="!isArrAggregateView && !isAgrrAggregateView && !isAoueAggregateView && !isTspAggregateView" class="summary-section">
                   <div class="section-heading">
-                    <h3>{{ currentData.algorithm === 'TSP' ? '聚合结果分块' : `${currentData.algorithm} 管理端统计与频数估计` }}</h3>
+                    <h3>{{ currentData.algorithm === 'TSP' ? '聚合结果分块' : `${currentData.algorithm} 服务器端统计与频数估计` }}</h3>
                   </div>
 
                   <div class="result-blocks">
@@ -2430,4 +2430,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-

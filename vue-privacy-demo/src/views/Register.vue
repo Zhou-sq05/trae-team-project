@@ -48,7 +48,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 const pageTitle = computed(() => {
-  return userType.value === 'admin' ? '管理端注册' : '用户端注册'
+  return userType.value === 'admin' ? '服务器端注册' : '用户端注册'
 })
 
 const registerFormRef = ref(null)

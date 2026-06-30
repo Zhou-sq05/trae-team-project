@@ -484,7 +484,7 @@ export function calculateTSPAlphaBetaFromMissingProbs(conditionalProbs, epsilon)
   return calculateAlphaBeta(conditionalProbs, epsilon);
 }
 
-// 生成模拟的条件概率表（用于测试）
+// 生成测试用条件概率表
 export function generateConditionalProbs(domainSize, sensitiveDomainSize) {
   const probs = [];
   for (let i = 0; i < sensitiveDomainSize; i++) {
