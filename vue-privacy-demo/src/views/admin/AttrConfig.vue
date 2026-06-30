@@ -2364,16 +2364,24 @@ function handleClearAllTaskIds() {
 }
 
 function createGeneratedTaskId(attribute) {
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-  const nameSlug = String(attribute?.algorithm || 'task').toUpperCase();
-  
-  // 生成两位有序序号
-  const todayTaskPrefix = `Task_${nameSlug}_${dateStr}_`;
-  const todayTasks = taskStore.taskList.filter(task => task.id.startsWith(todayTaskPrefix));
-  const sequenceNumber = todayTasks.length.toString().padStart(2, '0');
-  
-  return `${todayTaskPrefix}${sequenceNumber}`;
+  const protocolPrefix = String(attribute?.algorithm || 'PROTOCOL')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '') || 'PROTOCOL';
+  const protocolTaskPattern = new RegExp(`^${protocolPrefix}_(\\d+)$`, 'i');
+  const usedNumbers = new Set(
+    taskStore.taskList
+      .map(task => String(task.id || '').match(protocolTaskPattern)?.[1])
+      .filter(Boolean)
+      .map(value => Number(value))
+      .filter(value => Number.isInteger(value) && value > 0)
+  );
+
+  let nextSequence = 1;
+  while (usedNumbers.has(nextSequence)) {
+    nextSequence += 1;
+  }
+
+  return `${protocolPrefix}_${String(nextSequence).padStart(2, '0')}`;
 }
 
 function validateTaskId(taskIdValue) {
