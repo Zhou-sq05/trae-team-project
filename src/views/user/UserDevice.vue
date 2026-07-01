@@ -347,10 +347,11 @@
                 <div v-if="!tspParametersReady" class="preview-tip">
                   当前任务尚未在服务器端完成 TSP 参数保存，暂时无法执行两阶段本地扰动上报。
                 </div>
-                <div class="action-row">
-                  <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
-                    提交上报
-                  </el-button>
+                <div class="tsp-submit-state" :class="{ 'is-uploaded': tspHasUploadedCurrentSample }">
+                  {{ tspHasUploadedCurrentSample ? '成功上报' : '等待本地扰动上报' }}
+                </div>
+                <div class="preview-tip">
+                  {{ tspReportStatusText }}
                 </div>
               </div>
             </template>
@@ -435,8 +436,8 @@
                     v-if="['arr', 'agrr'].includes(currentTaskDetail?.scenario)"
                     type="primary"
                     plain
-                    @click="simulateCurrentTaskOnce"
-                    :disabled="currentTaskDetail?.scenario === 'agrr' ? !canRunAgrrPerturbation : !canRunSingleSimulation"
+                    @click="simulateSingleDemoPerturbation"
+                    :disabled="!canRunSingleDemoPerturbation"
                   >
                     扰动
                   </el-button>
@@ -451,13 +452,14 @@
 
               <div class="summary-block">
                 <div class="summary-heading">
-                  <h4>操作区</h4>
-                  <span class="section-tip">先执行扰动，再提交上报</span>
+                  <h4>结果上报</h4>
+                  <span class="section-tip">右侧仅展示演示结果，真实提交请使用左侧“本地扰动上报”</span>
                 </div>
-                <div class="action-row">
-                  <el-button type="success" @click="submitData" :loading="submitting" :disabled="!canSubmitCurrentTask">
-                    提交上报
-                  </el-button>
+                <div class="local-submit-state" :class="{ 'is-uploaded': singleHasUploadedCurrentSample }">
+                  {{ singleHasUploadedCurrentSample ? '成功上报' : '等待本地扰动上报' }}
+                </div>
+                <div class="preview-tip">
+                  {{ singleReportStatusText }}
                 </div>
               </div>
             </template>
@@ -1080,6 +1082,16 @@ const canSimulateAgrr = computed(() => (
   && Boolean(derivedStandBucket.value)
 ));
 const canRunAgrrPerturbation = computed(() => canSimulateAgrr.value && agrrEncodingRevealed.value);
+const canRunSingleDemoPerturbation = computed(() => {
+  if (systemStatus.value === 2) return false;
+  if (currentTaskDetail.value?.scenario === 'arr') {
+    return canSimulateArr.value;
+  }
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    return canRunAgrrPerturbation.value;
+  }
+  return false;
+});
 const canSimulateAoue = computed(() => (
   currentTaskDetail.value?.scenario === 'aoue'
   && formTouched.value
@@ -1104,16 +1116,16 @@ const canRunSingleSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
   if (submitting.value) return false;
   if (currentTaskDetail.value.scenario === 'arr') {
-    return canSimulateArr.value;
+    return canSimulateArr.value && systemStatus.value !== 2;
   }
   if (currentTaskDetail.value.scenario === 'agrr') {
-    return canSimulateAgrr.value;
+    return canSimulateAgrr.value && systemStatus.value !== 2;
   }
   if (currentTaskDetail.value.scenario === 'aoue') {
     return canSimulateAoue.value && systemStatus.value !== 2;
   }
   if (currentTaskDetail.value.scenario === 'tsp') {
-    return canSimulateTsp.value;
+    return canSimulateTsp.value && systemStatus.value !== 2;
   }
   return formTouched.value;
 });
@@ -1304,6 +1316,23 @@ const agrrResultCards = computed(() => [
   }
 ]);
 
+const singleHasUploadedCurrentSample = computed(() => (
+  ['arr', 'agrr'].includes(currentTaskDetail.value?.scenario)
+  && systemStatus.value === 2
+  && Boolean(currentSimulationResult.value)
+));
+const singleReportStatusText = computed(() => {
+  if (singleHasUploadedCurrentSample.value) {
+    return `已成功上报。右侧编码与扰动结果仅用于回放本次 ${currentTaskDetail.value?.protocol || ''} 本地扰动过程，不会再次提交数据。`;
+  }
+
+  if (currentSimulationResult.value) {
+    return `当前演示已生成扰动结果。点击左侧“本地扰动上报”后会将本次 ${currentTaskDetail.value?.protocol || ''} 扰动结果写入服务器端提交数据。`;
+  }
+
+  return '右侧仅用于演示编码与扰动结果；真实提交请使用左侧“本地扰动上报”。';
+});
+
 const aoueResultCards = computed(() => [
   {
     label: '初始编码向量',
@@ -1379,6 +1408,22 @@ const tspFinalReportCards = computed(() => [
   { label: '上报缺失状态', value: tspStageTwoReady.value ? tspSimulationResult.value?.reportMissingLabel || '--' : '--' },
   { label: '上报评分', value: tspStageTwoReady.value ? tspSimulationResult.value?.reportScoreDisplay ?? '--' : '--' }
 ]);
+const tspHasUploadedCurrentSample = computed(() => (
+  currentTaskDetail.value?.scenario === 'tsp'
+  && systemStatus.value === 2
+  && Boolean(tspSimulationResult.value)
+));
+const tspReportStatusText = computed(() => {
+  if (tspHasUploadedCurrentSample.value) {
+    return '已成功上报。右侧编码、第一阶段和第二阶段只用于回放本次 TSP 两阶段扰动过程，不会再次提交数据。';
+  }
+
+  if (tspStageTwoReady.value) {
+    return '当前演示已生成待上传扰动结果。点击左侧“本地扰动上报”后会将本次 TSP 扰动结果写入服务器端提交数据。';
+  }
+
+  return '右侧仅用于演示 TSP 编码与两阶段扰动过程；真实提交请使用左侧“本地扰动上报”。';
+});
 
 const aoueAnimationReady = computed(() => (
   currentTaskDetail.value?.scenario === 'aoue'
@@ -2674,15 +2719,36 @@ function simulateArrPerturbation(showMessage = true) {
     rawValue: dynamicForm.fallAlarm,
     rawLabel: dynamicForm.fallAlarm === 1 ? '触发提醒' : '未触发提醒'
   };
-  systemStatus.value = 1;
+  setSingleDemoStatus(1);
 
   if (showMessage) {
-    ElMessage.success('已完成一次 ARR 本地扰动上报');
+    ElMessage.success('已完成一次 ARR 本地扰动演示');
   }
 }
 
+function setSingleDemoStatus(status) {
+  if (['arr', 'agrr'].includes(currentTaskDetail.value?.scenario) && systemStatus.value === 2) {
+    return;
+  }
+
+  systemStatus.value = status;
+}
+
+function getPreparedArrResultForCurrentInput() {
+  if (!arrSimulationResult.value) {
+    return null;
+  }
+
+  return Number(arrSimulationResult.value.rawValue) === Number(dynamicForm.fallAlarm)
+    ? arrSimulationResult.value
+    : null;
+}
+
 function executeArrPerturbAndSubmit() {
-  simulateArrPerturbation(false);
+  arrEncodingRevealed.value = true;
+  if (!getPreparedArrResultForCurrentInput()) {
+    simulateArrPerturbation(false);
+  }
   if (!arrSimulationResult.value) {
     ElMessage.warning('请先完成填写，并确保服务器端已保存当前 ARR 参数');
     return;
@@ -2738,10 +2804,48 @@ function simulateAgrrPerturbation(showMessage = true) {
   }
 
   agrrSimulationResult.value = result;
-  systemStatus.value = 1;
+  setSingleDemoStatus(1);
 
   if (showMessage) {
-    ElMessage.success('已完成一次 AGRR 本地扰动上报');
+    ElMessage.success('已完成一次 AGRR 本地扰动演示');
+  }
+}
+
+function getPreparedAgrrResultForCurrentInput() {
+  if (!agrrSimulationResult.value) {
+    return null;
+  }
+
+  return Number(agrrSimulationResult.value.rawMinutes) === Number(dynamicForm.standMinutes)
+    ? agrrSimulationResult.value
+    : null;
+}
+
+function executeAgrrPerturbAndSubmit() {
+  agrrEncodingRevealed.value = true;
+  if (!getPreparedAgrrResultForCurrentInput()) {
+    simulateAgrrPerturbation(false);
+  }
+
+  if (!agrrSimulationResult.value) {
+    ElMessage.warning('请先填写原始分钟数，并确保服务器端已保存当前 AGRR 参数');
+    return;
+  }
+
+  submitData();
+}
+
+function simulateSingleDemoPerturbation() {
+  if (currentTaskDetail.value?.scenario === 'arr') {
+    arrEncodingRevealed.value = true;
+    activeDemoTab.value = 'single';
+    simulateArrPerturbation(true);
+    return;
+  }
+
+  if (currentTaskDetail.value?.scenario === 'agrr') {
+    activeDemoTab.value = 'single';
+    simulateAgrrPerturbation(true);
   }
 }
 
@@ -3208,11 +3312,49 @@ function simulateTspPerturbation(showMessage = true) {
   tspEncodingRevealed.value = true;
   tspStageOneReady.value = true;
   tspStageTwoReady.value = true;
-  systemStatus.value = 1;
+  setTspDemoStatus(1);
 
   if (showMessage) {
-    ElMessage.success('已完成一次 TSP 本地扰动上报');
+    ElMessage.success('已完成一次 TSP 两阶段扰动演示');
   }
+}
+
+function setTspDemoStatus(status) {
+  if (currentTaskDetail.value?.scenario === 'tsp' && systemStatus.value === 2) {
+    return;
+  }
+
+  systemStatus.value = status;
+}
+
+function getPreparedTspResultForCurrentInput() {
+  if (!tspSimulationResult.value || !tspStageTwoReady.value) {
+    return null;
+  }
+
+  const currentMissing = Number(dynamicForm.sleepMissing) === 1 ? 1 : 0;
+  const currentScore = currentMissing === 1 ? null : Number(dynamicForm.sleepScore);
+  const preparedMissing = Number(tspSimulationResult.value.rawMissing) === 1 ? 1 : 0;
+  const preparedScore = preparedMissing === 1 ? null : Number(tspSimulationResult.value.rawScore);
+
+  return currentMissing === preparedMissing && currentScore === preparedScore
+    ? tspSimulationResult.value
+    : null;
+}
+
+function submitTspLocalPerturbation() {
+  activeDemoTab.value = 'single';
+
+  if (!getPreparedTspResultForCurrentInput()) {
+    simulateTspPerturbation(false);
+  }
+
+  if (!tspSimulationResult.value || !tspStageTwoReady.value) {
+    ElMessage.warning('请先完成 TSP 输入，并确保服务器端已保存当前 TSP 参数');
+    return;
+  }
+
+  submitData();
 }
 
 function executeTspStageOne() {
@@ -3235,7 +3377,7 @@ function executeTspStageOne() {
   tspSimulationResult.value = result;
   tspStageOneReady.value = true;
   tspStageTwoReady.value = false;
-  systemStatus.value = 0;
+  setTspDemoStatus(0);
 
   if (result.stageOneSkipped) {
     ElMessage.info('当前样本为缺失记录，第一阶段跳过，请继续执行第二阶段扰动');
@@ -3257,14 +3399,13 @@ function executeTspStageTwo() {
   }
 
   tspStageTwoReady.value = true;
-  systemStatus.value = 1;
+  setTspDemoStatus(1);
   ElMessage.success('已完成第二阶段扰动');
 }
 
 function simulateCurrentTaskOnce() {
   if (currentTaskDetail.value?.scenario === 'tsp') {
-    activeDemoTab.value = 'single';
-    simulateTspPerturbation(true);
+    submitTspLocalPerturbation();
     return;
   }
 
@@ -3274,16 +3415,14 @@ function simulateCurrentTaskOnce() {
   }
 
   if (currentTaskDetail.value.scenario === 'arr') {
-    arrEncodingRevealed.value = true;
     activeDemoTab.value = 'single';
-    simulateArrPerturbation(true);
+    executeArrPerturbAndSubmit();
     return;
   }
 
   if (currentTaskDetail.value.scenario === 'agrr') {
-    agrrEncodingRevealed.value = true;
     activeDemoTab.value = 'single';
-    simulateAgrrPerturbation(true);
+    executeAgrrPerturbAndSubmit();
     return;
   }
 
@@ -4210,6 +4349,29 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.local-submit-state,
+.tsp-submit-state {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #f3d38a;
+  background: #fff8e8;
+  color: #a16207;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.local-submit-state.is-uploaded,
+.tsp-submit-state.is-uploaded {
+  border-color: #a7e0bc;
+  background: #edf9f1;
+  color: #15803d;
 }
 
 .tsp-final-value-card .card-value {
