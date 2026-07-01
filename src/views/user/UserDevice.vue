@@ -799,7 +799,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowDown, FullScreen } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
@@ -879,6 +879,9 @@ const aoueLogExpanded = ref(false);
 const aoueBatchLogExpanded = ref(false);
 const aoueExpandedVisible = ref(false);
 const aoueBatchExpandedVisible = ref(false);
+const aoueManualSegmentRunning = ref(false);
+const aoueManualSegmentRunId = ref(0);
+const suppressDynamicFormWatcher = ref(false);
 const batchSimulationCount = ref(200);
 const batchSimulationRunning = ref(false);
 const activeDemoTab = ref('single');
@@ -1099,6 +1102,7 @@ const canRunTspStageTwo = computed(() => (
 ));
 const canRunSingleSimulation = computed(() => {
   if (!currentTaskDetail.value) return false;
+  if (submitting.value) return false;
   if (currentTaskDetail.value.scenario === 'arr') {
     return canSimulateArr.value;
   }
@@ -1106,7 +1110,7 @@ const canRunSingleSimulation = computed(() => {
     return canSimulateAgrr.value;
   }
   if (currentTaskDetail.value.scenario === 'aoue') {
-    return canSimulateAoue.value;
+    return canSimulateAoue.value && systemStatus.value !== 2;
   }
   if (currentTaskDetail.value.scenario === 'tsp') {
     return canSimulateTsp.value;
@@ -1153,7 +1157,7 @@ const canSubmitCurrentTask = computed(() => {
     return Boolean(agrrSimulationResult.value);
   }
   if (currentTaskDetail.value.scenario === 'aoue') {
-    return Boolean(aoueSimulationResult.value) && aoueAnimationStage.value === 'done';
+    return Boolean(aoueSimulationResult.value);
   }
   if (currentTaskDetail.value.scenario === 'tsp') {
     return Boolean(tspSimulationResult.value) && tspStageTwoReady.value;
@@ -1459,7 +1463,7 @@ const aouePlayModeText = computed(() => {
   const labelMap = {
     idle: '未选择播放模式',
     auto: aoueAnimationPaused.value ? '自动播放已暂停' : '自动播放',
-    manual: '手动模式'
+    manual: '手动播放'
   };
   return labelMap[aouePlayMode.value] || '未选择播放模式';
 });
@@ -1515,7 +1519,7 @@ const aoueOverviewTypeText = computed(() => {
   }
 
   if (aoueAnimationStage.value === 'idle') {
-    return '等待选择播放模式';
+    return '等待演示操作';
   }
 
   if (aoueAnimationStage.value === 'bucketing') {
@@ -1544,11 +1548,11 @@ const aoueOverviewTypeText = computed(() => {
 
 const aoueOverviewVectorNoteText = computed(() => {
   if (!aoueAnimationReady.value) {
-    return '先采集一条手环数据，再选择自动播放或手动模式。';
+    return '先采集一条手环数据。点击左侧“本地扰动上报”会自动演示；右侧也可以按协议步骤分段演示。';
   }
 
   if (aoueAnimationStage.value === 'idle') {
-    return '当前演示保持静止，等待你选择“自动播放”或“手动模式”。';
+    return '当前演示保持静止，可以点击左侧“本地扰动上报”自动演示，或在右侧按“编码、逐位扰动、生成上报向量”分步演示。';
   }
 
   if (aoueAnimationStage.value === 'bucketing') {
@@ -1651,11 +1655,11 @@ const aoueCurrentDetailTitle = computed(() => {
 
 const aoueVectorDetailText = computed(() => {
   if (!aoueAnimationReady.value) {
-    return '点击左侧“本地扰动上报”或“采集手环数据”后，会先准备当前采集值，但不会自动播放。';
+    return '点击左侧“采集手环数据”后，会先准备当前采集值；点击“本地扰动上报”会提交并自动播放演示。';
   }
 
   if (aoueAnimationStage.value === 'idle') {
-    return '当前样例已准备完成。请选择“自动播放”完整演示，或进入“手动模式”逐步推进。';
+    return '当前样例已准备完成。点击左侧“本地扰动上报”会自动播放完整演示，也可以用右侧三个按钮分步推进。';
   }
 
   if (aoueAnimationStage.value === 'bucketing') {
@@ -1782,6 +1786,50 @@ const aoueCanStepManually = computed(() => (
 ));
 
 const aoueCanResetDemo = computed(() => aoueAnimationReady.value);
+const aoueEncodingDemoReady = computed(() => (
+  aoueAnimationReady.value
+  && aouePlayMode.value !== 'auto'
+  && !aoueManualSegmentRunning.value
+  && (
+    ['idle', 'bucketing'].includes(aoueAnimationStage.value)
+    || (aoueAnimationStage.value === 'encoding' && aoueEncodingStepIndex.value < 2)
+  )
+));
+const aoueEncodingCompleted = computed(() => (
+  ['perturbing', 'done'].includes(aoueAnimationStage.value)
+  || (aoueAnimationStage.value === 'encoding' && aoueEncodingStepIndex.value >= 2)
+));
+const aoueCanRunPerturbationDemo = computed(() => (
+  aoueAnimationReady.value
+  && aouePlayMode.value !== 'auto'
+  && !aoueManualSegmentRunning.value
+  && aoueEncodingCompleted.value
+  && aoueAnimationStage.value !== 'done'
+  && !aoueHasCompletedPerturbation.value
+));
+const aoueCanGenerateReportVector = computed(() => (
+  aoueAnimationReady.value
+  && aouePlayMode.value !== 'auto'
+  && !aoueManualSegmentRunning.value
+  && aoueHasCompletedPerturbation.value
+  && aoueAnimationStage.value !== 'done'
+));
+const aoueHasUploadedCurrentSample = computed(() => (
+  currentTaskDetail.value?.scenario === 'aoue'
+  && systemStatus.value === 2
+  && Boolean(aoueSimulationResult.value)
+));
+const aoueReportStatusText = computed(() => {
+  if (aoueHasUploadedCurrentSample.value) {
+    return '已成功上报。右侧自动演示和分步演示只用于回放本次 AOUE 分桶、编码与逐位扰动过程，不会再次提交数据。';
+  }
+
+  if (aoueAnimationReady.value) {
+    return '当前样例已准备完成。点击左侧“本地扰动上报”后会立即写入服务器端提交数据，并自动播放右侧演示流程。';
+  }
+
+  return '请先点击左侧“采集手环数据”准备 AOUE 样例，再使用右侧演示按钮查看流程。';
+});
 
 function openAoueExpandedDialog() {
   aoueExpandedVisible.value = true;
@@ -1812,7 +1860,6 @@ const aoueDemoViewModel = computed(() => ({
   currentDisplayStep: aoueCurrentDisplayStep.value,
   currentDetailTitle: aoueCurrentDetailTitle.value,
   vectorDetailText: aoueVectorDetailText.value,
-  canGenerateSample: canRunSingleSimulation.value,
   canRunSingleSimulation: canRunSingleSimulation.value,
   canStartAuto: aoueCanStartAuto.value,
   canStartManual: aoueCanStartManual.value,
@@ -1820,17 +1867,24 @@ const aoueDemoViewModel = computed(() => ({
   canResumeAuto: aoueCanResumeAuto.value,
   autoButtonText: aoueAutoButtonText.value,
   canStepManually: aoueCanStepManually.value,
+  canRunEncoding: aoueEncodingDemoReady.value,
+  canRunPerturbation: aoueCanRunPerturbationDemo.value,
+  canGenerateReportVector: aoueCanGenerateReportVector.value,
   canResetDemo: aoueCanResetDemo.value,
   canSubmitCurrentTask: canSubmitCurrentTask.value,
+  hasUploadedCurrentSample: aoueHasUploadedCurrentSample.value,
+  reportStatusText: aoueReportStatusText.value,
   submitting: submitting.value,
   logToggleText: aoueLogToggleText.value,
   visibleLogRows: aoueVisibleLogRows.value,
-  onGenerate: replayAoueAnimation,
   onStartAuto: startAoueAutoMode,
   onStartManual: startAoueManualMode,
   onPause: pauseAoueAutoPlayback,
   onResumeAuto: resumeAoueAutoMode,
   onNext: handleAoueNextBit,
+  onRunEncoding: runAoueEncodingDemo,
+  onRunPerturbation: runAouePerturbationDemo,
+  onGenerateReportVector: generateAoueReportVectorDemo,
   onReset: resetPreparedAoueDemo,
   onSubmit: submitData,
   onToggleLog: toggleAoueLogPanel,
@@ -2340,7 +2394,7 @@ watch(currentTaskDetail, detail => {
 watch(
   () => ({ ...dynamicForm }),
   () => {
-    if (!currentTaskDetail.value || !formTouched.value) {
+    if (!currentTaskDetail.value || !formTouched.value || suppressDynamicFormWatcher.value) {
       return;
     }
 
@@ -2394,6 +2448,8 @@ function resetDynamicForm() {
 }
 
 function clearSimulationState() {
+  aoueManualSegmentRunId.value += 1;
+  aoueManualSegmentRunning.value = false;
   arrEncodingRevealed.value = false;
   agrrEncodingRevealed.value = false;
   tspEncodingRevealed.value = false;
@@ -2498,30 +2554,37 @@ async function refreshData() {
     return;
   }
 
-  switch (currentTaskDetail.value.scenario) {
-    case 'arr':
-      dynamicForm.fallAlarm = exampleInput.fallAlarm ?? 0;
-      break;
-    case 'agrr':
-      dynamicForm.standMinutes = exampleInput.standMinutes ?? null;
-      break;
-    case 'aoue':
-      dynamicForm.dailySteps = exampleInput.dailySteps ?? null;
-      break;
-    case 'tsp':
-      dynamicForm.sleepMissing = exampleInput.sleepMissing ?? 0;
-      dynamicForm.sleepScore = exampleInput.sleepScore ?? null;
-      break;
-  }
+  suppressDynamicFormWatcher.value = true;
 
-  formTouched.value = true;
-  systemStatus.value = 0;
-  // 采集只刷新原始输入，扰动必须由用户显式触发。
-  activeDemoTab.value = 'single';
-  clearSimulationState();
-  batchUploadState.value = null;
-  if (currentTaskDetail.value.scenario === 'aoue' && aoueParametersReady.value) {
-    simulateAouePerturbation(false);
+  try {
+    switch (currentTaskDetail.value.scenario) {
+      case 'arr':
+        dynamicForm.fallAlarm = exampleInput.fallAlarm ?? 0;
+        break;
+      case 'agrr':
+        dynamicForm.standMinutes = exampleInput.standMinutes ?? null;
+        break;
+      case 'aoue':
+        dynamicForm.dailySteps = exampleInput.dailySteps ?? null;
+        break;
+      case 'tsp':
+        dynamicForm.sleepMissing = exampleInput.sleepMissing ?? 0;
+        dynamicForm.sleepScore = exampleInput.sleepScore ?? null;
+        break;
+    }
+
+    formTouched.value = true;
+    systemStatus.value = 0;
+    // 采集只刷新原始输入，扰动必须由用户显式触发。
+    activeDemoTab.value = 'single';
+    clearSimulationState();
+    batchUploadState.value = null;
+    if (currentTaskDetail.value.scenario === 'aoue' && aoueParametersReady.value) {
+      simulateAouePerturbation(false);
+    }
+    await nextTick();
+  } finally {
+    suppressDynamicFormWatcher.value = false;
   }
   ElMessage.success('已采集当前任务的一条手环数据');
 }
@@ -2738,7 +2801,47 @@ function prepareAoueDemo(showMessage = true) {
   return result;
 }
 
+function setAoueDemoStatus(status) {
+  if (currentTaskDetail.value?.scenario === 'aoue' && systemStatus.value === 2) {
+    return;
+  }
+
+  systemStatus.value = status;
+}
+
+function getPreparedAoueResultForCurrentInput() {
+  if (!aoueSimulationResult.value) {
+    return null;
+  }
+
+  const currentSteps = Number(dynamicForm.dailySteps);
+  const preparedSteps = Number(aoueSimulationResult.value.rawSteps);
+  return Number.isFinite(currentSteps) && preparedSteps === currentSteps
+    ? aoueSimulationResult.value
+    : null;
+}
+
+function submitAoueLocalPerturbation() {
+  activeDemoTab.value = 'single';
+  aoueManualSegmentRunId.value += 1;
+  aoueManualSegmentRunning.value = false;
+
+  const result = getPreparedAoueResultForCurrentInput() || prepareAoueDemo(false);
+  if (!result) {
+    ElMessage.warning('请先填写每日步数，并确保服务器端已保存当前 AOUE 参数');
+    return;
+  }
+
+  aoueSimulationResult.value = result;
+  prepareAoueAnimation(result);
+  submitData();
+  startAoueAutoMode();
+}
+
 async function startAoueAutoMode() {
+  aoueManualSegmentRunId.value += 1;
+  aoueManualSegmentRunning.value = false;
+
   if (!aoueAnimationReady.value) {
     const prepared = prepareAoueDemo(true);
     if (!prepared) {
@@ -2749,7 +2852,7 @@ async function startAoueAutoMode() {
   activeDemoTab.value = 'single';
   const finished = await startAoueAutoPlayback();
   if (finished) {
-    systemStatus.value = 1;
+    setAoueDemoStatus(1);
   }
 }
 
@@ -2765,15 +2868,133 @@ function startAoueManualMode() {
   startAoueManualPlayback();
 }
 
+function ensureAoueManualDemoReady() {
+  if (aoueManualSegmentRunning.value) {
+    return false;
+  }
+
+  if (!aoueAnimationReady.value) {
+    const prepared = prepareAoueDemo(true);
+    if (!prepared) {
+      return false;
+    }
+  }
+
+  if (aouePlayMode.value === 'auto') {
+    ElMessage.info('当前正在自动演示中，请等待结束或重置后再手动演示');
+    return false;
+  }
+
+  activeDemoTab.value = 'single';
+  if (aouePlayMode.value !== 'manual') {
+    startAoueManualPlayback();
+  }
+
+  return true;
+}
+
+function getAoueSegmentDelay() {
+  return aoueAnimationStage.value === 'perturbing'
+    ? aoueStepDelayMs.value
+    : Math.max(220, Math.round(520 * 0.9));
+}
+
+async function animateAoueSegment(shouldContinue, onComplete = null) {
+  const token = ++aoueManualSegmentRunId.value;
+  aoueManualSegmentRunning.value = true;
+
+  try {
+    while (token === aoueManualSegmentRunId.value && shouldContinue()) {
+      const executed = advanceAoueDemo();
+      if (!executed) {
+        break;
+      }
+
+      await waitForUiFrame(getAoueSegmentDelay());
+    }
+
+    if (token === aoueManualSegmentRunId.value && typeof onComplete === 'function') {
+      onComplete();
+    }
+  } finally {
+    if (token === aoueManualSegmentRunId.value) {
+      aoueManualSegmentRunning.value = false;
+    }
+  }
+}
+
+async function runAoueEncodingDemo() {
+  if (!ensureAoueManualDemoReady()) {
+    return;
+  }
+
+  if (!aoueEncodingDemoReady.value) {
+    ElMessage.info('当前样例已经完成编码');
+    return;
+  }
+
+  await animateAoueSegment(() => (
+    ['idle', 'bucketing'].includes(aoueAnimationStage.value)
+    || (aoueAnimationStage.value === 'encoding' && aoueEncodingStepIndex.value < 2)
+  ));
+}
+
+async function runAouePerturbationDemo() {
+  if (!ensureAoueManualDemoReady()) {
+    return;
+  }
+
+  if (!aoueEncodingCompleted.value) {
+    ElMessage.warning('请先点击“编码”生成初始编码向量');
+    return;
+  }
+
+  if (aoueHasCompletedPerturbation.value) {
+    ElMessage.info('当前样例已经完成逐位扰动');
+    return;
+  }
+
+  await animateAoueSegment(() => (
+    aoueAnimationStage.value !== 'done' && !aoueHasCompletedPerturbation.value
+  ));
+}
+
+async function generateAoueReportVectorDemo() {
+  if (!ensureAoueManualDemoReady()) {
+    return;
+  }
+
+  if (!aoueHasCompletedPerturbation.value) {
+    ElMessage.warning('请先点击“逐位扰动”完成所有 bit 扰动');
+    return;
+  }
+
+  if (aoueAnimationStage.value === 'done') {
+    ElMessage.info('当前样例已经生成上报向量');
+    return;
+  }
+
+  await animateAoueSegment(
+    () => aoueAnimationStage.value !== 'done',
+    () => {
+      if (aoueAnimationStage.value === 'done') {
+        setAoueDemoStatus(1);
+      }
+    }
+  );
+}
+
 function resetPreparedAoueDemo(showMessage = false) {
   if (!aoueAnimationReady.value) {
     return;
   }
 
+  aoueManualSegmentRunId.value += 1;
+  aoueManualSegmentRunning.value = false;
   resetAoueDemoProgress();
-  systemStatus.value = 0;
+  setAoueDemoStatus(0);
   if (showMessage) {
-    ElMessage.info('已重置本次 AOUE 演示，可重新选择自动播放或手动模式');
+    ElMessage.info('已重置本次 AOUE 演示，可点击左侧上报自动播放，或使用右侧分步演示');
   }
 }
 
@@ -2784,13 +3005,13 @@ async function resumeAoueAutoMode() {
 
   const finished = await resumeAoueAutoPlayback();
   if (finished) {
-    systemStatus.value = 1;
+    setAoueDemoStatus(1);
   }
 }
 
 function pauseAoueAutoPlayback() {
   if (pauseAouePlayback()) {
-    systemStatus.value = 0;
+    setAoueDemoStatus(0);
   }
 }
 
@@ -2801,7 +3022,7 @@ function simulateAouePerturbation(showMessage = true) {
   }
 
   if (showMessage) {
-    ElMessage.success('已采集 AOUE 手环数据，请选择自动播放或手动模式开始');
+    ElMessage.success('已采集 AOUE 手环数据，可点击左侧本地扰动上报自动播放，或在右侧分步演示');
   }
 }
 
@@ -2835,7 +3056,7 @@ function handleAoueNextBit() {
   }
 
   if (aoueAnimationStage.value === 'done') {
-    systemStatus.value = 1;
+    setAoueDemoStatus(1);
   }
 }
 
@@ -3068,7 +3289,7 @@ function simulateCurrentTaskOnce() {
 
   if (currentTaskDetail.value.scenario === 'aoue') {
     activeDemoTab.value = 'single';
-    simulateAouePerturbation(true);
+    submitAoueLocalPerturbation();
     return;
   }
 
@@ -3580,7 +3801,6 @@ function submitData() {
 
   setTimeout(() => {
     submitting.value = false;
-    systemStatus.value = 2;
 
     try {
       const uploadTime = new Date().toISOString();
@@ -3714,6 +3934,7 @@ function submitData() {
         }
       };
       appendSubmissionRecords([record]);
+      systemStatus.value = 2;
       ElMessage.success('当前任务扰动结果已提交上报');
     } catch (error) {
       console.error('保存用户端采集数据失败:', error);

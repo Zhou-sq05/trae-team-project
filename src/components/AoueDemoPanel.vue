@@ -94,36 +94,23 @@
         </div>
 
         <div class="aoue-control-card">
-          <div class="aoue-side-card__eyebrow">播放控制</div>
+          <div class="aoue-side-card__eyebrow">演示控制</div>
           <div class="aoue-control-actions">
-            <template v-if="demo.playMode === 'idle'">
-              <el-button type="primary" size="large" @click="demo.onStartAuto" :disabled="!demo.canStartAuto">
-                自动播放
-              </el-button>
-              <el-button type="warning" plain @click="demo.onStartManual" :disabled="!demo.canStartManual">
-                手动模式
-              </el-button>
-              <el-button plain @click="demo.onGenerate" :disabled="!demo.canGenerateSample">
-                重新生成一次样例
-              </el-button>
-            </template>
-            <template v-else-if="demo.playMode === 'auto'">
-              <el-button v-if="demo.canPauseAuto" type="primary" plain @click="demo.onPause">
-                暂停自动播放
-              </el-button>
-              <el-button v-if="demo.canResumeAuto" type="primary" @click="demo.onResumeAuto">
-                继续自动播放
-              </el-button>
+            <template v-if="demo.playMode === 'auto'">
+              <div class="aoue-control-status">左侧上报后自动演示中</div>
               <el-button plain @click="demo.onReset" :disabled="!demo.canResetDemo">
                 重置本次演示
               </el-button>
             </template>
             <template v-else>
-              <el-button type="warning" @click="demo.onNext" :disabled="!demo.canStepManually">
-                下一步
+              <el-button type="primary" plain @click="demo.onRunEncoding" :disabled="!demo.canRunEncoding">
+                编码
               </el-button>
-              <el-button type="primary" plain @click="demo.onResumeAuto" :disabled="!demo.canResumeAuto">
-                切换为自动播放
+              <el-button type="warning" plain @click="demo.onRunPerturbation" :disabled="!demo.canRunPerturbation">
+                逐位扰动
+              </el-button>
+              <el-button type="success" plain @click="demo.onGenerateReportVector" :disabled="!demo.canGenerateReportVector">
+                生成上报向量
               </el-button>
               <el-button plain @click="demo.onReset" :disabled="!demo.canResetDemo">
                 重置本次演示
@@ -134,10 +121,13 @@
 
         <div class="aoue-submit-card">
           <div class="aoue-side-card__eyebrow">结果上报</div>
-          <div class="aoue-side-card__body">只有完整演示结束后，页面上的最终向量才会作为这次 AOUE 上报结果。</div>
-          <el-button type="success" size="large" @click="demo.onSubmit" :loading="demo.submitting" :disabled="!demo.canSubmitCurrentTask">
-            提交上报
-          </el-button>
+          <div
+            class="aoue-submit-state"
+            :class="{ 'is-uploaded': demo.hasUploadedCurrentSample }"
+          >
+            {{ demo.hasUploadedCurrentSample ? '成功上报' : '等待本地扰动上报' }}
+          </div>
+          <div class="aoue-side-card__body">{{ demo.reportStatusText }}</div>
         </div>
       </div>
     </div>
@@ -494,11 +484,43 @@ defineProps({
   color: #5f6b7a;
 }
 
+.aoue-submit-state {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #f3d38a;
+  background: #fff8e8;
+  color: #a16207;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.aoue-submit-state.is-uploaded {
+  border-color: #a7e0bc;
+  background: #edf9f1;
+  color: #15803d;
+}
+
 .aoue-control-actions {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.aoue-control-status {
+  min-height: 38px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .aoue-control-actions :deep(.el-button) {
